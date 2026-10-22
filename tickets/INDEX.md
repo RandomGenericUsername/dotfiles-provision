@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- [REQ-001-repo-birth](./REQ-001-repo-birth/ticket.md) — Birth the dotfiles-provision engine (mu-strict) with the composition seam and v0.1.0 | `in-progress` | openspec: repo-birth
+(none)
 
 ## Bugs
 
@@ -30,4 +30,4 @@
 
 ## Done (links only, newest last)
 
-(none)
+- [REQ-001-repo-birth](./REQ-001-repo-birth/ticket.md) — Birth the dotfiles-provision engine (mu-strict) with the composition seam and v0.1.0 | `done` | openspec: repo-birth (validated strictly)

@@ -2,7 +2,7 @@
 id: REQ-001
 title: "Birth the dotfiles-provision engine (mu-strict) with the composition seam and cut v0.1.0"
 kind: requirement
-status: in-progress
+status: done
 lane: 3
 links:
   openspec: repo-birth
@@ -82,14 +82,30 @@ at closeout time.
 | Claim | Command | Result |
 | --- | --- | --- |
 | Repo is public | `gh api repos/RandomGenericUsername/dotfiles-provision --jq .private` | `false`, exit 0 |
-| Harness byte-identical | `diff -r /home/inumaki/Development/mu/<path> <path>` for the eight copied paths | empty output, exit 0 for all eight |
-| Seam guard | `uv run pytest -q tests/unit/test_composition_seam.py` | see closeout |
-| Gates (local clone) | `make sync && make gates` | see closeout |
-| Hermetic | `make hermetic` | see closeout |
-| Lock current | `uv lock --check` | see closeout |
-| Build | `uv build` | see closeout |
-| Specs valid | `openspec validate --all --strict` | see closeout |
-| Workflow ↔ Makefile parity | `make ci-gates-parity` | see closeout |
-| Tag object / peeled commit | `git rev-parse v0.1.0`; `git rev-parse 'v0.1.0^{commit}'` | see closeout |
-| CI | `gh run list -R RandomGenericUsername/dotfiles-provision --limit 1` | see closeout |
-| `dotfiles-v3` untouched | `git -C /home/inumaki/Development/dotfiles/dotfiles-v3 status --porcelain` | see closeout |
+| Harness byte-identical | `diff -r /home/inumaki/Development/mu/<path> <path>` for the eight copied paths | empty output, exit 0 for all eight (`scripts/worktree-guard.sh`, `skills-lock.json`, `_bmad`, `.agents/skills`, `.opencode`, `tickets/_template`, `tickets/_fixtures`, `tickets/LIFECYCLE.md`) |
+| Seam guard | `uv run pytest -q tests/unit/test_composition_seam.py` | `12 passed in 0.95s`, exit 0 |
+| Gates (local clone) | `make sync && make gates` | test `953 passed, 3 skipped, 53 deselected in 846.69s`; lint `All checks passed!`; hermetic `921 passed, 35 skipped, 53 deselected in 577.91s`; `uv lock --check` → `Resolved 33 packages in 2ms`; docs-check silent → exit `0` (log: `/tmp/opencode/gates2.log`, `EXIT=0`) |
+| Hermetic separately | `make hermetic` | covered by the gates run above: exit 0 from an unrelated cwd with empty `HOME`/`XDG_*`; 35 corpus/spine-dependent cases skip with their stated reason (never vacuous) |
+| Lock current | `uv lock --check` | `Resolved 33 packages in 2ms`, exit 0 |
+| Build | `uv build` | `Successfully built dist/dotfiles_provision-0.1.0.tar.gz` + `dotfiles_provision-0.1.0-py3-none-any.whl`, exit 0 |
+| Specs valid | `openspec validate --all --strict` | `✓ change/repo-birth`, `✓ spec/repo-harness`, `Totals: 2 passed, 0 failed (2 items)`, exit 0 |
+| Workflow ↔ Makefile parity | `make ci-gates-parity` | `PASS gates=['docs-check', 'hermetic', 'lint', 'lock-check', 'test'] jobs=['ci-gates-parity', 'docs-check', 'hermetic', 'lint', 'lock-check', 'release', 'test'] exempt=['ci-gates-parity', 'release']`, exit 0 |
+| Tag object / peeled commit | `git rev-parse v0.1.0`; `git rev-parse 'v0.1.0^{commit}'`; `git cat-file -t v0.1.0` | `954beada233b5166f6a5ddc466a37891deda6299`; `e1a6f099a25e77ce61701f26062ef1ea9f218491`; `tag` (annotated) |
+| Tag is anonymously fetchable | `GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote https://github.com/RandomGenericUsername/dotfiles-provision 'refs/tags/v0.1.0'` | `954bead…	refs/tags/v0.1.0` — exactly one line, exit 0 |
+| Release carries both artifacts | `gh release view v0.1.0 -R RandomGenericUsername/dotfiles-provision --json assets --jq '.assets[].name'` | `dotfiles_provision-0.1.0-py3-none-any.whl`, `dotfiles_provision-0.1.0.tar.gz` |
+| Main CI run is green | `gh run view 39857016656 --json status,conclusion,jobs` | `completed` / `success`; `test`, `lint`, `hermetic`, `lock-check`, `docs-check`, `ci-gates-parity` all `success`; `release` `skipped` (not a tag) |
+| Tag CI run is green including release | `gh run view 39857028924 --json status,conclusion,jobs` | `completed` / `success`; all six gate jobs `success` and `release` `success` |
+| Cross-checkout proof (real composition) | `XDG_DATA_HOME=/home/inumaki/.local/share uv run --frozen dotfiles-provision --output-format json --manifests-dir /home/inumaki/Development/dotfiles/dotfiles-v3/dotfiles/provisioning --composition-root /home/inumaki/Development/dotfiles/dotfiles-v3 --inventory /home/inumaki/Development/dotfiles/dotfiles-v3/src/provisioning/ansible/inventory/localhost.yaml verify` | exit `0`; `"success": true`, `"install_dir": "/home/inumaki/.local/share/dotfiles"`, PLAY RECAP `ok=177 changed=0 failed=0` — read-only |
+| Cross-checkout proof (btop reads `composition_root`) | `env ANSIBLE_CONFIG=$PWD/ansible/ansible.cfg uv run --frozen ansible-playbook -i ansible/inventory/localhost.yaml --check -e install_dir=/home/inumaki/.local/share/dotfiles -e os_family=arch -e manifests_dir=/home/inumaki/Development/dotfiles/dotfiles-v3/dotfiles/provisioning -e composition_root=/home/inumaki/Development/dotfiles/dotfiles-v3 ansible/playbooks/btop-config.yaml` | exit `0`; task `Read the repo-owned active-theme setting` ok, `Render btop.conf` ok; PLAY RECAP `ok=8 changed=0 failed=0` |
+| `dotfiles-v3` untouched | `git -C /home/inumaki/Development/dotfiles/dotfiles-v3 status --porcelain`; `git rev-parse HEAD` | `0` lines; `854bac0844e56655f9dada1f3f7487d5d341f2ac` |
+
+Slice commits (oldest first; both are on `main` and the tag):
+
+| Commit | Subject |
+| --- | --- |
+| `e11daa4` | `feat(seam): make the composition seam the only path source (AD-17)` |
+| `e1a6f09` | `chore(repo): add the birth essentials — harness, CI, packaging, license` |
+
+The first commit is the seam implementation (roles, CLI, extra-vars, moved tests, seam guard);
+the second is the mu-strict birth (tickets, OpenSpec, Makefile/CI, license/docs, packaging). The
+closeout record was committed after the tag so `v0.1.0` stays on the tested release commit.
