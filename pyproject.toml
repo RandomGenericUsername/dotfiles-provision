@@ -2,6 +2,9 @@
 name = "dotfiles-provision"
 version = "0.1.0"
 description = "Machine provisioning orchestrator for the dotfiles system (plan/apply/verify/bootstrap via Ansible)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.12",
@@ -10,16 +13,33 @@ dependencies = [
     "ansible-core>=2.16",
     "PyYAML>=6.0",
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
 
 [project.scripts]
 dotfiles-provision = "provisioning.cli.main:app"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/provisioning"]
+
+# The harness trees (.agents/, _bmad/, .opencode/, openspec/, tickets/, .github/)
+# are not release content. `ansible/` IS included: it is the engine the CLI runs,
+# and the sdist is the source-installable form of that engine.
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "pyproject.toml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "ansible",
+    "src/provisioning",
+    "tests",
+]
 
 [tool.uv.sources]
 cli-output = { git = "https://github.com/RandomGenericUsername/cli-output", tag = "v0.1.0" }
@@ -39,6 +59,11 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B"]
 ignore = ["B905"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test bodies carry long single-line fixture payloads and failure messages that
+# read better unwrapped; production code stays at the 100-column limit.
+"tests/**" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

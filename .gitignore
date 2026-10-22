@@ -2,8 +2,10 @@
 .venv/
 __pycache__/
 *.pyc
+# test / lint caches + pinned ansible collections
 .pytest_cache/
 .ruff_cache/
+.collections/
 .mypy_cache/
 
 # build / release
