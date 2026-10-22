@@ -19,7 +19,7 @@ set -uo pipefail
 INSTANCE="btop-theme-studio"
 WINDOW="btop-theme-studio-window"
 DIR="${HOME}/.config/ags-btop-studio"
-REPO_ROOT="{{ cli_tools_repo_root }}"
+REPO_ROOT="{{ cli_tools_composition_root }}"
 
 if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
     if timeout 8 ags toggle "$WINDOW" -i "$INSTANCE" 2>/dev/null; then

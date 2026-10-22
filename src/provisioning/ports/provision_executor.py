@@ -1,9 +1,10 @@
 """Port abstraction for provisioning execution.
 
 ``IProvisionExecutor`` abstracts ``ansible-playbook``: run a playbook in plan
-mode (``check=True``) or apply mode (``check=False``), passing the seam
-extra-vars keys ``install_dir`` and ``os_family``. Concrete adapters live in
-``provisioning.adapters`` (Story 1.5).
+mode (``check=True``) or apply mode (``check=False``), passing the four seam
+extra-vars keys ``install_dir``, ``os_family``, ``manifests_dir`` and
+``composition_root``. Concrete adapters live in ``provisioning.adapters``
+(Story 1.5; the composition seam is AD-17).
 """
 
 from __future__ import annotations

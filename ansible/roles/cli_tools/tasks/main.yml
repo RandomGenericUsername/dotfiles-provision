@@ -17,6 +17,18 @@
 # - User-scoped privilege context: NO become/become_user anywhere. Running as
 #   root would install into /root/.local/bin and AC 3 would be silently false.
 
+- name: Assert composition seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined and manifests_dir | trim | length > 0
+      - composition_root is defined and composition_root | trim | length > 0
+    fail_msg: >-
+      manifests_dir and composition_root are undefined or empty — this role
+      reads composition-owned files (dotfiles/provisioning/scripts/ and
+      src/runtime/). The engine CLI resolves them from --manifests-dir /
+      --composition-root; direct runs pass -e manifests_dir=... -e
+      composition_root=...
+
 - name: Check for uv
   ansible.builtin.shell: command -v uv
   register: uv_check
@@ -38,7 +50,7 @@
 
 - name: Install the Hyprland session plugin activator
   ansible.builtin.copy:
-    src: "{{ cli_tools_repo_root }}/dotfiles/provisioning/scripts/gloview-activate"
+    src: "{{ cli_tools_manifests_dir }}/scripts/gloview-activate"
     dest: "{{ cli_tools_bin_dir }}/gloview-activate"
     mode: "0755"
     remote_src: true
@@ -182,7 +194,7 @@
   when: not ansible_check_mode
 
 - name: Install source-path CLIs via uv tool install
-  ansible.builtin.command: "uv tool install --no-cache '{{ cli_tools_repo_root }}/{{ item.source }}'"
+  ansible.builtin.command: "uv tool install --no-cache '{{ cli_tools_composition_root }}/{{ item.source }}'"
   args:
     creates: "{{ cli_tools_bin_dir }}/{{ item.name }}"
   environment:
@@ -205,7 +217,7 @@
 # every-run re-pin from their checkout (the install task above already uses
 # --force, so a pin bump re-installs instead of being masked by `creates`).
 - name: Upgrade source-path CLI tool envs from current repo source
-  ansible.builtin.command: "uv tool install --force --no-cache '{{ cli_tools_repo_root }}/{{ item.source }}'"
+  ansible.builtin.command: "uv tool install --force --no-cache '{{ cli_tools_composition_root }}/{{ item.source }}'"
   environment:
     UV_TOOL_BIN_DIR: "{{ cli_tools_bin_dir }}"
   loop: "{{ cli_tools_source_entries }}"
@@ -480,7 +492,7 @@
       - --container-engine
       - "{{ container_runtime_engine }}"
       - --context
-      - "{{ cli_tools_repo_root }}/{{ item.source }}"
+      - "{{ cli_tools_composition_root }}/{{ item.source }}"
   loop: "{{ cli_tools_image_builds | rejectattr('tag', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"

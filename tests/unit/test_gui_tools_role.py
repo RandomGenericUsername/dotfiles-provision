@@ -15,6 +15,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import composition_root
+
 
 def _find_ansible_dir() -> Path:
     for parent in Path(__file__).resolve().parents:
@@ -29,8 +31,9 @@ def _find_ansible_dir() -> Path:
 
 _ANSIBLE_DIR = _find_ansible_dir()
 _ROLES_DIR = _ANSIBLE_DIR / "roles" / "gui_tools"
-# _ANSIBLE_DIR is <repo>/src/provisioning/ansible → repo root is 3 up.
-_REPO_ROOT = _ANSIBLE_DIR.parent.parent.parent
+# The manifest/paths this module asserts against live in the COMPOSITION
+# checkout (fixture unless DOTFILES_COMPOSITION_ROOT is set).
+_REPO_ROOT = composition_root()
 
 
 def _assets_configs_file(relative: str) -> Path | None:
@@ -219,7 +222,6 @@ class TestGuiToolsTasks:
 
 class TestGuiToolsVars:
     _REQUIRED_KEYS = {
-        "gui_tools_repo_root",
         "gui_tools_xdg_state_home",
         "gui_tools_state_dirs",
         "gui_tools_spine_config_dir",

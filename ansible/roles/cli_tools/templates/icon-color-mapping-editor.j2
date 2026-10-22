@@ -19,7 +19,7 @@ set -uo pipefail
 INSTANCE="icon-color-mapping-editor"
 WINDOW="icme-window"
 DIR="${HOME}/.config/ags-icme"
-REPO_ROOT="{{ cli_tools_repo_root }}"
+REPO_ROOT="{{ cli_tools_composition_root }}"
 
 if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
     if timeout 8 ags toggle "$WINDOW" -i "$INSTANCE" 2>/dev/null; then

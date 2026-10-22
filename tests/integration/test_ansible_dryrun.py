@@ -34,6 +34,7 @@ from provisioning.adapters.ansible_fact_reader import (
     AnsibleFactReader,
     InvalidFactOutputError,
 )
+from tests.support import FIXTURE_COMPOSITION
 
 pytestmark = pytest.mark.integration
 
@@ -132,6 +133,22 @@ def _detect_os_family() -> str:
 _OS_FAMILY = _detect_os_family()
 
 
+def _seam_extra_vars(install_dir: Path) -> dict[str, str]:
+    """The four locked seam extra-vars (AD-17).
+
+    The engine checkout has no composition, so every playbook that reads a
+    composition-owned path (btop active-theme, the gloview script, the runtime)
+    receives it explicitly. The fixture composition is enough for a ``--check``
+    dry-run: the tasks that would execute the runtime are skipped in check mode.
+    """
+    return {
+        "install_dir": str(install_dir),
+        "os_family": _OS_FAMILY,
+        "manifests_dir": str(FIXTURE_COMPOSITION / "dotfiles" / "provisioning"),
+        "composition_root": str(FIXTURE_COMPOSITION),
+    }
+
+
 def _run_check(
     playbook: Path,
     extra_vars: dict[str, str],
@@ -208,7 +225,7 @@ class TestDryRunEveryPlaybook:
             env = _scrubbed_env(ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"))
             result = _run_check(
                 playbook,
-                {"install_dir": str(install_dir), "os_family": _OS_FAMILY},
+                _seam_extra_vars(install_dir),
                 env,
             )
             _assert_clean_dry_run(playbook_name, result)
@@ -246,7 +263,7 @@ class TestYayNeverBuildsUnderCheck:
             install_dir = Path(tmp) / "install"
             result = _run_check(
                 _PLAYBOOKS_DIR / "packages.yaml",
-                {"install_dir": str(install_dir), "os_family": _OS_FAMILY},
+                _seam_extra_vars(install_dir),
                 env,
             )
             _assert_clean_dry_run("packages.yaml", result)

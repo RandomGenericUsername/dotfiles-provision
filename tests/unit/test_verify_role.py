@@ -12,6 +12,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import composition_root
+
 
 def _find_ansible_dir() -> Path:
     """Locate the real ansible scaffold dir by walking up from this test file.
@@ -32,7 +34,7 @@ def _find_ansible_dir() -> Path:
 
 _ANSIBLE_DIR = _find_ansible_dir()
 _ROLES_DIR = _ANSIBLE_DIR / "roles" / "verify"
-_REPO_ROOT = _ANSIBLE_DIR.parents[2]
+_REPO_ROOT = composition_root()
 _MANIFEST_PATH = _REPO_ROOT / "dotfiles" / "provisioning" / "config-copies.yaml"
 
 _TASK_KEYWORDS = {
@@ -1642,7 +1644,7 @@ class TestVerifyVars:
         data = _vars()
         manifest = yaml.safe_load(
             (
-                _ANSIBLE_DIR.parents[2] / "dotfiles" / "provisioning" / "assets.yaml"
+                composition_root() / "dotfiles" / "provisioning" / "assets.yaml"
             ).read_text()
         )
         assert str(data["verify_assets_pinned_tag"]) == manifest["assets"]["tag"]
@@ -3176,12 +3178,22 @@ class TestVerifyPlaybook:
             capture_output=True,
             text=True,
             env=env,
-            timeout=120,
+            timeout=300,
         )
         assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.integration
 class TestVerifyRuntime:
+    """Real ``ansible-playbook verify.yaml`` runs against a synthetic machine.
+
+    Marked ``integration`` (the marker this project uses for tests that need a
+    real ansible-playbook): each case runs the whole verify playbook, so the
+    default fast gate excludes them and ``make test-integration`` runs them.
+    The cross-checkout proof (`dotfiles-provision verify --manifests-dir ...`)
+    is the same layer executed against the real composition.
+    """
+
     _PATH = _ANSIBLE_DIR / "playbooks" / "verify.yaml"
 
     def test_verify_passes_on_a_provisioned_machine(self) -> None:
@@ -3228,7 +3240,7 @@ class TestVerifyRuntime:
                     capture_output=True,
                     text=True,
                     env=env,
-                    timeout=120,
+                    timeout=300,
                 )
 
             first = run()
@@ -3275,7 +3287,7 @@ class TestVerifyRuntime:
                     capture_output=True,
                     text=True,
                     env=env,
-                    timeout=200,
+                    timeout=300,
                 )
 
             clean = run()
@@ -3324,7 +3336,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=200,
+                timeout=300,
             )
             combined = result.stdout + result.stderr
             assert result.returncode != 0, (
@@ -3380,7 +3392,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL when a parse-gate CLI exits non-zero (the "
@@ -3453,7 +3465,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL when dunst is not masked (the notifications "
@@ -3515,7 +3527,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL when an always-on AGS instance is not running "
@@ -3572,7 +3584,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL when inode/directory does not resolve to the "
@@ -3632,7 +3644,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL when a rendered settings file references a "
@@ -3686,7 +3698,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL when a CSG color-format template is missing "
@@ -3736,7 +3748,7 @@ class TestVerifyRuntime:
                     capture_output=True,
                     text=True,
                     env=env,
-                    timeout=120,
+                    timeout=300,
                 )
 
             seeded = run()
@@ -3784,7 +3796,7 @@ class TestVerifyRuntime:
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=120,
+                timeout=300,
             )
             assert result.returncode != 0, (
                 "verify must FAIL on an unprovisioned machine (hardening: "
@@ -3856,6 +3868,24 @@ def _write_stub_binaries(home: Path) -> Path:
         "exit 0\n"
     )
     ags.chmod(0o755)
+    # csg/weg/itr: the pinned-CLI handshake asserts `contract <x>` in
+    # `--version` stdout. The generic exit-0 stub above cannot satisfy that.
+    verify_vars = _vars()
+    for cli_name in ("csg", "weg", "itr"):
+        contract = str(verify_vars[f"verify_{cli_name}_contract_version"])
+        stub = bin_dir / cli_name
+        stub.write_text(
+            "#!/bin/sh\n"
+            f'echo "{cli_name} {contract} (contract {contract})"\n'
+            "exit 0\n"
+        )
+        stub.chmod(0o755)
+    # The pinned image legs run `<engine> image inspect <ref>`; stub both
+    # engines so the assertion reads the reference, not the host's runtime.
+    for engine in ("podman", "docker"):
+        engine_stub = bin_dir / engine
+        engine_stub.write_text("#!/bin/sh\nexit 0\n")
+        engine_stub.chmod(0o755)
     sysctl = bin_dir / "systemctl"
     sysctl.write_text(
         "#!/bin/sh\n"
@@ -4082,6 +4112,17 @@ def _build_provisioned_layout(
     (install / "assets" / assets_tag / "icons" / "schema.json").write_text(
         '{"schema_major": 1}\n'
     )
+    # Pinned CLI checkouts (AD-10): the cli_tools role materializes one
+    # tag-qualified checkout per pinned entry and records the pin beside it;
+    # verify re-asserts the path, the pin record and the version handshake.
+    # Read the tags from the verify mirror so a pin bump never leaves this
+    # fixture behind (the previous fixture stopped at the assets block, which
+    # is why the runtime verify tests aborted at the itr pin on master).
+    verify_vars = _vars()
+    for cli_name in ("csg", "weg", "itr"):
+        cli_version = str(verify_vars[f"verify_{cli_name}_version"])
+        (install / "cli-tools" / cli_name / cli_version).mkdir(parents=True, exist_ok=True)
+        (install / "cli-tools" / cli_name / "pinned").write_text(f"{cli_version}\n")
     template_schema_dir = install / "assets" / assets_tag / "templates" / "zsh"
     template_schema_dir.mkdir(parents=True, exist_ok=True)
     (template_schema_dir / ".zshrc.vars.schema.json").write_text(

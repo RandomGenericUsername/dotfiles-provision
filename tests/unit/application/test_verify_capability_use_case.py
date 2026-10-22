@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from provisioning.application import VerifyCapabilityUseCase
+from provisioning.application import CompositionSeam, VerifyCapabilityUseCase
 from provisioning.domain.models import ProvisionResult
 from tests.unit.application.conftest import FakeExecutor, FakeFactReader, RaisingExecutor
+
+_SEAM = CompositionSeam(Path("/composition/dotfiles/provisioning"), Path("/composition"))
 
 
 class TestVerifyCapabilityUseCase:
@@ -16,6 +18,7 @@ class TestVerifyCapabilityUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("verify.yaml"),
+            seam=_SEAM,
         )
         use_case.verify()
         assert len(executor.calls) == 1
@@ -37,6 +40,7 @@ class TestVerifyCapabilityUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("playbooks/verify.yaml"),
+            seam=_SEAM,
         )
         use_case.verify()
         assert len(executor.calls) == 1
@@ -51,6 +55,7 @@ class TestVerifyCapabilityUseCase:
             executor=executor,
             fact_reader=FakeFactReader("debian-family"),
             playbook=Path("verify.yaml"),
+            seam=_SEAM,
         )
         use_case.verify()
         assert len(executor.calls) == 1
@@ -58,8 +63,15 @@ class TestVerifyCapabilityUseCase:
         assert extra_vars == {
             "install_dir": str(Path("/home/user/.local/share/dotfiles")),
             "os_family": "debian-family",
+            "manifests_dir": "/composition/dotfiles/provisioning",
+            "composition_root": "/composition",
         }
-        assert set(extra_vars) == {"install_dir", "os_family"}
+        assert set(extra_vars) == {
+            "install_dir",
+            "os_family",
+            "manifests_dir",
+            "composition_root",
+        }
 
     def test_result_returned_unchanged(self) -> None:
         expected = ProvisionResult(
@@ -73,6 +85,7 @@ class TestVerifyCapabilityUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("verify.yaml"),
+            seam=_SEAM,
         )
         result = use_case.verify()
         assert len(executor.calls) == 1
@@ -83,6 +96,7 @@ class TestVerifyCapabilityUseCase:
             executor=RaisingExecutor(),
             fact_reader=FakeFactReader("arch"),
             playbook=Path("verify.yaml"),
+            seam=_SEAM,
         )
         with pytest.raises(RuntimeError, match="boom"):
             use_case.verify()

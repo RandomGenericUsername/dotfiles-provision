@@ -9,6 +9,8 @@ from typer.testing import CliRunner, Result
 from provisioning.adapters.ansible_executor import ProvisionExecutorError
 from provisioning.application import resolve_install_dir
 from provisioning.domain.models import ProvisionResult
+from tests.support import FIXTURE_COMPOSITION
+from tests.support import manifests_dir as fixture_manifests
 from tests.unit.cli.conftest import FakeDeps, FakeFactReader, _invoke
 
 
@@ -53,7 +55,9 @@ class TestBecomePasswordResolution:
         monkeypatch.setattr(getpass, "getpass", lambda prompt: "typed")
         recorded: dict[str, object] = {}
 
-        def fake_build_deps(become_password: str | None = None) -> object:
+        def fake_build_deps(
+            settings: object = None, become_password: str | None = None
+        ) -> object:
             recorded["become_password"] = become_password
             from provisioning.domain.models import ProvisionResult
             from provisioning.ports import IProvisionExecutor
@@ -92,7 +96,9 @@ class TestBecomePasswordResolution:
 
         monkeypatch.setattr("provisioning.cli.main.build_deps", fake_build_deps)
         from provisioning.cli.main import app
+        from tests.support import FIXTURE_COMPOSITION
 
+        monkeypatch.chdir(FIXTURE_COMPOSITION)
         result = runner.invoke(app, ["apply", "--ask-become-pass"])
         assert result.exit_code == 0, result.stderr
         assert recorded["become_password"] == "typed"
@@ -124,7 +130,12 @@ def _expected_call(playbook: str, check: bool) -> tuple[Path, bool, dict[str, st
     return (
         Path(playbook),
         check,
-        {"install_dir": str(resolve_install_dir()), "os_family": "arch"},
+        {
+            "install_dir": str(resolve_install_dir()),
+            "os_family": "arch",
+            "manifests_dir": str(fixture_manifests()),
+            "composition_root": str(FIXTURE_COMPOSITION),
+        },
     )
 
 

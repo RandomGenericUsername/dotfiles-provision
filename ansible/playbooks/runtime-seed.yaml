@@ -39,13 +39,22 @@
           the install_dir seam extra-var (the orchestrator resolves
           $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
+    - name: Assert composition seam is provided
+      ansible.builtin.assert:
+        that: composition_root is defined and composition_root | trim | length > 0
+        fail_msg: >-
+          composition_root is undefined or empty — the runtime-seed step runs
+          the composition repo's runtime (src/runtime/). The engine CLI
+          resolves it from --composition-root; direct runs pass
+          -e composition_root=...
+
     - name: Seed runtime state from default wallpaper
       ansible.builtin.command:
         argv:
           - uv
           - run
           - --directory
-          - "{{ playbook_dir }}/../../../../src/runtime"
+          - "{{ composition_root }}/src/runtime"
           - dotfiles-runtime
           - wallpaper
           - set

@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from provisioning.domain.enums import Distro
+from tests.support import manifests_dir
 
 
 def _find_ansible_dir() -> Path:
@@ -344,16 +345,7 @@ _INTENTIONAL_DUPLICATE_KEY_PAIRS = {
 _DECLARED_NOT_PROVISIONED: frozenset[str] = frozenset()
 
 
-def _find_manifest_dir() -> Path:
-    """Locate dotfiles/provisioning/ (the logical manifest dir) from this file."""
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "dotfiles" / "provisioning" / "packages.yaml"
-        if candidate.is_file():
-            return candidate.parent
-    raise FileNotFoundError("dotfiles/provisioning/packages.yaml not found walking up")
-
-
-_MANIFEST_DIR = _find_manifest_dir()
+_MANIFEST_DIR = manifests_dir()
 
 
 def _names_of(value: object) -> list[object]:

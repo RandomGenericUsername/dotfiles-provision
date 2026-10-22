@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import composition_root
 from tests.unit import assets_templates
 
 _TASK_KEYWORDS = {
@@ -49,7 +50,7 @@ def _find_ansible_dir() -> Path:
 _ANSIBLE_DIR = _find_ansible_dir()
 _ROLES_DIR = _ANSIBLE_DIR / "roles" / "zsh_config"
 _PLAYBOOKS_DIR = _ANSIBLE_DIR / "playbooks"
-_REPO_ROOT = _ANSIBLE_DIR.parents[2]
+_REPO_ROOT = composition_root()
 _ZSH_TEMPLATE = "zsh/.zshrc.j2"
 
 

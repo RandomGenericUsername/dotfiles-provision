@@ -7,28 +7,12 @@ import pytest
 from provisioning.adapters.yaml_manifest_reader import ManifestReadError, YamlManifestReader
 from provisioning.domain.enums import ManifestKind
 from provisioning.domain.models import ProvisionManifest, Spec
+from tests.support import manifests_dir
 
 READER = YamlManifestReader()
 
 
-def _find_manifest_dir() -> Path:
-    """Locate the real manifests dir by walking up from this test file.
-
-    Resolves the repo root robustly (no fixed-depth assumption) and fails
-    loudly if the manifests are missing, so AC 7/8 coverage can never
-    silently disappear from the run.
-    """
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "dotfiles" / "provisioning"
-        if candidate.is_dir():
-            return candidate
-    raise FileNotFoundError(
-        "dotfiles/provisioning/ not found walking up from the test file; "
-        "AC 7/8 real-manifest coverage requires the authored manifests"
-    )
-
-
-_MANIFEST_DIR = _find_manifest_dir()
+_MANIFEST_DIR = manifests_dir()
 
 
 class TestYamlManifestReader:

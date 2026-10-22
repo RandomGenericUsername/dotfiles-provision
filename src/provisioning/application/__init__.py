@@ -1,5 +1,7 @@
 from provisioning.application.use_cases import (
     BootstrapUseCase,
+    CompositionPathError,
+    CompositionSeam,
     ProvisionMachineUseCase,
     VerifyCapabilityUseCase,
     resolve_install_dir,
@@ -7,6 +9,8 @@ from provisioning.application.use_cases import (
 
 __all__ = [
     "BootstrapUseCase",
+    "CompositionPathError",
+    "CompositionSeam",
     "ProvisionMachineUseCase",
     "VerifyCapabilityUseCase",
     "resolve_install_dir",

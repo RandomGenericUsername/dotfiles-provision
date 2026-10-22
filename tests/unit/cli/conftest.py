@@ -8,11 +8,13 @@ from typer.testing import CliRunner, Result
 
 from provisioning.application import (
     BootstrapUseCase,
+    CompositionSeam,
     ProvisionMachineUseCase,
     VerifyCapabilityUseCase,
 )
 from provisioning.domain.models import ProvisionResult
 from provisioning.ports import IFactReader, IProvisionExecutor
+from tests.support import composition_root, manifests_dir
 
 
 class FakeExecutor(IProvisionExecutor):
@@ -58,10 +60,11 @@ class FakeDeps:
         fact_reader = FakeFactReader()
         bootstrap_playbook = Path("bootstrap.yaml")
         verify_playbook = Path("verify.yaml")
-        self.plan = ProvisionMachineUseCase(plan_executor, fact_reader, bootstrap_playbook)
-        self.apply = ProvisionMachineUseCase(apply_executor, fact_reader, bootstrap_playbook)
-        self.verify = VerifyCapabilityUseCase(verify_executor, fact_reader, verify_playbook)
-        self.bootstrap = BootstrapUseCase(bootstrap_executor, fact_reader, bootstrap_playbook)
+        seam = CompositionSeam(manifests_dir(), composition_root())
+        self.plan = ProvisionMachineUseCase(plan_executor, fact_reader, bootstrap_playbook, seam)
+        self.apply = ProvisionMachineUseCase(apply_executor, fact_reader, bootstrap_playbook, seam)
+        self.verify = VerifyCapabilityUseCase(verify_executor, fact_reader, verify_playbook, seam)
+        self.bootstrap = BootstrapUseCase(bootstrap_executor, fact_reader, bootstrap_playbook, seam)
         self.plan_executor = plan_executor
         self.apply_executor = apply_executor
         self.verify_executor = verify_executor
@@ -79,7 +82,13 @@ def _invoke(
     args: list[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> Result:
-    monkeypatch.setattr("provisioning.cli.main.build_deps", lambda become_password=None: deps)
+    monkeypatch.setattr(
+        "provisioning.cli.main.build_deps", lambda settings=None, become_password=None: deps
+    )
     from provisioning.cli.main import app
+    from tests.support import FIXTURE_COMPOSITION
 
+    # The default composition seam is <cwd>/dotfiles/provisioning; run from the
+    # fixture composition so the default path resolves without extra flags.
+    monkeypatch.chdir(FIXTURE_COMPOSITION)
     return runner.invoke(app, args)

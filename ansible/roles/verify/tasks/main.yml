@@ -1111,8 +1111,8 @@
   ansible.builtin.assert:
     that: verify_assets_template_schema_files.matched | int > 0
     fail_msg: >-
-      no `<tag>/templates/**/*.vars.schema.json` contract was found under
-      {{ verify_assets_tag_dir }}/templates — every template has shipped a
+      no contract was found under {{ verify_assets_tag_dir }}/templates
+      (`<tag>/templates/**/*.vars.schema.json`) — every template has shipped a
       sibling vars schema since v0.1.0, so an empty result means the deployed
       checkout is partial or was pruned after the fetch. This consumer supports
       templates schema_major {{ verify_assets_schema_support.templates }}

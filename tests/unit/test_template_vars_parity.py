@@ -38,6 +38,7 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import manifests_dir
 from tests.unit import assets_templates
 
 _TASK_KEYWORDS = {
@@ -223,7 +224,7 @@ class TestRequiredVarsAreSupplied:
 class TestPinMirrorsMatchTheManifest:
     def test_every_render_role_pin_equals_assets_tag(self) -> None:
         manifest = yaml.safe_load(
-            (assets_templates.REPO_ROOT / "dotfiles" / "provisioning" / "assets.yaml").read_text()
+            (manifests_dir() / "assets.yaml").read_text()
         )
         tag = str(manifest["assets"]["tag"])
         mirrors = {

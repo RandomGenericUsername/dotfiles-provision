@@ -1,0 +1,47 @@
+# Desired filesystem subtree under $XDG_DATA_HOME/dotfiles/ (plan §5 spine) plus
+# XDG config/state/cache dirs. Each entry is a node name Ansible ensures exists.
+#
+# config-in-spine (2026-08-16): the `config/` subtree hosts ALL managed configs
+# (tool dirs + the csg-templates/effects relocations); `config` is DUAL-USE —
+# the XDG config base dir AND the spine's managed-config root. The csg-templates
+# live at config/color-scheme-generator/templates and the weg effects catalog at
+# config/weg/effects.yaml (the `weg-effects.yaml` file node maps there; its
+# parent `config/weg` is the spine dir). Parity-locked with
+# roles/filesystem/vars/main.yml (filesystem_spine_dirs / file_nodes).
+#
+# Epic 4 single-source: no `generated/` tree — the runtime owns all derived
+# artifacts under $XDG_STATE_HOME/dotfiles/ (cache/ + current/).
+kind: filesystem
+entries:
+  # XDG base dirs (config is shared with the spine root below)
+  - name: state
+  - name: cache
+  # Install-spine dirs (relative to install_dir)
+  - name: wallpapers
+  - name: icon-templates
+  - name: icon-mappings
+  - name: config
+  - name: config/color-scheme-generator
+  - name: config/color-scheme-generator/templates
+  - name: config/hypr
+  - name: config/hyprpaper
+  # config/ags is DELIBERATELY absent: the ags_apps role owns it as the
+  # live-bar SYMLINK (<install>/config/ags -> the pinned unit's bar/), not the
+  # filesystem role as a dir. Keeping it out of the manifest keeps the parity
+  # lock (test_parity_with_manifest) from re-adding it to filesystem_spine_dirs.
+  # config/ags-capture is absent for the SAME reason (slice 5): the ags_apps role
+  # owns it as the live-capture SYMLINK -> the unit's capture-tool/.
+  - name: config/nvim
+  - name: config/starship
+  - name: config/wlogout
+  - name: config/zsh
+  - name: config/kitty
+  - name: config/weg
+  - name: config/itr
+  # GTK consumer dirs (gt-3-1): spine parents for the gtk-3.0/gtk-4.0
+  # config-links targets. At first runtime seed they host the runtime's
+  # colors.css pointers (runtime seeder creates the pointers, never us).
+  - name: config/gtk-3.0
+  - name: config/gtk-4.0
+  # File node (emitted by the assets role into config/weg/effects.yaml)
+  - name: weg-effects.yaml

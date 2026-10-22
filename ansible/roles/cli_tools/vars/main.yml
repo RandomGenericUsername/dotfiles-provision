@@ -1,11 +1,15 @@
 # CLI tools role vars (Story 2.4).
 #
-# cli_tools_repo_root: repo root derived from this playbook's location.
-#   cli-tools.yaml lives at <repo>/src/provisioning/ansible/playbooks/, so
-#   <repo> = {{ playbook_dir }}/../../../.. (playbooks -> ansible ->
-#   provisioning -> src -> repo root). Overridable if a future user runs the
-#   playbooks from a relocated repo.
-cli_tools_repo_root: "{{ playbook_dir }}/../../../.."
+# cli_tools_manifests_dir / cli_tools_composition_root: the composition seam,
+#   supplied by the engine CLI as extra-vars (`--manifests-dir`,
+#   `--composition-root`; see group_vars/all.yml). `manifests_dir` is the
+#   composition's `dotfiles/provisioning/` (it owns `scripts/gloview-activate`);
+#   `composition_root` is the checkout root (it owns `src/runtime/`, the ONE
+#   permitted source-path install entry: `dotfiles-runtime`). Neither is ever
+#   derived from `{{ playbook_dir }}` — this repo is the engine, not a
+#   composition checkout.
+cli_tools_manifests_dir: "{{ manifests_dir }}"
+cli_tools_composition_root: "{{ composition_root }}"
 
 # cli_tools_bin_dir: uv's executable directory, resolved EXACTLY as uv does,
 #   so the PATH prepend + `creates` guard match where `uv tool install` actually
@@ -86,10 +90,10 @@ cli_tools_checkout_root: "{{ install_dir | trim }}/cli-tools"
 #   the manifest, split so each install path is explicit instead of a single
 #   loop carrying undefined keys. `cli_tools_pinned` entries are shallow-cloned
 #   at their tag and installed FROM the checkout; `cli_tools_source_entries`
-#   are installed from `{{ cli_tools_repo_root }}/<source>`. Since S6 the only
-#   source entry is `dotfiles-runtime` (this repo still authors the runtime);
-#   every CLI is pinned. The door stays open for the runtime's own install
-#   path — it is NOT an extraction leftover.
+#   are installed from `{{ cli_tools_composition_root }}/<source>`. Since S6 the
+#   only source entry is `dotfiles-runtime` (the COMPOSITION repo still authors
+#   the runtime); every CLI is pinned. The door stays open for the runtime's own
+#   install path — it is NOT an extraction leftover.
 cli_tools_pinned: "{{ cli_tools | selectattr('repo', 'defined') | list }}"
 cli_tools_source_entries: "{{ cli_tools | rejectattr('repo', 'defined') | list }}"
 

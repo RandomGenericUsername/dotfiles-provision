@@ -34,6 +34,15 @@
       install_dir seam extra-var (the orchestrator resolves
       $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
+- name: Assert composition seam is provided
+  ansible.builtin.assert:
+    that: composition_root is defined and composition_root | trim | length > 0
+    fail_msg: >-
+      composition_root is undefined or empty — the btop_config role reads the
+      composition-owned active-theme setting
+      (dotfiles/config/btop/active-theme). The engine CLI resolves it from
+      --composition-root; direct runs pass -e composition_root=...
+
 - name: Ensure btop config dir exists in the spine
   ansible.builtin.file:
     path: "{{ btop_config_spine_dir }}"

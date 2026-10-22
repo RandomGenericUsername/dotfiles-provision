@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.support import composition_root
+
 
 def _find_ansible_dir() -> Path:
     """Locate the real ansible scaffold dir by walking up from this test file.
@@ -28,7 +30,7 @@ def _find_ansible_dir() -> Path:
 
 _ANSIBLE_DIR = _find_ansible_dir()
 _ROLES_DIR = _ANSIBLE_DIR / "roles" / "cli_tools"
-_REPO_ROOT = _ANSIBLE_DIR.parents[2]
+_REPO_ROOT = composition_root()
 _MANIFEST_PATH = _REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml"
 
 #: Any release-tag literal. Role expressions and task code must derive the pin
@@ -403,19 +405,19 @@ class TestCliToolsTasks:
     def test_no_absolute_repo_paths_hardcoded(self) -> None:
         """Every source is derived from a seam var, never an absolute repo
         path baked into the task: in-repo entries use
-        `{{ cli_tools_repo_root }}/{{ item.source }}`, pinned entries use the
+        `{{ cli_tools_composition_root }}/{{ item.source }}`, pinned entries use the
         tag-qualified `{{ cli_tools_checkout_root }}/<name>/<tag>`."""
         for task in _install_tasks():
             command = str(task.get("ansible.builtin.command", ""))
             assert "uv tool install" in command, (
                 f"install task {task.get('name')!r} must run `uv tool install`"
             )
-            assert "{{ cli_tools_repo_root }}/" in command, (
+            assert "{{ cli_tools_composition_root }}/" in command, (
                 f"install task {task.get('name')!r} must use "
-                "'{{ cli_tools_repo_root }}/{{ item.source }}'"
+                "'{{ cli_tools_composition_root }}/{{ item.source }}'"
             )
             assert "{{ item.source }}" in command
-            assert "{{ cli_tools_repo_root }}/" in command.replace("'", ""), (
+            assert "{{ cli_tools_composition_root }}/" in command.replace("'", ""), (
                 "repo source must be interpolated, never an absolute literal"
             )
         pinned_tasks = [
@@ -631,7 +633,7 @@ class TestCliToolsImageBuildTasks:
 
         source_argv = _argv_of(source[0])
         assert source_argv[source_argv.index("--context") + 1] == (
-            "{{ cli_tools_repo_root }}/{{ item.source }}"
+            "{{ cli_tools_composition_root }}/{{ item.source }}"
         ), "a source-path CLI builds from its in-repo package dir"
         assert "--image-tag" not in source_argv, (
             "a source-only CLI has no pin to pass as its tag"
@@ -1006,7 +1008,12 @@ class TestCliToolsVars:
     def test_vars_parse_with_required_keys(self) -> None:
         data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
         assert isinstance(data, dict), "vars/main.yml must parse to a dict"
-        assert {"cli_tools_repo_root", "cli_tools_bin_dir", "cli_tools"}.issubset(set(data))
+        assert {
+            "cli_tools_manifests_dir",
+            "cli_tools_composition_root",
+            "cli_tools_bin_dir",
+            "cli_tools",
+        }.issubset(set(data))
 
     def test_engine_is_declared_not_detected(self) -> None:
         """Option 2b: the engine is DECLARED once

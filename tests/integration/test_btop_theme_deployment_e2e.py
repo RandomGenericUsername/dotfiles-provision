@@ -129,7 +129,7 @@ class TestAuthoredThemeDeployment:
         authored.mkdir()
         (authored / _AUTHORED).write_text(_AUTHORED_BODY)
 
-        first = _run_playbook(install, home, xdg, setting, authored)
+        _first = _run_playbook(install, home, xdg, setting, authored)
 
         conf = _parse_config(install / "config/btop/btop.conf")
         assert conf["color_theme"] == _AUTHORED, (

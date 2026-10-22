@@ -4,10 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from provisioning.application import ProvisionMachineUseCase
+from provisioning.application import CompositionSeam, ProvisionMachineUseCase
 from provisioning.application.use_cases import resolve_install_dir
 from provisioning.domain.models import ProvisionResult
 from tests.unit.application.conftest import FakeExecutor, FakeFactReader
+
+_SEAM = CompositionSeam(Path("/composition/dotfiles/provisioning"), Path("/composition"))
 
 
 class TestProvisionMachineUseCase:
@@ -17,6 +19,7 @@ class TestProvisionMachineUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("bootstrap.yaml"),
+            seam=_SEAM,
         )
         use_case.provision(check=True)
         assert executor.calls[0][1] is True
@@ -27,6 +30,7 @@ class TestProvisionMachineUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("bootstrap.yaml"),
+            seam=_SEAM,
         )
         use_case.provision(check=False)
         assert executor.calls[0][1] is False
@@ -37,11 +41,12 @@ class TestProvisionMachineUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("playbooks/bootstrap.yaml"),
+            seam=_SEAM,
         )
         use_case.provision(check=True)
         assert executor.calls[0][0] == Path("playbooks/bootstrap.yaml")
 
-    def test_extra_vars_carry_exactly_install_dir_and_os_family(
+    def test_extra_vars_carry_the_four_seam_keys(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("XDG_DATA_HOME", "/home/user/.local/share")
@@ -50,14 +55,22 @@ class TestProvisionMachineUseCase:
             executor=executor,
             fact_reader=FakeFactReader("debian-family"),
             playbook=Path("bootstrap.yaml"),
+            seam=_SEAM,
         )
         use_case.provision(check=True)
         extra_vars = executor.calls[0][2]
         assert extra_vars == {
             "install_dir": str(Path("/home/user/.local/share/dotfiles")),
             "os_family": "debian-family",
+            "manifests_dir": "/composition/dotfiles/provisioning",
+            "composition_root": "/composition",
         }
-        assert set(extra_vars) == {"install_dir", "os_family"}
+        assert set(extra_vars) == {
+            "install_dir",
+            "os_family",
+            "manifests_dir",
+            "composition_root",
+        }
 
     def test_result_returned_unchanged(self) -> None:
         expected = ProvisionResult(success=False, tasks=(("packages : TASK", "failed"),))
@@ -66,6 +79,7 @@ class TestProvisionMachineUseCase:
             executor=executor,
             fact_reader=FakeFactReader("arch"),
             playbook=Path("bootstrap.yaml"),
+            seam=_SEAM,
         )
         result = use_case.provision(check=False)
         assert result == expected

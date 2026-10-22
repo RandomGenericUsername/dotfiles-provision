@@ -12,6 +12,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import manifests_dir
+
 
 def _find_ansible_dir() -> Path:
     """Locate the real ansible scaffold dir by walking up from this test file.
@@ -934,7 +936,7 @@ class TestSettingsImageTag:
     """
 
     _PLAYBOOK = _ANSIBLE_DIR / "playbooks" / "settings.yaml"
-    _MANIFEST = _ANSIBLE_DIR.parents[2] / "dotfiles" / "provisioning" / "cli-tools.yaml"
+    _MANIFEST = manifests_dir() / "cli-tools.yaml"
 
     @staticmethod
     def _manifest_weg_tag() -> str:
@@ -1022,7 +1024,7 @@ class TestSettingsCsgImageTag:
     """
 
     _PLAYBOOK = _ANSIBLE_DIR / "playbooks" / "settings.yaml"
-    _MANIFEST = _ANSIBLE_DIR.parents[2] / "dotfiles" / "provisioning" / "cli-tools.yaml"
+    _MANIFEST = manifests_dir() / "cli-tools.yaml"
 
     @staticmethod
     def _manifest_csg_tag() -> str:

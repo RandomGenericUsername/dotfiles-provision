@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import composition_root
 from tests.unit import assets_templates
 
 _TASK_KEYWORDS = {
@@ -306,6 +307,8 @@ class TestBtopConfigPlaybook:
                         str(_PLAYBOOKS_DIR / "btop-config.yaml"),
                         "-e",
                         f"install_dir={install}",
+                        "-e",
+                        f"composition_root={composition_root()}",
                     ],
                     capture_output=True,
                     text=True,
@@ -338,13 +341,12 @@ class TestBtopConfigPlaybook:
 
 class TestBtopThemeDeployment:
     """btop-theme-deployment capability: authored themes ship into the spine,
-    and the active `color_theme` is a repo-owned setting that survives
+    and the active `color_theme` is a composition-owned setting that survives
     re-provisioning (design D10)."""
 
     def test_vars_carry_the_deployment_seams(self) -> None:
         data = _vars()
         for key in (
-            "btop_config_repo_root",
             "btop_config_active_theme_file",
             "btop_config_default_active_theme",
             "btop_config_assets_pinned_tag",
@@ -358,7 +360,7 @@ class TestBtopThemeDeployment:
 
     def test_active_theme_file_is_the_repo_owned_setting(self) -> None:
         value = str(_vars()["btop_config_active_theme_file"])
-        assert value == "{{ btop_config_repo_root }}/dotfiles/config/btop/active-theme"
+        assert value == "{{ composition_root }}/dotfiles/config/btop/active-theme"
 
     def test_authored_themes_dir_is_the_pinned_assets_checkout(self) -> None:
         """S1: authored themes moved to the pinned assets corpus (content/
@@ -375,7 +377,7 @@ class TestBtopThemeDeployment:
     def test_assets_pin_mirrors_the_assets_manifest(self) -> None:
         """AD-6: the role's ONE pin mirror equals `assets.tag` in the manifest."""
         manifest = yaml.safe_load(
-            (_ANSIBLE_DIR.parents[2] / "dotfiles" / "provisioning" / "assets.yaml").read_text()
+            (composition_root() / "dotfiles" / "provisioning" / "assets.yaml").read_text()
         )
         assert str(_vars()["btop_config_assets_pinned_tag"]) == manifest["assets"]["tag"]
         assert "{{ btop_config_assets_pinned_tag }}" in str(

@@ -75,9 +75,11 @@
 # whole package — nothing stays in-repo. The deploy-coverage gate asserts the
 # absence of a stale per-file icme entry.
 
-# gui_tools_repo_root: repo root derived from this playbook's location.
-#   Mirror of compositor_configs_repo_root / cli_tools_repo_root exactly.
-gui_tools_repo_root: "{{ playbook_dir }}/../../../.."
+# gui_tools_repo_root is GONE (S6): the GUI apps deploy WHOLE from the pinned
+#   `ags-apps` unit, so this role reads no composition-repo tree. The last
+#   repo-derived path (a per-file app source list) was retired with the GUI; a
+#   playbook-relative climb here would resolve inside the engine checkout,
+#   which ships no GUI sources.
 
 # gui_tools_xdg_state_home: the XDG state home the app log dir lives under
 #   ($XDG_STATE_HOME, spec default ~/.local/state). Identical derivation to

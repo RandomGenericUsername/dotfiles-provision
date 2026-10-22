@@ -3,6 +3,22 @@
 # This file is the seam for variables that apply to every host regardless of
 # OS family. Keep it MINIMAL.
 #
+# ── Composition seam (AD-17) ────────────────────────────────────────────────
+# This repository is the pinned INSTALLER ENGINE: it owns the Ansible tree but
+# no composition checkout. The composition repo owns `dotfiles/provisioning/`
+# (the manifests), `dotfiles/config/btop/active-theme` and `src/runtime/`, and
+# the engine CLI passes both paths as extra-vars on every run:
+#
+#   manifests_dir     <composition>/dotfiles/provisioning
+#   composition_root  <composition>
+#
+# They are declared EMPTY (not defaulted to a path) so a direct
+# `ansible-playbook` invocation without them fails loud in the consuming role's
+# assert instead of silently reading the engine checkout. NEVER derive either
+# from `{{ playbook_dir }}`: a fresh engine clone has no composition ancestors.
+manifests_dir: ""
+composition_root: ""
+
 # `install_dir` is deliberately NOT defaulted here: the orchestrator seam
 # always provides it via --extra-vars (use_cases `_seam_extra_vars`), and an
 # undefined `install_dir` must FAIL LOUDLY in the renders (Story 2.11) rather

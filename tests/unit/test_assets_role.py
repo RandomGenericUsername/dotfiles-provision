@@ -11,6 +11,7 @@ import pytest
 import yaml
 
 from provisioning.domain.enums import AssetKind
+from tests.support import composition_root
 
 
 def _find_ansible_dir() -> Path:
@@ -31,7 +32,7 @@ def _find_ansible_dir() -> Path:
 
 _ANSIBLE_DIR = _find_ansible_dir()
 _ROLES_DIR = _ANSIBLE_DIR / "roles" / "assets"
-_REPO_ROOT = _ANSIBLE_DIR.parents[2]
+_REPO_ROOT = composition_root()
 _MANIFEST_PATH = _REPO_ROOT / "dotfiles" / "provisioning" / "assets.yaml"
 
 _TASK_KEYWORDS = {
@@ -788,7 +789,7 @@ class TestAssetsVars:
         manifest_entries = _manifest_entries()
         csg_entry = next(e for e in manifest_entries if e["name"] == "csg-templates")
         cli_manifest = yaml.safe_load(
-            (_ANSIBLE_DIR.parents[2] / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
+            (composition_root() / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
         )
         csg_cli = next(e for e in cli_manifest["entries"] if e.get("name") == "csg")
         pin = str(csg_cli["tag"])

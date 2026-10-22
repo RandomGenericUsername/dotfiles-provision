@@ -26,7 +26,7 @@
 # - template module check-mode support is FULL — no `not ansible_check_mode`
 #   gate needed on the placements.
 # - User-scoped privilege context: NO become/become_user anywhere.
-# - No absolute repo paths: every source is {{ gui_tools_repo_root }}/...
+# - No repo-derived paths: the GUI apps deploy WHOLE from the pinned unit.
 
 - name: Assert install_dir seam is provided
   ansible.builtin.assert:

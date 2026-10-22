@@ -9,9 +9,8 @@ Resolution order, mirroring `test_compositor_configs_role.py`'s
 `_assets_configs_file` / `_authored_icons_yaml`:
 
 1. ``$DOTFILES_ASSETS_TEMPLATES_DIR`` — an explicit templates-class directory;
-2. a local ``dotfiles-assets`` checkout — ``$DOTFILES_ASSETS_REPO`` else
-   ``/home/inumaki/Development/dotfiles/dotfiles-assets`` (the sibling-checkout
-   convention `_AGS_APPS_REPO` already uses for the ags-apps unit);
+2. a local ``dotfiles-assets`` checkout — ``$DOTFILES_ASSETS_REPO`` only (no
+   baked absolute path: the corpus is a separate pinned repo);
 3. the provisioned spine — ``$DOTFILES_INSTALL_SPINE`` else
    ``$XDG_DATA_HOME/dotfiles``, then ``assets/<role's pinned tag>/templates``.
 
@@ -31,13 +30,13 @@ from typing import Any
 import pytest
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-ANSIBLE_DIR = REPO_ROOT / "src" / "provisioning" / "ansible"
+ENGINE_ROOT = Path(__file__).resolve().parents[2]
+ANSIBLE_DIR = ENGINE_ROOT / "ansible"
 ROLES_DIR = ANSIBLE_DIR / "roles"
 
-#: The sibling checkout convention (see `_AGS_APPS_REPO` in
-#: `test_compositor_configs_role.py`).
-DEFAULT_ASSETS_REPO = Path("/home/inumaki/Development/dotfiles/dotfiles-assets")
+#: No baked checkout path: the corpus is a SEPARATE pinned repo, and an
+#: absolute dev path in a test would make the suite pass only on one machine.
+#: Point `DOTFILES_ASSETS_REPO` at a checkout, or use the provisioned spine.
 
 
 def role_vars(role: str) -> dict[str, Any]:
@@ -66,8 +65,9 @@ def _candidates(role: str | None) -> list[Path]:
     explicit = os.environ.get("DOTFILES_ASSETS_TEMPLATES_DIR")
     if explicit:
         candidates.append(Path(explicit).expanduser())
-    checkout = Path(os.environ.get("DOTFILES_ASSETS_REPO", DEFAULT_ASSETS_REPO)).expanduser()
-    candidates.append(checkout / "templates")
+    checkout = os.environ.get("DOTFILES_ASSETS_REPO")
+    if checkout:
+        candidates.append(Path(checkout).expanduser() / "templates")
     spine = os.environ.get("DOTFILES_INSTALL_SPINE")
     if spine:
         base = Path(spine).expanduser()

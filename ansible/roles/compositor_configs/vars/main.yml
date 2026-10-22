@@ -28,8 +28,9 @@
 # compositor_configs_repo_root is GONE (S4): the last two repo-authored inputs —
 # the bin scripts and the desktop entries — now come from the pinned corpus's
 # `desktop/` class, so this role reads no composition-repo tree at all. A
-# `{{ playbook_dir }}/../../../..` derivation here would be a path that resolves
-# to a file no consumer ships.
+# playbook-relative climb here would resolve to a file no consumer ships (and
+# the engine checkout has no composition ancestors), so composition paths can
+# only arrive through the `manifests_dir` / `composition_root` seam.
 
 # compositor_configs_assets_pinned_tag / compositor_configs_assets_configs_dir /
 # compositor_configs_assets_desktop_dir:

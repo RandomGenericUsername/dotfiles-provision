@@ -17,6 +17,7 @@ silently.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -30,15 +31,45 @@ _IMAGE = "archlinux:latest"
 
 
 def _find_repo_root() -> Path:
+    """The engine checkout root (``ansible/ansible.cfg`` + ``pyproject.toml``).
+
+    The Ansible tree sits at the engine repo root in this repo (the composition
+    checkout keeps its own ``src/provisioning/``; the engine does not).
+    """
     for parent in Path(__file__).resolve().parents:
-        candidate = parent / "src" / "provisioning" / "ansible" / "ansible.cfg"
-        if candidate.is_file() and (parent / "src" / "provisioning" / "pyproject.toml").is_file():
+        if (parent / "ansible" / "ansible.cfg").is_file() and (
+            parent / "pyproject.toml"
+        ).is_file():
             return parent
-    raise FileNotFoundError("repo root not found walking up from the test file")
+    raise FileNotFoundError("engine repo root not found walking up from the test file")
 
 
 _REPO_ROOT = _find_repo_root()
-_PROVISION_REL = "src/provisioning"
+
+
+def _find_composition_root() -> Path:
+    """The composition checkout the full-chain bootstrap provisions from.
+
+    A full bootstrap runs the composition's ``src/runtime`` (``wallpaper set``),
+    so the manifest-only fixture is not enough. Use an explicit
+    ``$DOTFILES_COMPOSITION_ROOT``; never guess a sibling checkout.
+    """
+    override = os.environ.get("DOTFILES_COMPOSITION_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    pytest.skip(
+        "full-chain container bootstrap needs a real composition checkout — "
+        "set DOTFILES_COMPOSITION_ROOT=/path/to/dotfiles-v3 (the manifest-only "
+        "tests/fixtures/composition ships no executable runtime); the dry-run "
+        "suite (test_ansible_dryrun.py) and the unit seam tests cover the "
+        "engine without it",
+        allow_module_level=True,
+    )
+
+
+_COMPOSITION_ROOT = _find_composition_root()
+_COMPOSITION_REL = "/composition"
+_MANIFESTS_REL = f"{_COMPOSITION_REL}/dotfiles/provisioning"
 
 # The filed deferred-work 3-2 packages-chain defects are FIXED:
 # - group_vars discovery ('packages' is undefined): resolved by commit 57063f5
@@ -122,7 +153,7 @@ class _Target:
             "XDG_STATE_HOME": "/scratch/state",
             "XDG_CACHE_HOME": "/scratch/cache",
             "UV_PROJECT_ENVIRONMENT": "/opt/provision-venv",
-            "ANSIBLE_CONFIG": f"/repo/{_PROVISION_REL}/ansible/ansible.cfg",
+            "ANSIBLE_CONFIG": "/repo/ansible/ansible.cfg",
         }
 
     def start(self) -> None:
@@ -134,6 +165,8 @@ class _Target:
                 self._name,
                 "-v",
                 f"{self._repo}:/repo:ro",
+                "-v",
+                f"{_COMPOSITION_ROOT}:{_COMPOSITION_REL}:ro",
                 _IMAGE,
                 "sleep",
                 "infinity",
@@ -177,12 +210,12 @@ class _Target:
                 "uv",
                 "run",
                 "--directory",
-                f"/repo/{_PROVISION_REL}",
+                "/repo",
                 "ansible-galaxy",
                 "collection",
                 "install",
                 "-r",
-                f"/repo/{_PROVISION_REL}/ansible/requirements.yml",
+                "/repo/ansible/requirements.yml",
             ],
             env=self._run_env(),
             timeout=1800,
@@ -202,16 +235,20 @@ class _Target:
                 "uv",
                 "run",
                 "--directory",
-                f"/repo/{_PROVISION_REL}",
+                "/repo",
                 "ansible-playbook",
                 "-i",
-                f"/repo/{_PROVISION_REL}/ansible/inventory/localhost.yaml",
+                "/repo/ansible/inventory/localhost.yaml",
                 "--check",
                 "-e",
                 "install_dir=/scratch/data/dotfiles",
                 "-e",
                 "os_family=arch",
-                f"/repo/{_PROVISION_REL}/ansible/playbooks/packages.yaml",
+                "-e",
+                f"manifests_dir={_MANIFESTS_REL}",
+                "-e",
+                f"composition_root={_COMPOSITION_REL}",
+                "/repo/ansible/playbooks/packages.yaml",
             ],
             env=self._run_env(),
             timeout=1800,
@@ -236,8 +273,12 @@ class _Target:
                 "uv",
                 "run",
                 "--directory",
-                f"/repo/{_PROVISION_REL}",
+                "/repo",
                 "dotfiles-provision",
+                "--manifests-dir",
+                _MANIFESTS_REL,
+                "--composition-root",
+                _COMPOSITION_REL,
                 "bootstrap",
             ],
             env=self._run_env(),
@@ -262,8 +303,12 @@ class _Target:
                 "uv",
                 "run",
                 "--directory",
-                f"/repo/{_PROVISION_REL}",
+                "/repo",
                 "dotfiles-provision",
+                "--manifests-dir",
+                _MANIFESTS_REL,
+                "--composition-root",
+                _COMPOSITION_REL,
                 "verify",
             ],
             env=self._run_env(),

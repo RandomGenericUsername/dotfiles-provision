@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import yaml
+
+from tests.support import ENGINE_ROOT, composition_root, manifests_dir
 
 # S2: the static config corpus is NOT authored in this checkout any more — it
 # ships in the pinned `dotfiles-assets` repo (`configs/` class) and the
@@ -24,20 +24,9 @@ import yaml
 # the tag, which this suite deliberately does not do.
 
 
-def _find_repo_root() -> Path:
-    """Locate the repo root anchored on the assets manifest (the pin every config
-    source derives from)."""
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "dotfiles" / "provisioning" / "assets.yaml").is_file():
-            return parent
-    raise FileNotFoundError(
-        "dotfiles/provisioning/assets.yaml not found walking up from the test "
-        "file; the config corpus pin is the subject of this module"
-    )
-
-
-_REPO_ROOT = _find_repo_root()
-_ANSIBLE_DIR = _REPO_ROOT / "src" / "provisioning" / "ansible"
+_REPO_ROOT = composition_root()
+_MANIFESTS = manifests_dir()
+_ANSIBLE_DIR = ENGINE_ROOT / "ansible"
 _ROLES_DIR = _ANSIBLE_DIR / "roles"
 _CONFIG_DIR = _REPO_ROOT / "dotfiles" / "config"
 
@@ -50,7 +39,7 @@ def _vars(role: str) -> dict[str, object]:
 
 def _assets_tag() -> str:
     manifest = yaml.safe_load(
-        (_REPO_ROOT / "dotfiles" / "provisioning" / "assets.yaml").read_text()
+        (_MANIFESTS / "assets.yaml").read_text()
     )
     return str(manifest["assets"]["tag"])
 
