@@ -6,6 +6,39 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-22
+
+Engine hardening from the assets-split residual ledger. No corpus or runtime behavior change.
+
+### Added
+
+- **Self-contained wheel (R-15):** `ansible/` ships as package data under
+  `provisioning/_ansible` (hatch wheel `force-include`); `cli/main.py` resolves it through
+  `importlib.resources` and keeps the repo-root `ansible/` fallback for editable checkouts.
+  `uv tool install git+…@v0.1.1` now resolves every playbook/inventory/config path without a
+  checkout. Child `ansible`/`ansible-playbook` lookups also prepend the interpreter's bin dir
+  (uv exposes only the project entry point on the tool bin dir), so the tool runs playbooks with
+  no ansible-core scripts installed globally.
+- **Engine-pin assertion in verify (R-17):** `verify --expected-engine-tag vX.Y.Z` forwards the
+  role's `expected_engine_tag` extra-var, runs `dotfiles-provision --output-format plain version`
+  and fails when it differs from the composition's `installer.pin`; both tasks are `engine`-tagged
+  and check-mode safe. Empty by default for hand-run development verifies.
+- **`make assets-parity` + CI job (R-01):** clone `dotfiles-assets` at the pinned tag, export
+  `DOTFILES_ASSETS_REPO` / `DOTFILES_ASSETS_TEMPLATES_DIR`, run the AD-8.4 parity module, and fail
+  on any skip or clone failure (fail-closed). Declared in `CI_ONLY_EXEMPT`, so `gates-ci` keeps its
+  five members.
+- **`reset-failed` before daemon enable/start (R-14):** the runtime daemon unit is cleared of a
+  previous `start-limit-hit` before `systemd` enable/start, manager-probe gated and check-safe.
+
+### Fixed
+
+- **`TestVerifyRuntime` fixture (R-02):** the synthetic machine already carries the pinned
+  `cli-tools/{csg,weg,itr}/<tag>/` checkouts, `pinned` records and contract handshake stubs added
+  in `e11daa4`; this release also repairs the WEG negative-lock stub so it fails on `weg info`
+  while still reporting the pinned `--version`. The full class remains a developer
+  `make test-integration` run and R-02 stays open: it executes the whole verify role per test and
+  exceeds the residual sweep's five-minute budget, so no green execution is claimed here.
+
 ## [0.1.0] - 2026-10-22
 
 First release. The engine content is the in-tree provisioning project imported from

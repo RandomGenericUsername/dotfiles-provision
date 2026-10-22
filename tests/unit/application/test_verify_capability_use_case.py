@@ -73,6 +73,44 @@ class TestVerifyCapabilityUseCase:
             "composition_root",
         }
 
+    def test_expected_engine_tag_is_forwarded_as_an_extra_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """R-17: the composition pin reaches the role as `expected_engine_tag`.
+
+        It is a fifth key only when requested, so the four-key seam contract is
+        unchanged for a default verify.
+        """
+        monkeypatch.setenv("XDG_DATA_HOME", "/home/user/.local/share")
+        executor = FakeExecutor(ProvisionResult(success=True))
+        use_case = VerifyCapabilityUseCase(
+            executor=executor,
+            fact_reader=FakeFactReader("debian-family"),
+            playbook=Path("verify.yaml"),
+            seam=_SEAM,
+        )
+        use_case.verify(expected_engine_tag="v9.9.9")
+        extra_vars = executor.calls[0][2]
+        assert extra_vars["expected_engine_tag"] == "v9.9.9"
+        assert set(extra_vars) == {
+            "install_dir",
+            "os_family",
+            "manifests_dir",
+            "composition_root",
+            "expected_engine_tag",
+        }
+
+    def test_blank_expected_engine_tag_is_not_forwarded(self) -> None:
+        executor = FakeExecutor(ProvisionResult(success=True))
+        use_case = VerifyCapabilityUseCase(
+            executor=executor,
+            fact_reader=FakeFactReader("arch"),
+            playbook=Path("verify.yaml"),
+            seam=_SEAM,
+        )
+        use_case.verify(expected_engine_tag="   ")
+        assert "expected_engine_tag" not in executor.calls[0][2]
+
     def test_result_returned_unchanged(self) -> None:
         expected = ProvisionResult(
             success=False,

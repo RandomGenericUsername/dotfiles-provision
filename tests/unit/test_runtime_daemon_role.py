@@ -276,6 +276,41 @@ class TestTasks:
         assert "ansible_check_mode" in when
         assert "default(1)" in when  # Gate-2: skipped-probe robustness
 
+    def test_start_limit_is_cleared_before_enable_start(self) -> None:
+        """R-14: a fixed unit can be stranded in `start-limit-hit`; `enable`
+        + `start` does not clear that state, so the role resets the failed
+        state before the live mutation (manager-probe gated, check-safe)."""
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        reset_name = "Clear any previous start-limit failure on the daemon unit"
+        enable_name = "Reload the user manager and enable + start the daemon unit"
+        assert reset_name in names, f"missing task {reset_name!r}"
+        assert enable_name in names, f"missing task {enable_name!r}"
+        assert names.index(reset_name) < names.index(enable_name), (
+            "reset-failed must run BEFORE enable/start, otherwise a stranded "
+            "start-limit-hit is never cleared"
+        )
+
+        reset = tasks[names.index(reset_name)]
+        assert _module_key(reset) == "ansible.builtin.command"
+        params = reset["ansible.builtin.command"]
+        assert isinstance(params, dict)
+        assert params.get("argv") == [
+            "systemctl",
+            "--user",
+            "reset-failed",
+            "{{ runtime_daemon_unit_name }}",
+        ], params.get("argv")
+        assert reset.get("changed_when") is False
+        assert reset.get("failed_when") is False, (
+            "reset-failed is best-effort: a missing/stale unit is not a "
+            "provisioning failure (the enable/start below is the real gate)"
+        )
+        when = " ".join(str(clause) for clause in reset.get("when", []))
+        assert "not ansible_check_mode" in when
+        assert "runtime_daemon_manager_probe" in when
+        assert "default(1)" in when
+
     def test_managerless_fallback_is_wants_symlink(self) -> None:
         link = next(
             t

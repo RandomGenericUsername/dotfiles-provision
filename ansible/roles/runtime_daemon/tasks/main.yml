@@ -46,6 +46,24 @@
       Run the cli-tools playbook first (or bootstrap in order) instead of
       runtime-daemon.yaml standalone on a fresh machine.
 
+# R-14: a unit that previously failed its start budget is reported as
+# `start-limit-hit`; `enable`+`start` does NOT clear that state, so a fixed
+# install (new ExecStart, newer binary) would stay stranded until a human ran
+# `reset-failed`. Clear it before the enable/start mutation — manager-probe
+# gated and check-mode safe like every other live mutation in this role.
+- name: Clear any previous start-limit failure on the daemon unit
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - --user
+      - reset-failed
+      - "{{ runtime_daemon_unit_name }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - runtime_daemon_manager_probe.rc | default(1) == 0
+
 - name: Reload the user manager and enable + start the daemon unit
   ansible.builtin.systemd:
     name: "{{ runtime_daemon_unit_name }}"

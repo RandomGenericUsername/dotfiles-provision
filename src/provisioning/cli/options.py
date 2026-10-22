@@ -40,6 +40,14 @@ ASK_BECOME_PASS_OPT: bool = typer.Option(
     "like ansible-playbook -K)",
 )
 
+EXPECTED_ENGINE_TAG_OPT: str | None = typer.Option(
+    None,
+    "--expected-engine-tag",
+    help="Assert the installed engine reports this tag (the composition's "
+    "installer.pin, e.g. v0.1.1). Default: no engine assertion.",
+    metavar="TAG",
+)
+
 # ── Composition seam (AD-17) ───────────────────────────────────────────────
 # The engine repo owns the Ansible tree; the composition repo owns the
 # manifests and the runtime source. These two options are the ONLY way the

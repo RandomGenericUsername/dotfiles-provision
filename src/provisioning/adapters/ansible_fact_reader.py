@@ -9,9 +9,11 @@ never inspects packages.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from collections.abc import Callable
 
+from provisioning.adapters.ansible_env import with_tool_bin
 from provisioning.domain.enums import Distro
 from provisioning.ports import IFactReader
 
@@ -38,7 +40,13 @@ _EMBEDDED_PAYLOAD_LIMIT = 200
 
 
 def _default_runner(command: list[str], timeout: float | None = None) -> str:
-    proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    proc = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=with_tool_bin(os.environ),
+    )
     if proc.returncode != 0:
         raise InvalidFactOutputError(
             f"ansible -m setup exited with {proc.returncode}: {_truncate(proc.stderr or '')}"

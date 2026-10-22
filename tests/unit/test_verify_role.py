@@ -187,12 +187,21 @@ def _ungated_probe_problems(tasks: list[dict[str, object]]) -> list[str]:
     Split out from the test so the negative case can feed it a synthetic
     ungated `shell` task — a defect detector nobody proved fires on the module
     it widened to is a comment.
+
+    A task may carry extra conditions in a list; the gate clause itself must be
+    present verbatim (a compound string is not accepted, so a typo like
+    ``not ansible_check_mode or …`` cannot masquerade as the gate).
     """
+
+    def gated(task: dict[str, object]) -> bool:
+        when = task.get("when")
+        clauses = when if isinstance(when, list) else [when]
+        return "not ansible_check_mode" in clauses
+
     return [
         f"{_module_key(task)} {task.get('name')!r}"
         for task in tasks
-        if _module_key(task) in _PROBE_MODULES
-        and task.get("when") != "not ansible_check_mode"
+        if _module_key(task) in _PROBE_MODULES and not gated(task)
     ]
 
 
@@ -746,9 +755,12 @@ class TestVerifyTasks:
             if task.get("name") in ungated_seam_asserts:
                 continue
             if _module_key(task) == "ansible.builtin.assert":
-                assert task.get("when") == "not ansible_check_mode", (
+                when = task.get("when")
+                clauses = when if isinstance(when, list) else [when]
+                assert "not ansible_check_mode" in clauses, (
                     f"state assert {task.get('name')!r} must be gated when: not "
-                    "ansible_check_mode (bootstrap --check cleanliness)"
+                    "ansible_check_mode (bootstrap --check cleanliness); extra "
+                    "conditions are allowed in a list, the gate clause is not"
                 )
 
     def test_criterion_6_checks_current_only(self) -> None:
@@ -852,7 +864,8 @@ class TestVerifyTasks:
             f"expected the three parse-gate command tasks; found {names}"
         )
         for task in _probe_tasks():
-            assert task.get("when") == "not ansible_check_mode", (
+            gate = _ungated_probe_problems([task])
+            assert gate == [], (
                 f"probe {task.get('name')!r} ({_module_key(task)}) must be "
                 "check-gated"
             )
@@ -3183,6 +3196,68 @@ class TestVerifyPlaybook:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
+class TestEngineTagAssertion:
+    """R-17: verify asserts the engine that provisioned the host.
+
+    The composition's `installer.pin` is the one source; bootstrap passes it as
+    `expected_engine_tag`, and verify compares it to the installed
+    `dotfiles-provision version`. The empty default keeps a hand-run verify
+    against a development checkout usable.
+    """
+
+    _READ = "Read the installed engine version"
+    _ASSERT = "Assert the installed engine version matches the expected pin"
+
+    def test_expected_engine_tag_is_an_extra_var_with_an_empty_default(self) -> None:
+        default = str(_vars()["verify_expected_engine_tag"]).strip()
+        assert default == "{{ expected_engine_tag | default('', true) }}", default
+
+    def test_the_role_reads_the_installed_engine_version(self) -> None:
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        assert self._READ in names and self._ASSERT in names
+        assert names.index(self._READ) < names.index(self._ASSERT), (
+            "the version read must precede the assert that consumes it"
+        )
+
+        read = tasks[names.index(self._READ)]
+        assert _module_key(read) == "ansible.builtin.command"
+        argv = _module(read).get("argv")
+        assert isinstance(argv, list)
+        assert argv[0] == "{{ verify_cli_bin_dir | trim }}/dotfiles-provision"
+        assert argv[1:] == ["--output-format", "plain", "version"], argv
+        assert read.get("changed_when") is False
+        assert read.get("failed_when") is False, (
+            "a missing engine binary must reach the assert, which names both "
+            "the expected and observed versions"
+        )
+        assert read.get("tags") == ["engine"]
+        when = " ".join(str(clause) for clause in read.get("when", []))
+        assert "not ansible_check_mode" in when
+        assert "verify_expected_engine_tag" in when
+
+    def test_the_assert_compares_the_normalized_version_to_the_pin(self) -> None:
+        tasks = _load_tasks()
+        by_name = {str(task.get("name")): task for task in tasks}
+        assert_task = by_name[self._ASSERT]
+        assert _module_key(assert_task) == "ansible.builtin.assert"
+        that = str(_module(assert_task).get("that"))
+        assert "verify_engine_version_check.rc == 0" in that
+        assert "verify_engine_version_check.stdout | trim" in that
+        assert "verify_expected_engine_tag | trim | regex_replace('^v', '')" in that, (
+            "the package metadata reports `0.1.1` while installer.pin says "
+            "`v0.1.1`; the comparison must normalize the tag prefix"
+        )
+        fail_msg = str(_module(assert_task).get("fail_msg"))
+        assert "installer.pin" in fail_msg
+        assert "verify_expected_engine_tag" in fail_msg
+        assert "verify_engine_version_check.stdout" in fail_msg
+        assert assert_task.get("tags") == ["engine"]
+        when = " ".join(str(clause) for clause in assert_task.get("when", []))
+        assert "not ansible_check_mode" in when
+        assert "verify_expected_engine_tag" in when
+
+
 @pytest.mark.integration
 class TestVerifyRuntime:
     """Real ``ansible-playbook verify.yaml`` runs against a synthetic machine.
@@ -3257,16 +3332,77 @@ class TestVerifyRuntime:
                 "(negative lock — the gate is not vacuous); recap:\n" + second.stdout
             )
 
+    def test_engine_tag_is_asserted_against_the_pin(self) -> None:
+        """R-17 execution proof: the tagged pair reads the installed console
+        and compares it to `expected_engine_tag`; a matching pin is green and
+        a different pin fails naming both versions. `--tags engine` runs only
+        the R-17 tasks (the rest of verify needs a provisioned machine)."""
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            xdg = Path(tmp) / "xdg"
+            install = Path(tmp) / "install"
+            state_home = Path(tmp) / "state-home"
+            cache_home = Path(tmp) / "cache-home"
+            home.mkdir()
+            xdg.mkdir()
+            install.mkdir()
+
+            bin_dir = home / ".local" / "bin"
+            bin_dir.mkdir(parents=True)
+            engine = bin_dir / "dotfiles-provision"
+            engine.write_text("#!/bin/sh\nprintf '9.9.9\\n'\n")
+            engine.chmod(0o755)
+
+            env = _test_env(
+                HOME=str(home),
+                XDG_CONFIG_HOME=str(xdg),
+                XDG_STATE_HOME=str(state_home),
+                XDG_CACHE_HOME=str(cache_home),
+                ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
+                PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
+            )
+
+            def run(expected: str | None) -> subprocess.CompletedProcess[str]:
+                command = [
+                    ansible_playbook,
+                    str(self._PATH),
+                    "--tags",
+                    "engine",
+                ]
+                if expected is not None:
+                    command += ["-e", f"expected_engine_tag={expected}"]
+                return subprocess.run(
+                    command, capture_output=True, text=True, env=env, timeout=300
+                )
+
+            matching = run("v9.9.9")
+            assert matching.returncode == 0, matching.stdout + matching.stderr
+            assert "failed=0" in matching.stdout, matching.stdout
+
+            mismatch = run("v1.2.3")
+            combined = mismatch.stdout + mismatch.stderr
+            assert mismatch.returncode != 0, (
+                "verify must FAIL when the installed engine is not the "
+                "composition's pin; recap:\n" + combined
+            )
+            assert "1.2.3" in combined and "9.9.9" in combined, (
+                "the failure must name both the expected pin and the observed "
+                "version; recap:\n" + combined
+            )
+
     def test_desktop_layer3_passes_then_fails_on_a_missing_entry(self) -> None:
         """AD-10 layer 3 negative lock: the deployed desktop set is asserted, so
         deleting one entry (the shape of a skipped entry, or a role that never
         ran) must fail verify rather than leave a silently missing menu item.
 
-        The run starts AT the layer-3 block on purpose: this fixture class's
-        pre-desktop tail (the cli-tools pin block) predates the pinned-CLI split
-        and aborts at the itr pin on master too — a pre-existing gap, reproduced
-        outside this slice. Everything from the desktop block on runs for real,
-        and the clean run is asserted first so the failure cannot be vacuous.
+        The run starts AT the layer-3 block on purpose: this test isolates the
+        desktop gate from the other 170+ verify tasks (the full role green path
+        is asserted by test_verify_passes_on_a_provisioned_machine). Everything
+        from the desktop block on runs for real, and the clean run is asserted
+        first so the failure cannot be vacuous.
         """
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
@@ -3308,8 +3444,8 @@ class TestVerifyRuntime:
         """AD-10 layer 3 negative lock: the Exec probe reads the DEPLOYED file, so
         an entry whose launcher is not on PATH fails verify even though every file
         exists. This is the dead-menu-entry failure AD-10 exists to catch, and it
-        must not be green just because the corpus is fine. Same start-at rationale
-        as the test above (pre-existing cli-tools fixture gap)."""
+        must not be green just because the corpus is fine. Same start-at-task
+        isolation as the test above."""
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")
@@ -3370,9 +3506,20 @@ class TestVerifyRuntime:
             bin_dir = _write_stub_binaries(home)
             _build_provisioned_layout(home, xdg, install, state_home, cache_home)
 
-            # Make the WEG stub fail (itr/csg stay green — only the WEG gate
-            # is tripped, proving that specific rc assert is a real gate).
-            (bin_dir / "weg").write_text("#!/bin/sh\nexit 1\n")
+            # Make the WEG stub fail on `weg info` (itr/csg stay green — only
+            # the WEG gate is tripped, proving that specific rc assert is a
+            # real gate). `--version` still reports the pinned contract so the
+            # earlier AD-11 handshake passes and the failure is attributable to
+            # the parse gate, not to a stale-CLI assertion.
+            contract = str(_vars()["verify_weg_contract_version"])
+            (bin_dir / "weg").write_text(
+                "#!/bin/sh\n"
+                'if [ "$1" = "--version" ]; then\n'
+                f'  echo "weg {contract} (contract {contract})"; exit 0\n'
+                "fi\n"
+                "exit 1\n"
+            )
+            (bin_dir / "weg").chmod(0o755)
 
             env = _test_env(
                 HOME=str(home),

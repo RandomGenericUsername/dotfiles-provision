@@ -476,6 +476,17 @@ verify_cli_bin_dir: >-
   {{ ansible_facts.env.UV_TOOL_BIN_DIR
      | default(ansible_facts.env.XDG_BIN_HOME | default(ansible_facts.env.HOME + '/.local/bin', true), true) }}
 
+# verify_expected_engine_tag: R-17 — the composition's installer.pin, passed
+#   by bootstrap as the `expected_engine_tag` extra-var. Empty is the
+#   hand-run/default case: no engine assertion, so a developer running verify
+#   against a checkout is not forced to name a tag. When set, verify reads
+#   `dotfiles-provision --output-format plain version` from verify_cli_bin_dir
+#   and compares it to the pin after stripping the pin's leading `v` (the
+#   package metadata reports `0.1.1`, the composition pins `v0.1.1`). The
+#   engine tag is machine state: a fresh machine provisioned by engine A must
+#   not pass verify while claiming composition pin B.
+verify_expected_engine_tag: "{{ expected_engine_tag | default('', true) }}"
+
 # verify_settings_files: the three rendered settings DEST paths (criterion 5
 #   part 1). config-in-spine (2026-08-16): the files are rendered into the
 #   spine at <install>/config/<tool>/settings.toml; verify checks the SPINE

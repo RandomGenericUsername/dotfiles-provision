@@ -115,6 +115,45 @@
       -e install_dir=...; the trailing-slash rejection keeps the
       {{ install_dir | trim }}/<child> derivations single-slash)
 
+# R-17: the engine tag is machine state. `installer.pin` in the composition is
+# the one source, bootstrap passes it as `expected_engine_tag`, and verify
+# asserts the installed console reports that version. Without this, "which
+# engine provisioned this host?" is answered only by the bootstrap log.
+- name: Read the installed engine version
+  ansible.builtin.command:
+    argv:
+      - "{{ verify_cli_bin_dir | trim }}/dotfiles-provision"
+      - --output-format
+      - plain
+      - version
+  register: verify_engine_version_check
+  changed_when: false
+  failed_when: false
+  tags: [engine]
+  when:
+    - not ansible_check_mode
+    - verify_expected_engine_tag | trim | length > 0
+
+- name: Assert the installed engine version matches the expected pin
+  ansible.builtin.assert:
+    that:
+      - verify_engine_version_check.rc == 0
+      - (verify_engine_version_check.stdout | trim) == (verify_expected_engine_tag | trim | regex_replace('^v', ''))
+    fail_msg: >-
+      the engine that provisioned this host is not the composition's
+      installer.pin (R-17). Expected `dotfiles-provision version` to report
+      {{ verify_expected_engine_tag | trim | regex_replace('^v', '') }} (pin
+      {{ verify_expected_engine_tag }}), observed
+      rc={{ verify_engine_version_check.rc | default('n/a', true) }},
+      stdout={{ verify_engine_version_check.stdout | default('', true) | trim }}
+      from {{ verify_cli_bin_dir | trim }}/dotfiles-provision. A stale or
+      different engine tool install means bootstrap installed an engine other
+      than the pinned tag; re-install the engine at the pin, then re-run verify
+  tags: [engine]
+  when:
+    - not ansible_check_mode
+    - verify_expected_engine_tag | trim | length > 0
+
 - name: Assert verify list vars are not empty
   ansible.builtin.assert:
     that:

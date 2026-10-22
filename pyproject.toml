@@ -1,6 +1,6 @@
 [project]
 name = "dotfiles-provision"
-version = "0.1.0"
+version = "0.1.1"
 description = "Machine provisioning orchestrator for the dotfiles system (plan/apply/verify/bootstrap via Ansible)"
 readme = "README.md"
 license = "MIT"
@@ -26,6 +26,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/provisioning"]
+
+# The wheel must be a self-contained engine: the CLI runs the Ansible tree, and
+# a `uv tool install git+…@tag` has no checkout beside site-packages. The tree
+# ships as package data under `provisioning/_ansible` and `cli/main.py` resolves
+# it through `importlib.resources` (R-15). The sdist keeps `ansible/` at the
+# repo root, so a source install builds the same wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"ansible" = "provisioning/_ansible"
 
 # The harness trees (.agents/, _bmad/, .opencode/, openspec/, tickets/, .github/)
 # are not release content. `ansible/` IS included: it is the engine the CLI runs,

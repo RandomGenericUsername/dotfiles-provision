@@ -20,6 +20,7 @@ import threading
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from provisioning.adapters.ansible_env import with_tool_bin
 from provisioning.domain.models import ProvisionResult
 from provisioning.ports import IProvisionExecutor
 
@@ -90,7 +91,7 @@ def _default_runner(
     ``OSError``/``TimeoutExpired`` propagate raw so ``run()`` converts them
     exactly as it does for injected runners.
     """
-    base_env = env if env is not None else os.environ
+    base_env = with_tool_bin(env if env is not None else os.environ)
     proc = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,

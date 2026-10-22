@@ -32,6 +32,7 @@ WORKFLOW = ".github/workflows/gates.yml"
 # Jobs that are deliberately not `make` gates, with the reason they exist.
 CI_ONLY_EXEMPT: dict[str, str] = {
     "ci-gates-parity": "this check: it compares the workflow to GATES and is not itself a gate",
+    "assets-parity": "needs a network clone of the pinned dotfiles-assets corpus (R-01)",
     "release": "tag-only artifact publisher; it needs a GitHub token, not a local gate",
 }
 

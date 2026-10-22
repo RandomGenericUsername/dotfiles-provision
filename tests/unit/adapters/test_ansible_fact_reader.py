@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
@@ -41,6 +44,24 @@ class TestAnsibleFactReader:
         reader = AnsibleFactReader(runner=_recording_runner(commands, _setup_output("Archlinux")))
         reader.os_family()
         assert commands == [["ansible", "-m", "setup", "localhost"]]
+
+    def test_default_runner_puts_the_tool_bin_on_the_child_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """R-15: the fact command is `ansible`, which a tool install does not
+        expose on PATH; the interpreter's bin dir must be prepended."""
+        seen: dict[str, object] = {}
+
+        def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            seen.update(kwargs)
+            return subprocess.CompletedProcess(command, 0, _setup_output("Archlinux"), "")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        reader = AnsibleFactReader()
+        assert reader.os_family() == Distro.ARCH.value
+        env = seen["env"]
+        assert isinstance(env, dict)
+        assert str(Path(sys.executable).parent) in str(env["PATH"]).split(os.pathsep)
 
     def test_unrecognized_family_fails_loudly(self) -> None:
         reader = AnsibleFactReader(runner=_recording_runner([], _setup_output("FreeBSD")))

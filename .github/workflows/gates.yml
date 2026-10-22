@@ -76,10 +76,26 @@ jobs:
       - uses: actions/checkout@v4
       - run: make ci-gates-parity
 
+  # R-01 / AD-8.4: the parity test needs the pinned dotfiles-assets corpus. A
+  # bare runner would SKIP it, so this job provides the corpus and fails on
+  # any skip. Declared in CI_ONLY_EXEMPT because it needs network access to a
+  # separate repo, not because it is optional.
+  assets-parity:
+    name: assets-parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.22"
+          enable-cache: true
+      - run: make sync
+      - run: make assets-parity
+
   release:
     name: release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, lint, hermetic, lock-check, docs-check]
+    needs: [test, lint, hermetic, lock-check, docs-check, assets-parity]
     runs-on: ubuntu-latest
     permissions:
       contents: write

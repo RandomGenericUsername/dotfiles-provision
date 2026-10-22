@@ -5,11 +5,13 @@ import json
 import logging
 import os
 import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+from provisioning.adapters.ansible_env import with_tool_bin
 from provisioning.adapters.ansible_executor import (
     AnsibleExecutor,
     ProvisionExecutorError,
@@ -346,6 +348,23 @@ class TestAnsibleExecutor:
     def test_empty_tags_rejected_at_construction(self) -> None:
         with pytest.raises(ValueError, match="non-empty"):
             AnsibleExecutor(inventory=Path("inventory.yaml"), tags="  ")
+
+
+class TestToolBinPath:
+    """R-15: a tool install exposes only the project entry point, not the
+    ansible binaries that ship in its venv. The child PATH must include the
+    interpreter's bin dir or every playbook run dies with "No such file"."""
+
+    def test_prepends_the_interpreter_bin_when_absent(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PATH", "/usr/bin")
+        env = with_tool_bin(os.environ)
+        assert env["PATH"].split(os.pathsep)[0] == str(Path(sys.executable).parent)
+
+    def test_does_not_duplicate_a_present_interpreter_bin(self) -> None:
+        bin_dir = str(Path(sys.executable).parent)
+        original = os.pathsep.join([bin_dir, "/usr/bin"])
+        env = with_tool_bin({"PATH": original})
+        assert env["PATH"] == original
 
 
 class TestAnsibleEnv:

@@ -324,6 +324,24 @@ class TestVerifyCommand:
         assert deps.verify_executor.calls == [_expected_call("verify.yaml", False)]
         _assert_success_payload(result, "verify")
 
+    def test_verify_forwards_the_expected_engine_tag(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """R-17: the composition pin is forwarded as the fifth extra-var."""
+        deps = FakeDeps(_ok_result())
+        result = _invoke(
+            runner,
+            deps,
+            ["verify", "--expected-engine-tag", "v9.9.9"],
+            monkeypatch,
+        )
+        assert result.exit_code == 0, result.stderr
+        playbook, check, extra_vars = deps.verify_executor.calls[0]
+        assert (playbook, check) == (Path("verify.yaml"), False)
+        assert extra_vars["expected_engine_tag"] == "v9.9.9"
+        assert extra_vars["install_dir"] == str(resolve_install_dir())
+        _assert_success_payload(result, "verify")
+
     def test_verify_adapter_error_renders_error_view(
         self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
     ) -> None:

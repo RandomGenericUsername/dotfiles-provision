@@ -179,10 +179,11 @@ class VerifyCapabilityUseCase:
         self._playbook = playbook
         self._seam = seam or CompositionSeam.resolve()
 
-    def verify(self) -> ProvisionResult:
-        return self._executor.run(
-            self._playbook, False, _seam_extra_vars(self._fact_reader, self._seam)
-        )
+    def verify(self, expected_engine_tag: str | None = None) -> ProvisionResult:
+        extra_vars = _seam_extra_vars(self._fact_reader, self._seam)
+        if expected_engine_tag is not None and expected_engine_tag.strip():
+            extra_vars["expected_engine_tag"] = expected_engine_tag.strip()
+        return self._executor.run(self._playbook, False, extra_vars)
 
 
 class BootstrapUseCase:

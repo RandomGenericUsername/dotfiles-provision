@@ -19,6 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
+from importlib.resources import files as _resource_files
 from pathlib import Path
 
 import typer
@@ -54,6 +55,7 @@ from provisioning.cli.options import (
     BECOME_PASSWORD_OPT,
     CHECK_OPT,
     COMPOSITION_ROOT_OPT,
+    EXPECTED_ENGINE_TAG_OPT,
     INVENTORY_OPT,
     MANIFESTS_DIR_OPT,
     OUTPUT_FORMAT_OPT,
@@ -101,9 +103,24 @@ class CliDependencies:
     bootstrap: BootstrapUseCase
 
 
-# main.py lives at src/provisioning/cli/main.py:
-#   parents[0]=cli, parents[1]=provisioning, parents[2]=src, parents[3]=<engine repo>
-_ANSIBLE_ROOT = Path(__file__).resolve().parents[3] / "ansible"
+# The Ansible tree is packaged INSIDE the Python package as `_ansible`
+# (pyproject.toml wheel force-include), so a wheel/tool install is
+# self-contained. An editable/source checkout has no `_ansible` beside the
+# package, so fall back to the repo-root `ansible/` — that is the engine
+# development path only.
+def _resolve_ansible_root() -> Path:
+    packaged = Path(str(_resource_files("provisioning").joinpath("_ansible")))
+    if packaged.is_dir():
+        return packaged
+    checkout = Path(__file__).resolve().parents[3] / "ansible"
+    if checkout.is_dir():
+        return checkout
+    # Let the first consumer fail loudly with the path it looked for instead
+    # of silently pretending the engine has no Ansible tree.
+    return packaged
+
+
+_ANSIBLE_ROOT = _resolve_ansible_root()
 
 
 def default_inventory() -> Path:
@@ -310,10 +327,17 @@ def apply(
 
 
 @app.command(help="Assert all done-criteria hold")
-def verify(ctx: typer.Context) -> None:
+def verify(
+    ctx: typer.Context,
+    expected_engine_tag: str | None = EXPECTED_ENGINE_TAG_OPT,
+) -> None:
     deps = build_deps(_require_seam(ctx))
     renderer: Renderer = ctx.obj["renderer"]
-    _render_run(renderer, lambda: deps.verify.verify(), "verify")
+    _render_run(
+        renderer,
+        lambda: deps.verify.verify(expected_engine_tag=expected_engine_tag),
+        "verify",
+    )
 
 
 @app.command(help="Run the aggregate provisioning end-to-end")

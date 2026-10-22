@@ -28,7 +28,7 @@ GATES := test lint hermetic lock-check docs-check
 # disposable root container. Both are developer proofs, not stock-runner gates.
 FAST := -m "not integration and not container_target"
 
-.PHONY: help sync collections install test test-integration lint format gates gates-ci hermetic lock-check docs-check build ci-gates-parity clean
+.PHONY: help sync collections install test test-integration lint format gates gates-ci hermetic lock-check docs-check build assets-parity ci-gates-parity clean
 
 help:
 	@echo "sync             Install the env from uv.lock (uv sync --frozen)"
@@ -42,6 +42,7 @@ help:
 	@echo "docs-check       README/CHANGELOG/LICENSE/AGENTS + CLAUDE symlink exist"
 	@echo "gates            $(GATES)"
 	@echo "ci-gates-parity  Workflow jobs equal GATES + declared CI-only jobs"
+	@echo "assets-parity    Run AD-8.4 parity against the pinned dotfiles-assets corpus"
 	@echo "build            Build sdist + wheel into dist/"
 	@echo "install          Install the built package into .venv"
 	@echo "clean            Remove dist/ and local caches"
@@ -106,6 +107,12 @@ gates-ci: $(GATES)
 
 ci-gates-parity:
 	python3 scripts/ci-gates-parity.py
+
+# R-01: CI-only because it needs a network clone of the pinned assets repo.
+# The runner clones the tag, exports the corpus env, and fails on a skipped
+# parity test (a skip would be a silent pass). Run `make sync` first.
+assets-parity:
+	$(UV) run python scripts/assets-parity.py
 
 build:
 	$(UV) build

@@ -63,16 +63,24 @@ This repo is consumed as an **immutable git tag**, never a path and never `edita
 ```toml
 # a consumer's pyproject.toml
 [tool.uv.sources]
-dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.0" }
+dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.1" }
 ```
 
 A tag is never moved or deleted; a fix ships as a new tag. The `cli-output` dependency is pinned
 the same way in this repo's `pyproject.toml`.
 
-**The wheel is not a self-contained provisioner.** `[tool.hatch.build.targets.wheel]` packages
-only `src/provisioning`, and the CLI resolves `ansible/` beside the installed checkout — not in
-`site-packages`. Install the engine from the pinned **checkout** (the sdist carries `ansible/` for
-source installs); the wheel exists to record the release, not to replace the tree.
+**The wheel is self-contained.** The Ansible tree ships as package data
+(`provisioning/_ansible`, via the wheel `force-include` in `pyproject.toml`), and the CLI resolves
+it through `importlib.resources` — a `uv tool install git+…@<tag>` has no checkout beside
+site-packages. Child `ansible`/`ansible-playbook` lookups prepend the interpreter's bin dir, so
+the tool also runs without ansible-core's scripts installed globally. A source/editable checkout
+still resolves the repo-root `ansible/`:
+
+```bash
+uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.1"
+dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
+  --composition-root /path/to/dotfiles-v3 manifests
+```
 
 ## Tests
 
@@ -88,6 +96,21 @@ source installs); the wheel exists to record the release, not to replace the tre
 - `make hermetic` runs the same selection with empty `HOME`/`XDG_*` and a foreign cwd. Tests that
   need the pinned `dotfiles-assets` corpus (a separate repo) skip with their stated reason unless
   `$DOTFILES_ASSETS_REPO`, `$DOTFILES_ASSETS_TEMPLATES_DIR` or a provisioned spine provides it.
+- `make assets-parity` clones `dotfiles-assets` at the tag the composition pins, exports the corpus
+  env, and runs `tests/unit/test_template_vars_parity.py` — failing if any parity test skips
+  (R-01). CI runs the same target as the `assets-parity` job.
+
+## Verify the engine pin
+
+`verify` accepts the composition's `installer.pin` as `--expected-engine-tag` (forwarded to the
+`expected_engine_tag` extra-var). When set, it runs
+`dotfiles-provision --output-format plain version` from the tool bin dir and fails if the installed
+engine is not that tag (leading `v` normalized). The empty default keeps a hand-run verify against
+a development checkout usable.
+
+```bash
+dotfiles-provision verify --expected-engine-tag v0.1.1
+```
 
 ## Repo harness
 
