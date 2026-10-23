@@ -2,7 +2,7 @@
 id: BUG-001
 title: "runtime-seed invokes the deleted composition src/runtime"
 kind: bug
-status: in-progress
+status: done
 lane: direct
 severity: high
 links:
@@ -54,3 +54,19 @@ The seed invokes the installed pinned binary from `runtime_seed_bin_dir`
 - A unit test locks the argv and the absence of the composition source path.
 - Engine gates green; `v0.1.8` tagged/released; the composition pin bumps to `v0.1.8` in its own
   commit.
+
+## Closeout
+
+| Claim | Command | Result |
+| --- | --- | --- |
+| No source path remains | `rg -n 'src/runtime|uv run --directory' ansible/playbooks/runtime-seed.yaml` | exit 1, no matches |
+| Seed argv locked | `uv run pytest -q tests/unit/test_runtime_seed_playbook.py` | 3 passed |
+| Engine gates | `make gates` | `978 passed, 3 skipped, 54 deselected`; lint clean; hermetic `946 passed, 35 skipped, 54 deselected`; lock `Resolved 33 packages` |
+| Build | `make build` | `dotfiles_provision-0.1.8-py3-none-any.whl` + `.tar.gz` |
+| Seed executes the installed binary | stub `dotfiles-runtime` + `ansible-playbook ansible/playbooks/runtime-seed.yaml` | `ok=4 changed=1 failed=0`; the stub is the only runtime invoked, no composition root needed |
+| Main CI | `gh run view 40025470974` | `completed/success` (all gates) |
+| Tag CI | `gh run view 40026090029` | `completed/success` incl. `release` |
+| Annotated tag | `git rev-parse v0.1.8` / `'v0.1.8^{commit}'` / `git cat-file -t` | `fd2e1f01…` / `9d4648ea…` / `tag` |
+| Release artifacts | `gh release view v0.1.8 --json assets` | `dotfiles_provision-0.1.8-py3-none-any.whl`, `dotfiles_provision-0.1.8.tar.gz` |
+
+Composition pin bumped to `v0.1.8` in `dotfiles-v3` commit `291afca0`; its CI is green.
