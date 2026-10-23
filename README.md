@@ -7,9 +7,10 @@ settings and the desktop session.
 
 **Charter — the engine, not the composition.** This repo owns `ansible/` and
 `src/provisioning/`. The composition repo (`dotfiles-v3`) owns the manifests
-(`dotfiles/provisioning/*.yaml`), the provisioning scripts, `dotfiles/config/btop/active-theme`
-and `src/runtime/`. The engine never ships or edits them; it reads them through the CLI seam
-below.
+(`dotfiles/provisioning/*.yaml`), the provisioning scripts and `src/runtime/`. The btop
+active-theme preference is host state in the install spine (written by the studio, read by
+`btop_config`). The engine never ships or edits composition files; it reads them through the CLI
+seam below.
 
 ## The composition seam (AD-17)
 
@@ -20,7 +21,7 @@ extra-vars:
 | Flag | Default | Extra-var | Used for |
 | --- | --- | --- | --- |
 | `--manifests-dir` | `<cwd>/dotfiles/provisioning` | `manifests_dir` | manifest validation, `scripts/gloview-activate` |
-| `--composition-root` | parent of `--manifests-dir`'s parent | `composition_root` | `dotfiles/config/btop/active-theme`, `src/runtime/` |
+| `--composition-root` | parent of `--manifests-dir`'s parent | `composition_root` | `src/runtime/`; the legacy active-theme path is read only for the R-07 migration |
 | `--inventory` | this engine's `ansible/inventory/localhost.yaml` | (executor `-i`) | the host Ansible runs against |
 
 Flags are global (before the command). A bad path fails before Ansible starts with a structured

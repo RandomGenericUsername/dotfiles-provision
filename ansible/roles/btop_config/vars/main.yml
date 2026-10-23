@@ -50,13 +50,18 @@ btop_config_spine_themes_dir: "{{ btop_config_spine_dir }}/themes"
 #   ansible_facts.env, NOT the deprecated top-level ansible_env fact.
 btop_config_xdg_config_home: "{{ ansible_facts.env.XDG_CONFIG_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.config', true) }}"
 
-# btop_config_active_theme_file: the composition-owned active-theme setting,
-#   read from `composition_root` (the extra-var the engine CLI resolves; never
-#   `{{ playbook_dir }}` — this repo is the pinned engine and owns no
-#   composition tree). The studio's "★ active" action writes the chosen theme's
-#   filename here; the render below reads it so the selection SURVIVES
-#   re-provisioning (design D10). A missing file falls back to the default.
-btop_config_active_theme_file: "{{ composition_root }}/dotfiles/config/btop/active-theme"
+# btop_config_active_theme_file: the HOST-OWNED active-theme setting in the
+#   install spine. The studio's "★ active" action writes the chosen theme's
+#   filename here and the render below reads it, so the selection SURVIVES
+#   re-provisioning (design D10) without living in a git-tracked composition
+#   checkout (OPEN-5 / R-07). A missing file falls back to the default.
+btop_config_active_theme_file: "{{ btop_config_spine_dir }}/active-theme"
+
+# btop_config_legacy_active_theme_file: the pre-R-07 composition path, read
+#   ONLY to seed the spine on a host that still has the old checkout. The file
+#   is deleted from the composition repo; this task lets an existing selection
+#   survive the migration instead of silently reverting to the default.
+btop_config_legacy_active_theme_file: "{{ composition_root }}/dotfiles/config/btop/active-theme"
 
 # btop_config_default_active_theme: the generated theme, selected by FILENAME
 #   (btop matches color_theme only against themes discovered in its own theme

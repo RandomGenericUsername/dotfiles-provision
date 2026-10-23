@@ -6,6 +6,18 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-23
+
+### Changed
+
+- **btop active-theme is host state in the install spine (R-07):** `btop_config` reads
+  `<install>/config/btop/active-theme` instead of `dotfiles/config/btop/active-theme`. A
+  pre-R-07 composition file is used once to seed the spine, so an existing selection survives the
+  migration. The composition repo no longer authors a `dotfiles/config/` tree.
+- **`ags-apps` pin `v0.4.1`:** the btop studio now writes the active theme through
+  `activeThemePath()` into the install spine (`<install>/config/btop/active-theme`), matching the
+  role. `make btop-theme-studio-tests` is green in the studio repo.
+
 ## [0.1.2] - 2026-10-22
 
 ### Added

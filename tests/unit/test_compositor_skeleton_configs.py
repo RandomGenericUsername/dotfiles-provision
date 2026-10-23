@@ -16,8 +16,8 @@ from tests.support import ENGINE_ROOT, composition_root, manifests_dir
 #      assets manifest declares (no role-local pin drift, no repo tree);
 #   2. the 15 compositor skeletons are exactly the configs-class files the
 #      consumer addresses (an unregistered file silently never deploys);
-#   3. the in-tree static corpus is gone, and since S3 so are the template
-#      sources: `dotfiles/config/` holds only the mutable `btop/active-theme`.
+#   3. the in-tree static corpus is gone, and since R-07 so is the mutable
+#      `btop/active-theme`: `dotfiles/config/` itself must not exist.
 #
 # The corpus's own content checks now belong to the assets repo (configs/README.md
 # and the release acceptance grep); a consumer-side byte test would have to fetch
@@ -133,22 +133,15 @@ class TestRetiredConfigCorpus:
             "configs class and `style.css.tpl` is its templates class (S3)"
         )
 
-    def test_only_the_mutable_preference_remains(self) -> None:
-        """`btop/active-theme` is host state (AD-11/OPEN-5, S7); nothing else is
-        authored under `dotfiles/config/`."""
-        assert (_CONFIG_DIR / "btop" / "active-theme").is_file(), (
-            "btop/active-theme is the mutable preference and stays until S7"
-        )
-        files = sorted(
-            str(p.relative_to(_CONFIG_DIR)) for p in _CONFIG_DIR.rglob("*") if p.is_file()
-        )
-        dirs = sorted(
-            str(p.relative_to(_CONFIG_DIR)) for p in _CONFIG_DIR.rglob("*") if p.is_dir()
-        )
-        assert files == ["btop/active-theme"] and dirs == ["btop"], (
-            f"dotfiles/config/ must hold only btop/active-theme (the mutable preference, "
-            f"S7/OPEN-5); found files={files} dirs={dirs}. Static config is the corpus's "
-            f"configs class; templates are its templates class (S3)"
+    def test_composition_config_tree_is_gone(self) -> None:
+        """R-07: the last file in `dotfiles/config/` (btop/active-theme) is now
+        host state in the install spine, so the composition authors no config
+        tree at all."""
+        assert not _CONFIG_DIR.exists(), (
+            "dotfiles/config/ must be absent: the static corpus is the pinned "
+            "assets configs class, the templates are its templates class, and "
+            "the active-theme preference is host state in the install spine "
+            "(R-07/OPEN-5)"
         )
 
     def test_render_sources_are_the_pinned_templates_class(self) -> None:

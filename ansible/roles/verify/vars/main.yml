@@ -1030,8 +1030,8 @@ verify_btop_theme_paths: >-
      verify_btop_themes_dir ~ '/') | list }}
 
 # verify_btop_default_theme: the theme btop.conf is expected to select when the
-#   repo-owned active-theme setting is absent/empty — the generated theme. The
-#   active theme is a repo-owned setting (btop-theme-deployment), so verify does
+#   host-owned active-theme setting is absent/empty — the generated theme. The
+#   active theme is host state in the install spine (btop-theme-deployment), so verify does
 #   NOT pin one filename: it resolves the name from btop.conf and asserts the
 #   matching .theme exists in the spine themes dir.
 verify_btop_default_theme: colors.btop.theme

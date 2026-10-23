@@ -1,9 +1,10 @@
 """Shared test fixtures for the installer engine.
 
 The engine repo owns the Ansible tree but **not** the composition checkout:
-`dotfiles/provisioning/*.yaml` (the manifests), `dotfiles/provisioning/scripts/`
-and `dotfiles/config/btop/active-theme` are the composition repo's, and
-`src/runtime/` is the composition's runtime. A unit test in this repo therefore
+`dotfiles/provisioning/*.yaml` (the manifests) and
+`dotfiles/provisioning/scripts/` are the composition repo's, and `src/runtime/`
+is the composition's runtime. The btop active-theme preference is host state in
+the install spine (R-07), not a composition file. A unit test in this repo therefore
 cannot walk up to a real composition tree — there is none above an engine
 checkout.
 
@@ -14,7 +15,7 @@ Resolution order for tests:
    manifests instead of the fixture.
 2. ``tests/fixtures/composition/`` — a minimal composition tree copied from
    ``dotfiles-v3`` when the engine was extracted (the five manifests, the
-   gloview-activate script, ``btop/active-theme`` and a runtime stub).
+   gloview-activate script and a runtime stub).
 
 The fixture is a **test input**, never a deployed source: production reads only
 what ``dotfiles-provision --manifests-dir/--composition-root`` resolves.

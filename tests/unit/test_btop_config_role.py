@@ -358,9 +358,28 @@ class TestBtopThemeDeployment:
     def test_default_active_theme_is_the_generated_theme(self) -> None:
         assert str(_vars()["btop_config_default_active_theme"]) == _SELECTED_THEME
 
-    def test_active_theme_file_is_the_repo_owned_setting(self) -> None:
+    def test_active_theme_file_is_the_spine_setting(self) -> None:
         value = str(_vars()["btop_config_active_theme_file"])
-        assert value == "{{ composition_root }}/dotfiles/config/btop/active-theme"
+        assert value == "{{ btop_config_spine_dir }}/active-theme", (
+            "R-07: the active theme is host state in the install spine, written "
+            "by the studio — not a git-tracked composition file"
+        )
+
+    def test_legacy_composition_setting_is_only_a_migration_source(self) -> None:
+        tasks = _load_tasks()
+        names = [str(t.get("name", "")) for t in tasks]
+        seed_name = "Seed the spine active-theme from the legacy composition setting"
+        assert seed_name in names
+        seed = tasks[names.index(seed_name)]
+        assert _module_key(seed) == "ansible.builtin.copy"
+        params = _module(seed)
+        assert "btop_config_legacy_active_theme_file" in str(params.get("src"))
+        assert "btop_config_active_theme_file" in str(params.get("dest"))
+        assert params.get("remote_src") is True
+        when = " ".join(str(clause) for clause in seed.get("when", []))
+        assert "not ansible_check_mode" in when
+        assert "legacy_active_theme.stat.exists" in when
+        assert "spine_active_theme.stat.exists" in when
 
     def test_authored_themes_dir_is_the_pinned_assets_checkout(self) -> None:
         """S1: authored themes moved to the pinned assets corpus (content/

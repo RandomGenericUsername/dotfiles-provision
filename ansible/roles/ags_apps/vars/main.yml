@@ -99,7 +99,7 @@ ags_apps_repo_url: https://github.com/RandomGenericUsername/ags-apps.git
 #   live link at an older sibling tag dir to roll back. Recorded on the host at
 #   ags_apps_pin_file so the installed version is observable without reading
 #   this file.
-ags_apps_version: v0.4.0
+ags_apps_version: v0.4.1
 
 # ags_apps_install_root: the monorepo home (<install>/ags-apps/). Trim lock:
 #   consumes the same validated {{ install_dir | trim }} value the sibling

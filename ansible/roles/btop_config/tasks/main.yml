@@ -38,10 +38,10 @@
   ansible.builtin.assert:
     that: composition_root is defined and composition_root | trim | length > 0
     fail_msg: >-
-      composition_root is undefined or empty — the btop_config role reads the
-      composition-owned active-theme setting
-      (dotfiles/config/btop/active-theme). The engine CLI resolves it from
-      --composition-root; direct runs pass -e composition_root=...
+      composition_root is undefined or empty — the btop_config role uses it to
+      migrate a pre-R-07 active-theme selection from the legacy composition
+      path. The engine CLI resolves it from --composition-root; direct runs
+      pass -e composition_root=...
 
 - name: Ensure btop config dir exists in the spine
   ansible.builtin.file:
@@ -58,10 +58,32 @@
     path: "{{ btop_config_spine_themes_dir }}"
     state: directory
 
-# btop-theme-deployment: read the repo-owned active-theme setting. A missing
-# setting is not an error — the default (the generated theme) is used. slurp is
-# read-only and therefore check-safe.
-- name: Read the repo-owned active-theme setting
+# btop-theme-deployment (R-07): the active-theme setting is host state in the
+# spine, written by the studio. A pre-R-07 host may still have the old
+# composition file; seed the spine from it once, then read only the spine. A
+# missing setting is not an error — the default (the generated theme) is used.
+- name: Check for a legacy composition active-theme setting
+  ansible.builtin.stat:
+    path: "{{ btop_config_legacy_active_theme_file }}"
+  register: btop_config_legacy_active_theme
+
+- name: Check for an existing spine active-theme setting
+  ansible.builtin.stat:
+    path: "{{ btop_config_active_theme_file }}"
+  register: btop_config_spine_active_theme
+
+- name: Seed the spine active-theme from the legacy composition setting
+  ansible.builtin.copy:
+    src: "{{ btop_config_legacy_active_theme_file }}"
+    dest: "{{ btop_config_active_theme_file }}"
+    remote_src: true
+    mode: "0644"
+  when:
+    - not ansible_check_mode
+    - btop_config_legacy_active_theme.stat.exists | default(false)
+    - not (btop_config_spine_active_theme.stat.exists | default(false))
+
+- name: Read the host-owned active-theme setting
   ansible.builtin.slurp:
     src: "{{ btop_config_active_theme_file }}"
   register: btop_config_active_theme_raw
