@@ -12,6 +12,11 @@ active-theme preference is host state in the install spine (written by the studi
 `btop_config`). The engine never ships or edits composition files; it reads them through the CLI
 seam below.
 
+**Workspace.** The engine is developed beside its consumers under `~/Development/dotfiles/`
+(`dotfiles-v3`, `dotfiles-assets`, `ags-apps`, `ags-platform`, `contracts`, …). The canonical
+ownership/pin map is [`../dotfiles-v3/docs/WORKSPACE.md`](../dotfiles-v3/docs/WORKSPACE.md);
+the engine's own consumers pin it by tag.
+
 ## The composition seam (AD-17)
 
 A pinned engine checkout has **no composition ancestors**, so no role derives a composition path
@@ -64,7 +69,7 @@ This repo is consumed as an **immutable git tag**, never a path and never `edita
 ```toml
 # a consumer's pyproject.toml
 [tool.uv.sources]
-dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.1" }
+dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.5" }
 ```
 
 A tag is never moved or deleted; a fix ships as a new tag. The `cli-output` dependency is pinned
@@ -78,7 +83,7 @@ the tool also runs without ansible-core's scripts installed globally. A source/e
 still resolves the repo-root `ansible/`:
 
 ```bash
-uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.1"
+uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.5"
 dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
   --composition-root /path/to/dotfiles-v3 manifests
 ```
@@ -110,7 +115,7 @@ engine is not that tag (leading `v` normalized). The empty default keeps a hand-
 a development checkout usable.
 
 ```bash
-dotfiles-provision verify --expected-engine-tag v0.1.1
+dotfiles-provision verify --expected-engine-tag v0.1.5
 ```
 
 ## Repo harness
