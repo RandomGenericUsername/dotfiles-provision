@@ -6,6 +6,15 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-23
+
+### Fixed
+
+- **btop integration test seam (R-07):** the direct `btop-config.yaml` run now passes
+  `composition_root`, which the legacy active-theme migration stat reads. Test-only fix; the
+  v0.1.3 role behavior is unchanged. `pytest tests/integration/test_btop_theme_deployment_e2e.py
+  -q` → `2 passed`.
+
 ## [0.1.3] - 2026-10-23
 
 ### Changed

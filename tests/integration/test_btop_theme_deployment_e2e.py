@@ -91,6 +91,8 @@ def _run_playbook(install: Path, home: Path, xdg: Path, setting: Path, authored:
             "-e",
             f"btop_config_active_theme_file={setting}",
             "-e",
+            f"composition_root={setting.parent}",
+            "-e",
             f"btop_config_authored_themes_repo_dir={authored}",
         ],
         capture_output=True,
