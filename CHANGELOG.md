@@ -6,6 +6,15 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-23
+
+### Fixed
+
+- **`verify` ags-apps pin mirror (v0.1.5 regression):** `ags_apps_version` advanced to `v0.4.1`
+  but `verify_ags_apps_version` stayed at `v0.4.0`, so the first post-apply verify failed on the
+  live-bar symlink assertion. The mirror is now `v0.4.1`; a parity test
+  (`TestVerifyAgsAppsPinMirror`) locks both the unit and platform versions to the `ags_apps` role.
+
 ## [0.1.5] - 2026-10-23
 
 ### Fixed

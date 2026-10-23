@@ -3014,6 +3014,32 @@ class TestVerifyVars:
         assert hit is None, f"vars/main.yml hardcodes an absolute path: {hit!r} (trim lock)"
 
 
+class TestVerifyAgsAppsPinMirror:
+    """The verify role must assert the SAME ags-apps unit the role installs.
+
+    The installer and verifier live in different roles, so their version vars are
+    a hand-maintained mirror. v0.1.5 shipped `ags_apps_version: v0.4.1` with
+    `verify_ags_apps_version: v0.4.0`, which failed the first post-apply verify.
+    """
+
+    def test_ags_apps_version_mirrors_the_role(self) -> None:
+        verify_vars = _vars()
+        apps_vars = _sibling_vars("ags_apps")
+        assert verify_vars["verify_ags_apps_version"] == apps_vars["ags_apps_version"]
+        assert (
+            verify_vars["verify_ags_apps_platform_version"]
+            == apps_vars["ags_apps_platform_version"]
+        )
+
+    def test_the_live_links_are_asserted_against_the_mirror(self) -> None:
+        tasks = _load_tasks()
+        by_name = {str(t.get("name", "")): t for t in tasks}
+        bar_assert = by_name["Assert the ags-apps unit + live bar + resolution shortcut are installed"]
+        that = str(_module(bar_assert).get("that"))
+        assert "verify_ags_apps_version" in that
+        assert "verify_ags_apps_platform_version" in that
+
+
 class TestVerifyAssetsSchemaWindow:
     """S5 (AD-12): the deployed pin and contracts are re-asserted, not assumed."""
 
