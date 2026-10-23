@@ -6,6 +6,16 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-23
+
+### Fixed
+
+- **Bootstrap failure in the R-14 rendered-unit assert (v0.1.4 regression):** the `that:` string
+  contained literal `{%`/`%}`, which Ansible parsed as a Jinja block before evaluating and failed
+  with `tag name expected` / `CapturedExceptionMarker`. The assert now uses the `[{]%` and `%[}]`
+  character classes, which match the same delimiters without spelling them out. Verified:
+  `ansible-playbook ansible/playbooks/runtime-daemon.yaml` → `failed=0`; unit tests `32 passed`.
+
 ## [0.1.4] - 2026-10-23
 
 ### Fixed

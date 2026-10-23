@@ -38,9 +38,13 @@
 
 - name: Assert the rendered daemon unit has no unresolved Jinja or swallowed continuation
   ansible.builtin.assert:
+    # NOTE: never put a literal `{%`/`%}` in an Ansible expression — the
+    # template engine parses it as a block tag before evaluating (v0.1.4
+    # bootstrap regression). The character classes match the two-character
+    # delimiters without spelling them out.
     that:
-      - "'{%' not in (runtime_daemon_unit_raw.content | b64decode)"
-      - "'%}' not in (runtime_daemon_unit_raw.content | b64decode)"
+      - "(runtime_daemon_unit_raw.content | b64decode) is not search('[{]%')"
+      - "(runtime_daemon_unit_raw.content | b64decode) is not search('%[}]')"
       - "'# ' not in ((runtime_daemon_unit_raw.content | b64decode).splitlines()
            | select('match', '^ExecStart=') | first | default(''))"
     fail_msg: >-

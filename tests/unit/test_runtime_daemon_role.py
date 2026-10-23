@@ -329,9 +329,17 @@ class TestTasks:
 
         check = tasks[names.index(assert_name)]
         assert _module_key(check) == "ansible.builtin.assert"
-        that = str(check["ansible.builtin.assert"].get("that"))
-        assert "'{%' not in" in that
-        assert "'%}' not in" in that
+        that_items = check["ansible.builtin.assert"].get("that")
+        assert isinstance(that_items, list)
+        that = " ".join(str(item) for item in that_items)
+        # v0.1.4 regression: a literal block delimiter inside an Ansible
+        # expression is parsed as a template before evaluation and fails with
+        # CapturedExceptionMarker. The braces must be regex escapes.
+        assert "{%" not in that and "%}" not in that, (
+            "an Ansible `that:` expression must not contain literal Jinja "
+            "block delimiters; use the [{]% / %[}] character classes"
+        )
+        assert "[{]%" in that and "%[}]" in that
         assert "# " in that
         assert "not ansible_check_mode" in str(check.get("when"))
 
