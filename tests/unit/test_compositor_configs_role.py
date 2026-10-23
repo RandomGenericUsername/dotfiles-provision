@@ -222,7 +222,7 @@ def _skeleton_task() -> dict[str, object]:
 #: sibling-checkout handling: when the checkout is absent the tests that need
 #: the real unit SKIP rather than fail (this suite is dev-only; CI has none).
 _AGS_APPS_REPO = Path(
-    os.environ.get("AGS_APPS_REPO", "/home/inumaki/Development/ags-apps")
+    os.environ.get("AGS_APPS_REPO", "/home/inumaki/Development/dotfiles/ags-apps")
 )
 
 
