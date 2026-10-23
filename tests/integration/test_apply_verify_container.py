@@ -50,9 +50,10 @@ _REPO_ROOT = _find_repo_root()
 def _find_composition_root() -> Path:
     """The composition checkout the full-chain bootstrap provisions from.
 
-    A full bootstrap runs the composition's ``src/runtime`` (``wallpaper set``),
-    so the manifest-only fixture is not enough. Use an explicit
-    ``$DOTFILES_COMPOSITION_ROOT``; never guess a sibling checkout.
+    A full bootstrap runs the installed pinned ``dotfiles-runtime`` and reads a
+    real composition's manifests/config/btop state, so the manifest-only fixture
+    is not enough. Use an explicit ``$DOTFILES_COMPOSITION_ROOT``; never guess a
+    sibling checkout.
     """
     override = os.environ.get("DOTFILES_COMPOSITION_ROOT")
     if override:
@@ -60,7 +61,7 @@ def _find_composition_root() -> Path:
     pytest.skip(
         "full-chain container bootstrap needs a real composition checkout — "
         "set DOTFILES_COMPOSITION_ROOT=/path/to/dotfiles-v3 (the manifest-only "
-        "tests/fixtures/composition ships no executable runtime); the dry-run "
+        "tests/fixtures/composition has no config/btop state); the dry-run "
         "suite (test_ansible_dryrun.py) and the unit seam tests cover the "
         "engine without it",
         allow_module_level=True,

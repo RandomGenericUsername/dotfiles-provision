@@ -11,8 +11,8 @@
 # Placement in bootstrap.yaml: after config-links.yaml (needs the
 # ~/.config/* spine symlinks + rendered settings in place) and before
 # display-manager.yaml/verify.yaml (verify asserts current-only
-# criteria). Requires: assets (default.png), cli_tools
-# (dotfiles-runtime on PATH), settings (ITR/CSG/WEG settings.toml).
+# criteria). Requires: assets (default.png), cli_tools (the installed pinned
+# dotfiles-runtime), settings (ITR/CSG/WEG settings.toml).
 #
 # User-scoped playbook: NO become (everything the runtime writes lives
 # under the user's XDG state dir; running as root would seed root's
@@ -30,6 +30,12 @@
 - name: Seed runtime desktop state from default wallpaper
   hosts: localhost
   gather_facts: true
+  vars:
+    # Where `uv tool install` dropped the pinned runtime. Resolved exactly as
+    # uv does, mirroring cli_tools_bin_dir / runtime_daemon_bin_dir.
+    runtime_seed_bin_dir: >-
+      {{ ansible_facts.env.UV_TOOL_BIN_DIR
+         | default(ansible_facts.env.XDG_BIN_HOME | default(ansible_facts.env.HOME + '/.local/bin', true), true) }}
   tasks:
     - name: Assert install_dir seam is provided
       ansible.builtin.assert:
@@ -39,23 +45,10 @@
           the install_dir seam extra-var (the orchestrator resolves
           $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
-    - name: Assert composition seam is provided
-      ansible.builtin.assert:
-        that: composition_root is defined and composition_root | trim | length > 0
-        fail_msg: >-
-          composition_root is undefined or empty — the runtime-seed step runs
-          the composition repo's runtime (src/runtime/). The engine CLI
-          resolves it from --composition-root; direct runs pass
-          -e composition_root=...
-
     - name: Seed runtime state from default wallpaper
       ansible.builtin.command:
         argv:
-          - uv
-          - run
-          - --directory
-          - "{{ composition_root }}/src/runtime"
-          - dotfiles-runtime
+          - "{{ runtime_seed_bin_dir | trim }}/dotfiles-runtime"
           - wallpaper
           - set
           - "{{ install_dir | trim }}/wallpapers/default.png"

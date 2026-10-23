@@ -69,7 +69,7 @@ This repo is consumed as an **immutable git tag**, never a path and never `edita
 ```toml
 # a consumer's pyproject.toml
 [tool.uv.sources]
-dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.7" }
+dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.8" }
 ```
 
 A tag is never moved or deleted; a fix ships as a new tag. The `cli-output` dependency is pinned
@@ -83,7 +83,7 @@ the tool also runs without ansible-core's scripts installed globally. A source/e
 still resolves the repo-root `ansible/`:
 
 ```bash
-uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.7"
+uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.8"
 dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
   --composition-root /path/to/dotfiles-v3 manifests
 ```
@@ -98,7 +98,7 @@ dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
   template under `ansible/` derives a path from `playbook_dir`.
 - `make test-integration` runs the real `ansible-playbook --check` matrix and the disposable
   container proof. The container proof skips loudly unless `$DOTFILES_COMPOSITION_ROOT` names a
-  composition with a real runtime.
+  real composition checkout.
 - `make hermetic` runs the same selection with empty `HOME`/`XDG_*` and a foreign cwd. Tests that
   need the pinned `dotfiles-assets` corpus (a separate repo) skip with their stated reason unless
   `$DOTFILES_ASSETS_REPO`, `$DOTFILES_ASSETS_TEMPLATES_DIR` or a provisioned spine provides it.
@@ -115,7 +115,7 @@ engine is not that tag (leading `v` normalized). The empty default keeps a hand-
 a development checkout usable.
 
 ```bash
-dotfiles-provision verify --expected-engine-tag v0.1.7
+dotfiles-provision verify --expected-engine-tag v0.1.8
 ```
 
 ## Repo harness

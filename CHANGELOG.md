@@ -6,6 +6,17 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-23
+
+### Fixed
+
+- **`runtime-seed` ran a deleted source tree (BUG-001):** the playbook still invoked
+  `uv run --directory {{ composition_root }}/src/runtime`, which the composition deleted in
+  REQ-002, so a fresh bootstrap would fail after `cli_tools`. It now runs the installed pinned
+  `{{ runtime_seed_bin_dir }}/dotfiles-runtime` (the same uv-bin-dir resolution as
+  `cli_tools_bin_dir` / `runtime_daemon_bin_dir`). No `composition_root` requirement remains in
+  the seed play. A unit test locks the argv and the absence of the source path.
+
 ## [0.1.7] - 2026-10-23
 
 ### Changed

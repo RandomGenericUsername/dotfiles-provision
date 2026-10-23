@@ -133,7 +133,7 @@ class TestExternalManifestsDir:
     ) -> None:
         """The manifests can live elsewhere, but ``composition_root`` must
         still be the checkout that owns ``dotfiles/provisioning/`` (it is where
-        ``src/runtime/`` and ``config/btop/`` are read from)."""
+        ``config/btop/`` is read from)."""
         stray = tmp_path / "manifests"
         stray.mkdir()
         (stray / "packages.yaml").write_text("kind: packages\npackages: []\n")
