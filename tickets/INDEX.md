@@ -14,7 +14,7 @@
 
 ## Bugs
 
-(none)
+- [BUG-001-runtime-seed-installed](./BUG-001-runtime-seed-installed/ticket.md) — `runtime-seed` invokes the deleted composition `src/runtime` | `in-progress` | openspec: runtime-seed-installed
 
 ## Ops tasks
 
