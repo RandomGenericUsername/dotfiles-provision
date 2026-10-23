@@ -311,6 +311,30 @@ class TestTasks:
         assert "runtime_daemon_manager_probe" in when
         assert "default(1)" in when
 
+    def test_rendered_unit_is_asserted_free_of_unresolved_jinja(self) -> None:
+        """R-14: a block tag at the end of ExecStart swallows the next line
+        (trim_blocks). The deployed unit, not the template, is what systemd
+        reads, so the role slurps it and asserts no `{%`/`%}` or `#`
+        continuation survives in ExecStart."""
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        read_name = "Read the rendered daemon unit"
+        assert_name = "Assert the rendered daemon unit has no unresolved Jinja or swallowed continuation"
+        assert read_name in names and assert_name in names
+        assert names.index(read_name) < names.index(assert_name)
+
+        read = tasks[names.index(read_name)]
+        assert _module_key(read) == "ansible.builtin.slurp"
+        assert "not ansible_check_mode" in str(read.get("when"))
+
+        check = tasks[names.index(assert_name)]
+        assert _module_key(check) == "ansible.builtin.assert"
+        that = str(check["ansible.builtin.assert"].get("that"))
+        assert "'{%' not in" in that
+        assert "'%}' not in" in that
+        assert "# " in that
+        assert "not ansible_check_mode" in str(check.get("when"))
+
     def test_managerless_fallback_is_wants_symlink(self) -> None:
         link = next(
             t

@@ -24,6 +24,16 @@ cli_tools_bin_dir: >-
   {{ ansible_facts.env.UV_TOOL_BIN_DIR
      | default(ansible_facts.env.XDG_BIN_HOME | default(ansible_facts.env.HOME + '/.local/bin', true), true) }}
 
+# cli_tools_uv_tool_dir: the uv TOOL ENV root, used by the R-14 stale-env
+#   preflight. `uv tool install --force` rewrites each tool's PEP 610
+#   `direct_url.json`; a file:// URL left pointing at a deleted checkout (a
+#   package-tree move, a removed worktree) is the trap where `uv tool list`
+#   looks green while the console dies with ModuleNotFoundError. Resolution
+#   order matches uv: $UV_TOOL_DIR -> $XDG_DATA_HOME/uv/tools -> ~/.local/share/uv/tools.
+cli_tools_uv_tool_dir: >-
+  {{ ansible_facts.env.UV_TOOL_DIR
+     | default((ansible_facts.env.XDG_DATA_HOME | default(ansible_facts.env.HOME + '/.local/share', true)) + '/uv/tools', true) }}
+
 # CONTAINER ENGINE — DECLARED, not detected:
 # the image-build task runs `<cli> install --container-engine
 # {{ container_runtime_engine }}`. The engine is the DECLARED value from

@@ -6,6 +6,18 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-22
+
+### Added
+
+- **Stale uv-tool metadata assert (R-14):** after the force re-installs, `cli_tools` scans every
+  `direct_url.json` under the uv tool root and fails naming any `file://` checkout that no longer
+  exists. The force install is the repair; the assert proves a package-tree move cannot leave a
+  console script that starts and then dies with `ModuleNotFoundError`.
+- **Rendered daemon unit assert (R-14):** `runtime_daemon` slurps the deployed unit and fails if
+  `ExecStart` carries an unresolved `{%`/`%}` or a swallowed `#` continuation (the
+  `start-limit-hit` trap). Check-mode safe; the existing `reset-failed` remains before enable/start.
+
 ## [0.1.1] - 2026-10-22
 
 Engine hardening from the assets-split residual ledger. No corpus or runtime behavior change.

@@ -25,6 +25,31 @@
     mode: "0644"
   notify: Restart dotfiles runtime daemon
 
+# R-14: a Jinja block tag at the end of an ExecStart line swallows the next
+# line (trim_blocks), producing `daemon run# …` and a start-limit failure. The
+# template is the source, but the DEPLOYED file is what systemd reads; assert
+# the rendered unit carries no unresolved Jinja tag. Check-mode safe: no write
+# and no read under --check (the template may not exist yet).
+- name: Read the rendered daemon unit
+  ansible.builtin.slurp:
+    src: "{{ ansible_facts.env.HOME }}/.config/systemd/user/{{ runtime_daemon_unit_name }}"
+  register: runtime_daemon_unit_raw
+  when: not ansible_check_mode
+
+- name: Assert the rendered daemon unit has no unresolved Jinja or swallowed continuation
+  ansible.builtin.assert:
+    that:
+      - "'{%' not in (runtime_daemon_unit_raw.content | b64decode)"
+      - "'%}' not in (runtime_daemon_unit_raw.content | b64decode)"
+      - "'# ' not in ((runtime_daemon_unit_raw.content | b64decode).splitlines()
+           | select('match', '^ExecStart=') | first | default(''))"
+    fail_msg: >-
+      the rendered {{ runtime_daemon_unit_name }} carries an unresolved Jinja
+      block tag or a swallowed `#` continuation in ExecStart — systemd would run
+      the next line as a command (the start-limit trap). Fix the unit template;
+      do not enable this unit.
+  when: not ansible_check_mode
+
 - name: Probe for a live user manager
   ansible.builtin.shell: "systemctl --user show-environment >/dev/null 2>&1"
   register: runtime_daemon_manager_probe

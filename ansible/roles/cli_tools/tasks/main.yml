@@ -225,6 +225,43 @@
     label: "{{ item.name }}"
   when: not ansible_check_mode
 
+# R-14: every install above uses --force, which rewrites the tool env and its
+# PEP 610 direct_url.json. This post-install assert proves the rewrite actually
+# landed: a file:// URL pointing at a deleted checkout means the console script
+# can start and then die with ModuleNotFoundError. It is a detection gate, not
+# a second installer — the force install is the repair.
+- name: Assert no uv tool direct_url points at a missing checkout (R-14)
+  ansible.builtin.shell:
+    cmd: |
+      python3 - "{{ cli_tools_uv_tool_dir }}" <<'PY'
+      import json
+      import pathlib
+      import sys
+
+      root = pathlib.Path(sys.argv[1])
+      stale = []
+      if root.is_dir():
+          for record in root.rglob("direct_url.json"):
+              try:
+                  data = json.loads(record.read_text(encoding="utf-8"))
+              except (OSError, ValueError):
+                  continue
+              url = str(data.get("url", ""))
+              if not url.startswith("file://"):
+                  continue
+              checkout = pathlib.Path(url[len("file://"):])
+              if not checkout.exists():
+                  stale.append(f"{record}: {url}")
+      if stale:
+          print("stale uv tool direct_url(s): " + "; ".join(stale))
+          raise SystemExit(1)
+      print("no stale uv tool direct_url")
+      PY
+  args:
+    executable: /bin/sh
+  changed_when: false
+  when: not ansible_check_mode
+
 - name: Verify csg/weg/itr resolve on PATH
   ansible.builtin.shell: "command -v {{ item.name }}"
   loop: "{{ cli_tools }}"

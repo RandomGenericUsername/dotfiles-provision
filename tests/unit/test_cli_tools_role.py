@@ -440,6 +440,38 @@ class TestCliToolsTasks:
             )
 
 
+class TestCliToolsStaleDirectUrl:
+    """R-14: force-install rewrites direct_url.json; the post-install assert
+    proves a stale file:// checkout cannot survive the run."""
+
+    def test_post_install_assert_scans_direct_url(self) -> None:
+        tasks = _load_tasks()
+        task = next(
+            t
+            for t in tasks
+            if "direct_url" in str(t.get("name", ""))
+        )
+        assert _module_key(task) == "ansible.builtin.shell"
+        params = task["ansible.builtin.shell"]
+        assert isinstance(params, dict)
+        cmd = str(params.get("cmd", ""))
+        assert "direct_url.json" in cmd
+        assert "file://" in cmd
+        assert "raise SystemExit(1)" in cmd
+        assert task.get("changed_when") is False
+        when = str(task.get("when"))
+        assert "not ansible_check_mode" in when
+
+    def test_post_install_assert_follows_the_force_installs(self) -> None:
+        tasks = _load_tasks()
+        names = [str(t.get("name", "")) for t in tasks]
+        install = next(
+            i for i, name in enumerate(names) if "Upgrade source-path CLI tool envs" in name
+        )
+        check = next(i for i, name in enumerate(names) if "direct_url" in name)
+        assert install < check, "the scan must follow the force re-install it verifies"
+
+
 class TestCliToolsCodexShadowCleanup:
     """provision-ai-ides-and-clis: the AUR openai-codex-bin owns /usr/bin/codex,
     but OpenAI's standalone installer leaves a self-updating symlink at
