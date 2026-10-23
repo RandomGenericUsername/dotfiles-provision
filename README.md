@@ -7,9 +7,9 @@ settings and the desktop session.
 
 **Charter — the engine, not the composition.** This repo owns `ansible/` and
 `src/provisioning/`. The composition repo (`dotfiles-v3`) owns the manifests
-(`dotfiles/provisioning/*.yaml`), the provisioning scripts and `src/runtime/`. The btop
-active-theme preference is host state in the install spine (written by the studio, read by
-`btop_config`). The engine never ships or edits composition files; it reads them through the CLI
+(`dotfiles/provisioning/*.yaml`) and the provisioning scripts; the runtime is its own pinned
+repo (`dotfiles-runtime`). The btop active-theme preference is host state in the install spine
+(written by the studio, read by `btop_config`). The engine never ships or edits composition files; it reads them through the CLI
 seam below.
 
 **Workspace.** The engine is developed beside its consumers under `~/Development/dotfiles/`
@@ -26,7 +26,7 @@ extra-vars:
 | Flag | Default | Extra-var | Used for |
 | --- | --- | --- | --- |
 | `--manifests-dir` | `<cwd>/dotfiles/provisioning` | `manifests_dir` | manifest validation, `scripts/gloview-activate` |
-| `--composition-root` | parent of `--manifests-dir`'s parent | `composition_root` | `src/runtime/`; the legacy active-theme path is read only for the R-07 migration |
+| `--composition-root` | parent of `--manifests-dir`'s parent | `composition_root` | the composition checkout root (`dotfiles/`); the legacy active-theme path is read only for the R-07 migration |
 | `--inventory` | this engine's `ansible/inventory/localhost.yaml` | (executor `-i`) | the host Ansible runs against |
 
 Flags are global (before the command). A bad path fails before Ansible starts with a structured
@@ -69,7 +69,7 @@ This repo is consumed as an **immutable git tag**, never a path and never `edita
 ```toml
 # a consumer's pyproject.toml
 [tool.uv.sources]
-dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.6" }
+dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.7" }
 ```
 
 A tag is never moved or deleted; a fix ships as a new tag. The `cli-output` dependency is pinned
@@ -83,7 +83,7 @@ the tool also runs without ansible-core's scripts installed globally. A source/e
 still resolves the repo-root `ansible/`:
 
 ```bash
-uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.6"
+uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.7"
 dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
   --composition-root /path/to/dotfiles-v3 manifests
 ```
@@ -115,7 +115,7 @@ engine is not that tag (leading `v` normalized). The empty default keeps a hand-
 a development checkout usable.
 
 ```bash
-dotfiles-provision verify --expected-engine-tag v0.1.6
+dotfiles-provision verify --expected-engine-tag v0.1.7
 ```
 
 ## Repo harness

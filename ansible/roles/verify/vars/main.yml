@@ -305,12 +305,13 @@ verify_system_binaries:
   - codex
 
 # verify_cli_tools: the uv-tool-installed CLIs on PATH (criterion 3). `itr` IS
-#   the icon-renderer console script (no separate binary), mirror of
-#   cli_tools.cli_tools.
+#   the icon-renderer console script (no separate binary); `dotfiles-runtime`
+#   is the host runtime. Mirror of cli_tools.cli_tools.
 verify_cli_tools:
   - csg
   - weg
   - itr
+  - dotfiles-runtime
 
 # verify_cli_tools_checkout_root / verify_itr_*: the pinned external CLI
 #   checkouts (spine AD-10/AD-11). `verify` carries INDEPENDENT literal pins
@@ -327,6 +328,15 @@ verify_itr_version: v0.2.0
 verify_itr_checkout: "{{ verify_cli_tools_checkout_root }}/itr/{{ verify_itr_version }}"
 verify_itr_pin_file: "{{ verify_cli_tools_checkout_root }}/itr/pinned"
 verify_itr_contract_version: 0.2.0
+
+# verify_runtime_*: the same three legs for the host runtime (REQ-002).
+#   `dotfiles-runtime` has no `--version` flag and no contract token: the
+#   `version` subcommand prints the package version, which equals the tag
+#   without its leading `v`.
+verify_runtime_version: v0.1.0
+verify_runtime_tool_version: 0.1.0
+verify_runtime_checkout: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/{{ verify_runtime_version }}"
+verify_runtime_pin_file: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/pinned"
 
 # verify_weg_*: the same four legs for `weg` (S5), plus the container image.
 #   weg is the first container-mode CLI consumed as a pinned repo, so verify

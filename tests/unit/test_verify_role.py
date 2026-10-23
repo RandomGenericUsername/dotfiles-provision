@@ -2399,9 +2399,14 @@ class TestVerifyVars:
         )
         assert "ansible_facts.env.XDG_STATE_HOME" not in value
 
-    def test_cli_tools_are_csg_weg_itr(self) -> None:
+    def test_cli_tools_are_csg_weg_itr_runtime(self) -> None:
         data = _vars()
-        assert [str(c) for c in data["verify_cli_tools"]] == ["csg", "weg", "itr"]
+        assert [str(c) for c in data["verify_cli_tools"]] == [
+            "csg",
+            "weg",
+            "itr",
+            "dotfiles-runtime",
+        ]
 
     def test_itr_pin_mirrors_the_cli_tools_role(self) -> None:
         """AD-11: verify carries INDEPENDENT literal pins mirroring the role so
@@ -2435,9 +2440,55 @@ class TestVerifyVars:
             ("csg", str(data["verify_csg_version"])),
             ("weg", str(data["verify_weg_version"])),
             ("itr", str(data["verify_itr_version"])),
+            ("dotfiles-runtime", str(data["verify_runtime_version"])),
         ], "verify_*_version must equal the role's pins"
         assert str(role_vars["cli_tools_checkout_root"]) == str(
             data["verify_cli_tools_checkout_root"]
+        )
+
+    def test_runtime_pin_is_asserted_by_execution(self) -> None:
+        """REQ-002: the runtime has no `--version` flag and no contract token,
+        so verify uses the `version` subcommand and asserts the exact tool
+        version (the tag without its leading `v`)."""
+        data = _vars()
+        assert str(data["verify_runtime_version"]) == "v0.1.0"
+        assert str(data["verify_runtime_tool_version"]) == "0.1.0"
+        assert str(data["verify_runtime_checkout"]) == (
+            "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/"
+            "{{ verify_runtime_version }}"
+        )
+        assert str(data["verify_runtime_pin_file"]) == (
+            "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/pinned"
+        )
+
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        stat_name = "Check the pinned dotfiles-runtime checkout and its pin record"
+        assert stat_name in names
+        stat_task = tasks[names.index(stat_name)]
+        assert _module_key(stat_task) == "ansible.builtin.stat"
+        loop = str(stat_task.get("loop"))
+        assert "verify_runtime_checkout" in loop and "verify_runtime_pin_file" in loop
+
+        version_name = "Read the installed dotfiles-runtime version"
+        assert version_name in names
+        version_task = tasks[names.index(version_name)]
+        argv = _module(version_task).get("argv")
+        assert isinstance(argv, list)
+        assert argv[0].endswith("/dotfiles-runtime") and argv[1] == "version"
+
+        assert_name = (
+            "Assert the dotfiles-runtime checkout is the pinned tag and reports "
+            "the pinned version"
+        )
+        assert assert_name in names
+        that = str(_module(tasks[names.index(assert_name)]).get("that"))
+        assert "verify_runtime_checkout is search(verify_runtime_version)" in that
+        assert "b64decode | trim == verify_runtime_version" in that
+        assert "verify_runtime_version_check.rc == 0" in that
+        assert (
+            "verify_runtime_version_check.stdout | trim == verify_runtime_tool_version"
+            in that
         )
 
     def test_weg_pin_and_image_are_asserted_by_execution(self) -> None:
@@ -4027,7 +4078,7 @@ def _write_stub_binaries(home: Path) -> Path:
     machine: report `NetworkManager` as active."""
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi"):
+    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi"):
         stub = bin_dir / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
@@ -4053,6 +4104,15 @@ def _write_stub_binaries(home: Path) -> Path:
             "exit 0\n"
         )
         stub.chmod(0o755)
+    # The runtime has no `--version` flag and no contract token: `version`
+    # prints the package version, and verify asserts it equals the tag minus `v`.
+    runtime_stub = bin_dir / "dotfiles-runtime"
+    runtime_stub.write_text(
+        "#!/bin/sh\n"
+        f'if [ "$1" = "version" ]; then echo "{verify_vars["verify_runtime_tool_version"]}"; exit 0; fi\n'
+        "exit 0\n"
+    )
+    runtime_stub.chmod(0o755)
     # The pinned image legs run `<engine> image inspect <ref>`; stub both
     # engines so the assertion reads the reference, not the host's runtime.
     for engine in ("podman", "docker"):
@@ -4292,8 +4352,13 @@ def _build_provisioned_layout(
     # fixture behind (the previous fixture stopped at the assets block, which
     # is why the runtime verify tests aborted at the itr pin on master).
     verify_vars = _vars()
-    for cli_name in ("csg", "weg", "itr"):
-        cli_version = str(verify_vars[f"verify_{cli_name}_version"])
+    for cli_name, version_key in (
+        ("csg", "verify_csg_version"),
+        ("weg", "verify_weg_version"),
+        ("itr", "verify_itr_version"),
+        ("dotfiles-runtime", "verify_runtime_version"),
+    ):
+        cli_version = str(verify_vars[version_key])
         (install / "cli-tools" / cli_name / cli_version).mkdir(parents=True, exist_ok=True)
         (install / "cli-tools" / cli_name / "pinned").write_text(f"{cli_version}\n")
     template_schema_dir = install / "assets" / assets_tag / "templates" / "zsh"
@@ -4468,7 +4533,8 @@ def _build_provisioned_layout(
     # real dir of per-file bar sources. The fixture mirrors
     # verify_ags_apps_unit_dir / _bar_dir / _pin_file / _live_bar_link /
     # _resolution_shortcut so the criterion asserts have something to pass on.
-    apps_unit = install / "ags-apps" / "v0.4.0"
+    apps_version = str(verify_vars["verify_ags_apps_version"])
+    apps_unit = install / "ags-apps" / apps_version
     apps_bar = apps_unit / "bar"
     (apps_bar / "bar" / "widgets").mkdir(parents=True, exist_ok=True)
     for apps_file in (
@@ -4484,7 +4550,7 @@ def _build_provisioned_layout(
         "bar/validate-cli.ts",
     ):
         (apps_bar / apps_file).write_text("")
-    (install / "ags-apps" / "pinned").write_text("v0.4.0\n")
+    (install / "ags-apps" / "pinned").write_text(f"{apps_version}\n")
     (apps_unit / "node_modules").mkdir(parents=True, exist_ok=True)
     (apps_unit / "node_modules" / "ags-platform").symlink_to(unit)
     (install / "config" / "ags").symlink_to(apps_bar, target_is_directory=True)

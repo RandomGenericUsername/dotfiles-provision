@@ -50,7 +50,7 @@ EXPECTED_ENGINE_TAG_OPT: str | None = typer.Option(
 
 # ── Composition seam (AD-17) ───────────────────────────────────────────────
 # The engine repo owns the Ansible tree; the composition repo owns the
-# manifests and the runtime source. These two options are the ONLY way the
+# manifests and provisioning scripts. These two options are the ONLY way the
 # engine learns where the composition is: no role derives a path from
 # `playbook_dir` (a pinned engine checkout has no composition ancestors).
 #
@@ -69,7 +69,7 @@ MANIFESTS_DIR_OPT: Path | None = typer.Option(
 COMPOSITION_ROOT_OPT: Path | None = typer.Option(
     None,
     "--composition-root",
-    help="The composition repo checkout root (holds dotfiles/ and src/runtime/). "
+    help="The composition repo checkout root (holds dotfiles/). "
     "Default: the parent of --manifests-dir's parent",
     metavar="PATH",
 )

@@ -51,8 +51,8 @@ class CompositionSeam:
 
     ``manifests_dir`` is the composition's ``dotfiles/provisioning/`` (the
     manifest set the engine validates and the ``scripts/`` it deploys);
-    ``composition_root`` is the checkout root (``dotfiles/`` and
-    ``src/runtime/`` live under it). Both are absolute and resolved once.
+    ``composition_root`` is the checkout root (``dotfiles/`` lives under it;
+    the runtime is its own pinned repo). Both are absolute and resolved once.
 
     The defaults document the composition layout rather than assuming a
     sibling checkout: ``--manifests-dir`` defaults to
@@ -107,7 +107,7 @@ class CompositionSeam:
             raise CompositionPathError(
                 f"--composition-root {self.composition_root} does not contain "
                 f"dotfiles/provisioning/. The engine reads composition-owned files "
-                f"(provisioning/scripts/, config/btop/, src/runtime/) from this root."
+                f"(provisioning/scripts/, config/btop/) from this root."
             )
         return self
 

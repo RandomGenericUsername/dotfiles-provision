@@ -251,10 +251,10 @@ class TestCliToolsTasks:
 
     def test_install_tasks_cover_all_manifest_entries(self) -> None:
         """Locks AC2: every manifest entry must be installed by a `uv tool
-        install` task. Since cli-tools-repos S4 there are TWO install paths —
-        a `creates:`-guarded source-path install (csg/weg/dotfiles-runtime) and
-        a `--force` install from the tag-bearing checkout (itr) — so the pair
-        must cover both addressing shapes."""
+        install` task. TWO install paths remain — a `creates:`-guarded
+        source-path install (now empty) and a `--force` install from the
+        tag-bearing checkout (all four entries after REQ-002) — so the pair
+        still covers both addressing shapes while every entry is pinned."""
         source_tasks = [
             task
             for task in _install_tasks()
@@ -271,9 +271,11 @@ class TestCliToolsTasks:
         assert len(pinned_tasks) == 1, "expected one pinned-checkout install task"
 
         manifest_entries = _manifest_entries()
-        assert any("source" in entry for entry in manifest_entries)
-        assert any(_entry_is_pinned(entry) for entry in manifest_entries), (
-            "the mixed-shape window must still carry at least one pinned entry"
+        assert not any("source" in entry for entry in manifest_entries), (
+            "REQ-002 moved the runtime to its pinned repo; no entry carries `source`"
+        )
+        assert all(_entry_is_pinned(entry) for entry in manifest_entries), (
+            "every manifest entry must be `{name, repo, tag}`"
         )
 
     def test_install_task_creates_guard_is_dry_run_and_idempotent(self) -> None:
@@ -915,10 +917,12 @@ class TestCliToolsPinnedCheckout:
             "AD-10 path shape is <install>/cli-tools/<name>/<tag>"
         )
         pinned = [e for e in data["cli_tools"] if _entry_is_pinned(e)]
-        assert [e["name"] for e in pinned] == ["csg", "weg", "itr"], (
-            "S6 moved the last CLI (csg) to the pinned shape; only "
-            "dotfiles-runtime stays source-path"
-        )
+        assert [e["name"] for e in pinned] == [
+            "csg",
+            "weg",
+            "itr",
+            "dotfiles-runtime",
+        ], "REQ-002 moved the runtime to the pinned shape; all four entries are pinned"
         assert pinned[0]["repo"] == (
             "https://github.com/RandomGenericUsername/color-scheme-generator"
         )
@@ -931,6 +935,10 @@ class TestCliToolsPinnedCheckout:
             "https://github.com/RandomGenericUsername/icon-templates-renderer"
         )
         assert pinned[2]["tag"] == "v0.2.0"
+        assert pinned[3]["repo"] == (
+            "https://github.com/RandomGenericUsername/dotfiles-runtime"
+        )
+        assert pinned[3]["tag"] == "v0.1.0"
 
     def test_pinned_clone_is_shallow_single_branch_and_tag_qualified(self) -> None:
         task = self._clone_task()
@@ -1097,18 +1105,18 @@ class TestCliToolsVars:
                 f"{name} must not keep a source path (S6 moved csg out)"
             )
 
-    def test_only_the_runtime_remains_a_source_entry(self) -> None:
-        """S6 end state: every CLI is pinned, so the role's source-path set is
-        exactly `dotfiles-runtime` — the runtime this repo still authors. If a
-        CLI reappears there, the mixed-shape window silently reopened."""
+    def test_no_cli_remains_a_source_entry(self) -> None:
+        """REQ-002 end state: every entry — csg, weg, itr and the runtime — is
+        pinned. The source-path branch remains as an extension point but selects
+        nothing; a source entry reappearing silently reopens the mixed shape."""
         data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
         source_names = [
             str(entry["name"])
             for entry in data["cli_tools"]
             if "source" in entry
         ]
-        assert source_names == ["dotfiles-runtime"], (
-            "only dotfiles-runtime may be installed from an in-repo source"
+        assert source_names == [], (
+            "no CLI may be installed from an in-repo source after REQ-002"
         )
 
     def test_cli_tools_parity_with_manifest(self) -> None:

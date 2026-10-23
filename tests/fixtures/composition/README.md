@@ -10,8 +10,10 @@ Provenance: copied from `dotfiles-v3@854bac08` when the engine was extracted
 
 - `dotfiles/provisioning/*.yaml` — the five manifests, byte-for-byte.
 - `dotfiles/provisioning/scripts/gloview-activate` — byte-for-byte.
-- `src/runtime/pyproject.toml` — a minimal stub: the real runtime lives in the
-  composition; the engine only needs the path to exist for the seam test.
+
+The runtime is **not** stubbed here: since REQ-002 it is the pinned
+`dotfiles-runtime` repo, so the fixture carries only the composition files the
+engine's mirrors are compared against.
 
 To check the engine's mirrors against a **real** composition instead, point
 `DOTFILES_COMPOSITION_ROOT` at one:

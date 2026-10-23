@@ -1,24 +1,11 @@
-# CLI tools installed by the `cli_tools` role (plan §3).
+# CLI tools installed by the `cli_tools` role (fixture mirror).
 #
-# csg/weg/itr are the three compute-provider CLIs; dotfiles-runtime is the
-# desktop-state CLI (wallpaper set / reconcile / inspect) that the login
-# hook needs on PATH. The old nested CLI-tools OpenSpec root was never an
-# install target and is gone (its only change moved into the csg repo, AD-15).
-#
-# END STATE (spine AD-10/AD-11): every extracted CLI is addressed as
-#   `{name, repo, tag}` — a pinned external repo. The role shallow-clones
-#   `<repo>@<tag>` into `<install>/cli-tools/<name>/<tag>/`, removes `.git`,
-#   records the pin in `<install>/cli-tools/<name>/pinned`, and installs the
-#   tool FROM that checkout (never from a `git+…@tag` URL), so PEP 610 records
-#   a tag-bearing path.
-#
-# `dotfiles-runtime` is the ONE remaining `{name, source}` entry: it is the
-# runtime this repo still authors (`src/runtime`), not an extracted CLI. It is
-# the only permitted local source — `deploy-coverage` asserts exactly this
-# (exactly one `source:`, every other entry repo+tag). The three shared
-# libraries (cli-output, config-assembler-engine, oci-runtime) are pinned the
-# same way, in each consumer's `[tool.uv.sources]`.
-# Exactly one shape per entry: `source` XOR (`repo` + `tag`).
+# Every entry is addressed as `{name, repo, tag}` after REQ-002 moved the
+# runtime to its own pinned repo. The role shallow-clones `<repo>@<tag>` into
+# `<install>/cli-tools/<name>/<tag>/`, removes `.git`, records the pin in
+# `<install>/cli-tools/<name>/pinned`, and installs the tool FROM that checkout.
+# Exactly one shape per entry: `source` XOR (`repo` + `tag`); no entry uses
+# `source` today.
 kind: cli-tools
 entries:
   - name: csg
@@ -31,4 +18,5 @@ entries:
     repo: https://github.com/RandomGenericUsername/icon-templates-renderer
     tag: v0.2.0
   - name: dotfiles-runtime
-    source: src/runtime
+    repo: https://github.com/RandomGenericUsername/dotfiles-runtime
+    tag: v0.1.0

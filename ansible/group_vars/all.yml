@@ -6,8 +6,8 @@
 # ── Composition seam (AD-17) ────────────────────────────────────────────────
 # This repository is the pinned INSTALLER ENGINE: it owns the Ansible tree but
 # no composition checkout. The composition repo owns `dotfiles/provisioning/`
-# (the manifests) and `src/runtime/` (the btop active-theme is host state in the
-# install spine since R-07), and
+# (the manifests); the runtime is the pinned `dotfiles-runtime` repo (the btop
+# active-theme is host state in the install spine since R-07), and
 # the engine CLI passes both paths as extra-vars on every run:
 #
 #   manifests_dir     <composition>/dotfiles/provisioning

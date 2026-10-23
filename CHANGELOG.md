@@ -6,6 +6,19 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-10-23
+
+### Changed
+
+- **`dotfiles-runtime` is a pinned CLI entry (REQ-002):** the runtime was extracted to
+  `RandomGenericUsername/dotfiles-runtime` and tagged `v0.1.0`. The `cli_tools` role mirror now
+  carries `{repo, tag}` for it, so all four CLI entries are pinned and the source-path loop
+  selects nothing. `verify` adds `dotfiles-runtime` to `verify_cli_tools` and asserts the
+  tag-bearing checkout, the `pinned` record and `dotfiles-runtime version` = `0.1.0`. The
+  source-path install/upgrade branch and its tasks remain as the extension point for a future
+  in-repo tool. The composition's `installer.pin` bump and `src/runtime/` deletion land in
+  `dotfiles-v3`.
+
 ## [0.1.6] - 2026-10-23
 
 ### Fixed

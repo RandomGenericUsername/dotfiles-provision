@@ -24,9 +24,10 @@ do not present the claim as fact.
   orchestrator (`src/provisioning/`) that runs it. One package, repo root = package root:
   `src/provisioning/`, `ansible/`, `tests/` at the top level, no nested project roots.
   Evidence: `pyproject.toml` `[tool.hatch.build.targets.wheel] packages = ["src/provisioning"]`.
-- The **composition** repo (`dotfiles-v3`) owns the manifests (`dotfiles/provisioning/*.yaml`),
-  the provisioning scripts and `src/runtime/`. The btop active-theme preference is host state in
-  the install spine (R-07), not a composition file. This repo ships none of them.
+- The **composition** repo (`dotfiles-v3`) owns the manifests (`dotfiles/provisioning/*.yaml`)
+  and the provisioning scripts; the runtime is its own pinned repo (`dotfiles-runtime`). The btop
+  active-theme preference is host state in the install spine (R-07), not a composition file. This
+  repo ships none of them.
   Evidence: `ls ansible/roles` has no manifest tree; `tests/fixtures/composition/README.md`
   documents the fixture standing in for the composition in tests.
 - **The composition seam (AD-17).** The engine learns composition paths ONLY from the CLI:

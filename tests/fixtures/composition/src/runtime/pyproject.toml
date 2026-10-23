@@ -1,5 +1,0 @@
-[project]
-name = "dotfiles-runtime"
-version = "0.0.0"
-description = "Fixture stub: the real runtime lives in the composition repo (src/runtime)."
-requires-python = ">=3.12"

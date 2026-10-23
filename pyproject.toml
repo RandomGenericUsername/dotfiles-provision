@@ -1,6 +1,6 @@
 [project]
 name = "dotfiles-provision"
-version = "0.1.6"
+version = "0.1.7"
 description = "Machine provisioning orchestrator for the dotfiles system (plan/apply/verify/bootstrap via Ansible)"
 readme = "README.md"
 license = "MIT"

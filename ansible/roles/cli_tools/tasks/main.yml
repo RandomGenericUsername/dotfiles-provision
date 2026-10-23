@@ -24,8 +24,8 @@
       - composition_root is defined and composition_root | trim | length > 0
     fail_msg: >-
       manifests_dir and composition_root are undefined or empty — this role
-      reads composition-owned files (dotfiles/provisioning/scripts/ and
-      src/runtime/). The engine CLI resolves them from --manifests-dir /
+      reads composition-owned files (dotfiles/provisioning/scripts/). The
+      engine CLI resolves them from --manifests-dir /
       --composition-root; direct runs pass -e manifests_dir=... -e
       composition_root=...
 
@@ -347,8 +347,8 @@
 #   settings env because its `install` verb has no such flag). The tag value in
 #   both cases is `{{ item.tag }}` — the manifest pin, never a literal.
 #   The legacy source-path build task stays for a future in-repo container-mode
-#   entry; today its loop selects nothing (dotfiles-runtime has no container
-#   mode).
+#   entry; today its loop selects nothing (the runtime moved to its own pin and
+#   has no container mode).
 # - NO `creates:` on these tasks: image EXISTENCE does not imply FRESHNESS.
 #   A stale image (built before the current CLI source) must be rebuilt, so the
 #   task runs every apply; the container engine's content-addressed cache makes

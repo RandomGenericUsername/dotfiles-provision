@@ -441,8 +441,8 @@
       - verify_cli_tool_checks.results | selectattr('rc', 'equalto', 0) | list | length == verify_cli_tools | length
       - verify_cli_tool_checks.results | map(attribute='stdout') | reject('equalto', '') | list | length == verify_cli_tools | length
     fail_msg: >-
-      not every CLI tool is on PATH (expected csg, weg, itr — done-criterion
-      3). The cli_tools role (Story 2.4) installs them via uv tool install
+      not every CLI tool is on PATH (expected csg, weg, itr, dotfiles-runtime —
+      done-criterion 3). The cli_tools role (Story 2.4) installs them via uv tool install
       into {{ verify_cli_bin_dir }}; the check prepends that dir to PATH. Run
       the cli-tools playbook first (direct-run prerequisite)
   when: not ansible_check_mode
@@ -502,6 +502,55 @@
       pin={{ verify_itr_pin.content | default('', true) | b64decode | trim }}.
       A stale local-path install or a pin-file/checkout mismatch means
       provisioning never re-pinned itr; re-run the cli-tools playbook
+  when: not ansible_check_mode
+
+# REQ-002: the runtime follows the same three legs (CHECKOUT / PIN / VERSION).
+# It has no `--version` flag and no contract token: `dotfiles-runtime version`
+# prints the package version, which must equal the tag without its leading `v`.
+- name: Check the pinned dotfiles-runtime checkout and its pin record
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ verify_runtime_checkout }}"
+    - "{{ verify_runtime_pin_file }}"
+  register: verify_runtime_checkout_checks
+
+- name: Read the dotfiles-runtime pin record
+  ansible.builtin.slurp:
+    src: "{{ verify_runtime_pin_file }}"
+  register: verify_runtime_pin
+  when: not ansible_check_mode
+
+- name: Read the installed dotfiles-runtime version
+  ansible.builtin.command:
+    argv:
+      - "{{ verify_cli_bin_dir | trim }}/dotfiles-runtime"
+      - version
+  register: verify_runtime_version_check
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert the dotfiles-runtime checkout is the pinned tag and reports the pinned version
+  ansible.builtin.assert:
+    that:
+      - verify_runtime_checkout_checks.results[0].stat.isdir
+      - verify_runtime_checkout_checks.results[1].stat.isreg
+      - verify_runtime_checkout is search(verify_runtime_version)
+      - verify_runtime_pin.content | b64decode | trim == verify_runtime_version
+      - verify_runtime_version_check.rc == 0
+      - verify_runtime_version_check.stdout | trim == verify_runtime_tool_version
+    fail_msg: >-
+      the pinned dotfiles-runtime install is not the tag `verify` mirrors
+      (spine AD-10/AD-11). Expected the checkout at {{ verify_runtime_checkout }}/,
+      the pin record {{ verify_runtime_pin_file }} containing exactly
+      {{ verify_runtime_version }}, and `dotfiles-runtime version` printing
+      {{ verify_runtime_tool_version }}. Observed:
+      rc={{ verify_runtime_version_check.rc | default('n/a', true) }},
+      stdout={{ verify_runtime_version_check.stdout | default('', true) | trim }},
+      pin={{ verify_runtime_pin.content | default('', true) | b64decode | trim }}.
+      A stale source-path install or a pin-file/checkout mismatch means
+      provisioning never re-pinned dotfiles-runtime; re-run the cli-tools playbook
   when: not ansible_check_mode
 
 # S5: `weg` follows the same four legs (CHECKOUT / PIN / CONTRACT / IMAGE).
