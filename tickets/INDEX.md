@@ -10,7 +10,7 @@
 
 ## Requirements
 
-(none)
+- [REQ-002-runtime-repo-pin](./REQ-002-runtime-repo-pin/ticket.md) — Consume `dotfiles-runtime` as a pinned repo (engine v0.1.7) | `in-progress` | openspec: runtime-repo-pin
 
 ## Bugs
 
