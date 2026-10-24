@@ -2,7 +2,7 @@
 id: BUG-002
 title: "Installed engine wheel drops inventory/group_vars"
 kind: bug
-status: in-progress
+status: done
 lane: direct
 severity: high
 links:
@@ -51,3 +51,18 @@ three group_vars files next to `localhost.yaml`. `make build` asserts it.
 - The source tests read `ansible/inventory/group_vars/*`.
 - `make gates` green; `v0.1.9` tagged/released; the composition pin bumps to
   `v0.1.9`; a real `make provision ARGS="verify …"` on the host passes.
+
+## Closeout
+
+| Claim | Command | Result |
+| --- | --- | --- |
+| Source layout | `test -f ansible/inventory/group_vars/all.yml && test ! -e ansible/group_vars` | exit 0 |
+| Wheel layout | `make build` | `PASS: dotfiles_provision-0.1.9-py3-none-any.whl carries the Ansible tree + inventory/group_vars` |
+| Engine gates | `make gates` | `978 passed, 3 skipped, 54 deselected`; lint clean; hermetic `946 passed, 35 skipped, 54 deselected`; lock `Resolved 33 packages` |
+| Main CI | `gh run view 40136647566` | `completed/success` (all gates) |
+| Tag CI | `gh run view 40137141868` | `completed/success` incl. `release` |
+| Annotated tag | `git rev-parse v0.1.9` / `'v0.1.9^{commit}'` / `git cat-file -t` | `v0.1.9` tag object / `89f32472…` / `tag` |
+| Release artifacts | `gh release view v0.1.9 --json assets` | `dotfiles_provision-0.1.9-py3-none-any.whl`, `dotfiles_provision-0.1.9.tar.gz` |
+| Host verify | `make provision ARGS="verify --expected-engine-tag v0.1.9"` (from `dotfiles-v3`) | exit 0; all verify tasks ok; engine 0.1.9, runtime 0.1.0 |
+
+Composition pin bumped to `v0.1.9` in `dotfiles-v3` commit `e0a83b8a`; its CI is green.
