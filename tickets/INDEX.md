@@ -14,7 +14,7 @@
 
 ## Bugs
 
-(none)
+- [BUG-002-group-vars-wheel](./BUG-002-group-vars-wheel/ticket.md) — Installed engine wheel drops `inventory/group_vars` | `in-progress` | openspec: group-vars-wheel
 
 ## Ops tasks
 
