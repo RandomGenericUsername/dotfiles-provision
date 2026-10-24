@@ -368,7 +368,7 @@ class TestGroupVarsValueShape:
 
     def test_packages_map_values_are_scalar_or_list_of_names(self) -> None:
         for basename in (Distro.ARCH.value, Distro.DEBIAN_FAMILY.value):
-            data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / f"{basename}.yml").read_text())
+            data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / f"{basename}.yml").read_text())
             packages = data["packages"]
             assert isinstance(packages, dict)
             for key, value in packages.items():
@@ -384,10 +384,10 @@ class TestGroupVarsValueShape:
 
     def test_aur_only_power_options_package_is_arch_only(self) -> None:
         arch = yaml.safe_load(
-            (_ANSIBLE_DIR / "group_vars" / f"{Distro.ARCH.value}.yml").read_text()
+            (_ANSIBLE_DIR / "inventory" / "group_vars" / f"{Distro.ARCH.value}.yml").read_text()
         )
         debian = yaml.safe_load(
-            (_ANSIBLE_DIR / "group_vars" / f"{Distro.DEBIAN_FAMILY.value}.yml").read_text()
+            (_ANSIBLE_DIR / "inventory" / "group_vars" / f"{Distro.DEBIAN_FAMILY.value}.yml").read_text()
         )
         assert arch["packages"]["power-options-gtk"] == "power-options-gtk"
         assert "power-options-gtk" not in debian["packages"]
@@ -396,7 +396,7 @@ class TestGroupVarsValueShape:
         """The launcher package maps in BOTH group_vars (the map, not the
         manifest, is the install authority — add-rofi-app-launcher)."""
         for basename in (Distro.ARCH.value, Distro.DEBIAN_FAMILY.value):
-            data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / f"{basename}.yml").read_text())
+            data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / f"{basename}.yml").read_text())
             assert data["packages"]["rofi"] == "rofi"
 
     def test_capture_stack_mapped_on_both_distros(self) -> None:
@@ -405,7 +405,7 @@ class TestGroupVarsValueShape:
         needs wl-paste --watch). Missing these broke capture ([Errno 2]
         slurp) and left clipboard history empty while verify stayed green."""
         for basename in (Distro.ARCH.value, Distro.DEBIAN_FAMILY.value):
-            data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / f"{basename}.yml").read_text())
+            data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / f"{basename}.yml").read_text())
             assert data["packages"]["capture"] == ["grim", "slurp", "wl-clipboard"]
 
     def test_session_and_lock_stacks_mapped_on_both_distros(self) -> None:
@@ -413,7 +413,7 @@ class TestGroupVarsValueShape:
         install-to-mask dunst (verify's mask gate hard-requires the unit),
         and thunar (keybindings.lua launches it) map in BOTH group_vars."""
         for basename in (Distro.ARCH.value, Distro.DEBIAN_FAMILY.value):
-            data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / f"{basename}.yml").read_text())
+            data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / f"{basename}.yml").read_text())
             packages = data["packages"]
             assert packages["portals"] == [
                 "hyprpolkitagent",

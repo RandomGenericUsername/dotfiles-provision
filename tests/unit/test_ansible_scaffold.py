@@ -35,9 +35,9 @@ _REQUIRED_FILES = (
     "inventory/localhost.yaml",
     "requirements.yml",
     "ansible.cfg",
-    "group_vars/all.yml",
-    "group_vars/arch.yml",
-    "group_vars/debian-family.yml",
+    "inventory/group_vars/all.yml",
+    "inventory/group_vars/arch.yml",
+    "inventory/group_vars/debian-family.yml",
 )
 
 # Every logical key in the group_vars `packages` map (Story 2.1 parity lock).
@@ -213,20 +213,20 @@ class TestGroupVars:
     def test_filenames_match_distro_seam_contract(self) -> None:
         files = sorted(
             p.stem
-            for p in (_ANSIBLE_DIR / "group_vars").glob("*")
+            for p in (_ANSIBLE_DIR / "inventory" / "group_vars").glob("*")
             if p.is_file() and p.suffix in (".yml", ".yaml")
         )
         assert files == sorted({"all"} | {d.value for d in Distro})
 
     @staticmethod
     def _packages_map(basename: str) -> dict[str, object]:
-        data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / basename).read_text())
+        data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / basename).read_text())
         packages = data["packages"]
         assert isinstance(packages, dict)
         return packages
 
     def test_all_yml_is_minimal_and_does_not_default_install_dir(self) -> None:
-        data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / "all.yml").read_text())
+        data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / "all.yml").read_text())
         assert data is None or isinstance(data, dict)
         if isinstance(data, dict):
             assert "install_dir" not in data, (
@@ -241,7 +241,7 @@ class TestGroupVars:
         cli_tools build and the rendered settings, so the image tag and the
         runtime lookup can never diverge. all.yml must still not define
         install_dir."""
-        data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / "all.yml").read_text())
+        data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / "all.yml").read_text())
         assert isinstance(data, dict)
         assert data["container_runtime_engine"] == (
             "{{ ansible_facts.env.DOTFILES_CONTAINER_ENGINE | default('podman', true) }}"
@@ -413,7 +413,7 @@ class TestPackageListInvariants:
 
     @staticmethod
     def _packages_map(basename: str) -> dict[str, object]:
-        data = yaml.safe_load((_ANSIBLE_DIR / "group_vars" / basename).read_text())
+        data = yaml.safe_load((_ANSIBLE_DIR / "inventory" / "group_vars" / basename).read_text())
         packages = data["packages"]
         assert isinstance(packages, dict)
         return packages

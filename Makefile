@@ -116,6 +116,7 @@ assets-parity:
 
 build:
 	$(UV) build
+	python3 scripts/check-wheel-contents.py
 
 clean:
 	rm -rf dist .pytest_cache .ruff_cache .coverage htmlcov

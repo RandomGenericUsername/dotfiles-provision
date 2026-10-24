@@ -6,6 +6,18 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-10-24
+
+### Fixed
+
+- **Installed wheel dropped `inventory/group_vars` (BUG-002):** the source kept
+  group_vars at `ansible/group_vars` with an `inventory/group_vars` symlink; the
+  sdist/wheel build silently dropped the symlink, so the installed engine's
+  `verify` lost `container_runtime_engine` and `shell`. The canonical files now
+  live in the real `ansible/inventory/group_vars/` directory, and `make build`
+  runs `scripts/check-wheel-contents.py`, which fails if the wheel lacks the
+  inventory or any group_vars file.
+
 ## [0.1.8] - 2026-10-23
 
 ### Fixed

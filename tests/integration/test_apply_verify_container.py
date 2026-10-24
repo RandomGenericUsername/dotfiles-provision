@@ -74,7 +74,7 @@ _MANIFESTS_REL = f"{_COMPOSITION_REL}/dotfiles/provisioning"
 
 # The filed deferred-work 3-2 packages-chain defects are FIXED:
 # - group_vars discovery ('packages' is undefined): resolved by commit 57063f5
-#   (inventory/group_vars -> ../group_vars symlink).
+#   (inventory/group_vars directory).
 # - root --check become_user temp-file ownership guard: fixed by remote_tmp =
 #   /tmp/dotfiles-ansible in ansible.cfg AND the become_user AUR build/install
 #   tasks gated `not ansible_check_mode` in the packages role.
@@ -474,7 +474,7 @@ def test_packages_check_never_builds_yay_in_container(
     dry-run mode.
 
     The filed deferred-work 3-2 packages-chain defect is fixed: group_vars
-    discovery (inventory/group_vars symlink, commit 57063f5) and the root
+    discovery (inventory/group_vars directory, BUG-002) and the root
     `--check` become_user temp-file ownership guard (remote_tmp in ansible.cfg
     + the become_user AUR build/install tasks gated `not ansible_check_mode`).
     This test must PASS (not xfail) now."""
