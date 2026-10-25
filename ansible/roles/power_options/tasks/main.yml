@@ -37,6 +37,27 @@
   register: power_options_bt_replace
   when: power_options_profile_dir_stat.stat.isdir | default(false)
 
+- name: Record that the Bluetooth profile policy is applied
+  ansible.builtin.copy:
+    dest: "{{ power_options_marker }}"
+    content: "{{ power_options_marker_content }}"
+    mode: "0644"
+  register: power_options_marker_write
+  when: power_options_profile_dir_stat.stat.isdir | default(false)
+
+# The daemon reads the TOMLs at startup; `refresh-full` alone keeps the old
+# in-memory profile (observed live: Powersave still blocked after the file
+# rewrite). Restart first, then apply the current profile. The marker write is
+# part of the trigger so a policy_version bump restarts an already-false set.
+- name: Restart power-options to reload the edited profiles
+  ansible.builtin.systemd_service:
+    name: power-options.service
+    state: restarted
+  when:
+    - power_options_profile_dir_stat.stat.isdir | default(false)
+    - power_options_bt_replace.changed | default(false)
+      or power_options_marker_write.changed | default(false)
+
 - name: Refresh the active power profile after changing the Bluetooth setting
   ansible.builtin.command:
     argv:
@@ -46,10 +67,4 @@
   when:
     - power_options_profile_dir_stat.stat.isdir | default(false)
     - power_options_bt_replace.changed | default(false)
-
-- name: Record that the Bluetooth profile policy is applied
-  ansible.builtin.copy:
-    dest: "{{ power_options_marker }}"
-    content: "block_bt = false\n"
-    mode: "0644"
-  when: power_options_profile_dir_stat.stat.isdir | default(false)
+      or power_options_marker_write.changed | default(false)

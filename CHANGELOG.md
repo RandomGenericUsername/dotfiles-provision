@@ -6,6 +6,18 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-10-24
+
+### Fixed
+
+- **`power-options` kept the old profile in memory (v0.1.10 regression):** the
+  daemon reads profile TOMLs at startup; `refresh-full` alone left Powersave
+  blocking Bluetooth after the file rewrite. The role now restarts
+  `power-options.service` after a change, then refreshes. The marker content
+  carries `policy_version = 2`, so upgrading a host whose TOMLs are already
+  false still restarts the daemon once. Verified live after restart: Powersave
+  keeps `rfkill` unblocked.
+
 ## [0.1.10] - 2026-10-24
 
 ### Added

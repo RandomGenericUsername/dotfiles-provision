@@ -5,8 +5,9 @@
 ### Requirement: power profiles keep Bluetooth available
 
 The engine SHALL rewrite `block_bt = false` in the `power-options` profiles
-`Powersave++.toml`, `Powersave.toml` and `Balanced.toml` during bootstrap, refresh the active
-profile only when a file changed, and skip the step when `/etc/power-options/profiles` is absent.
+`Powersave++.toml`, `Powersave.toml` and `Balanced.toml` during bootstrap, restart the daemon and
+refresh the active profile only when a file changed, and skip the step when
+`/etc/power-options/profiles` is absent.
 `verify` SHALL read the same profiles and fail when any still carries `block_bt = true`.
 
 Source: REQ-003; `/etc/power-options/profiles/*.toml`.

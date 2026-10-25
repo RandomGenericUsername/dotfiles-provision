@@ -69,7 +69,7 @@ This repo is consumed as an **immutable git tag**, never a path and never `edita
 ```toml
 # a consumer's pyproject.toml
 [tool.uv.sources]
-dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.10" }
+dotfiles-provision = { git = "https://github.com/RandomGenericUsername/dotfiles-provision", tag = "v0.1.11" }
 ```
 
 A tag is never moved or deleted; a fix ships as a new tag. The `cli-output` dependency is pinned
@@ -83,7 +83,7 @@ the tool also runs without ansible-core's scripts installed globally. A source/e
 still resolves the repo-root `ansible/`:
 
 ```bash
-uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.10"
+uv tool install "git+https://github.com/RandomGenericUsername/dotfiles-provision@v0.1.11"
 dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
   --composition-root /path/to/dotfiles-v3 manifests
 ```
@@ -115,7 +115,7 @@ engine is not that tag (leading `v` normalized). The empty default keeps a hand-
 a development checkout usable.
 
 ```bash
-dotfiles-provision verify --expected-engine-tag v0.1.10
+dotfiles-provision verify --expected-engine-tag v0.1.11
 ```
 
 ## Repo harness

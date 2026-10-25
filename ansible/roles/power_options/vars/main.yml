@@ -7,7 +7,12 @@
 power_options_profile_dir: /etc/power-options/profiles
 #: Written after the rewrite so `verify` can tell "the role ran" from "the
 #: package happens to be installed but this host was never provisioned".
+#: policy_version 2 records the daemon-reload behaviour; bumping it makes an
+#: upgrade restart the daemon once even when the TOMLs are already false.
 power_options_marker: /etc/power-options/.dotfiles-bt-ok
+power_options_marker_content: |
+  block_bt = false
+  policy_version = 2
 power_options_bt_profiles:
   - "Powersave++.toml"
   - "Powersave.toml"

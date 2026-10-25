@@ -15,9 +15,11 @@ exist (a package rename fails loud rather than silently leaving Bluetooth blocke
 
 ## D3. Refresh only when a profile changed
 
-`power-options-daemon` applies the active profile from the files. `power-daemon-mgr refresh-full`
-makes the change effective immediately, but running it unconditionally reports `changed` on every
-bootstrap. It is gated on the replace loop's `changed` flag and runs with `changed_when: false`.
+`power-options-daemon` reads the profile TOMLs at **startup**; `power-daemon-mgr refresh-full`
+alone keeps the old in-memory profile (observed live: Powersave still blocked after the file
+rewrite). The role restarts `power-options.service` after a successful rewrite, then runs
+`refresh-full`. Both are gated on the replace loop's `changed` flag; `refresh-full` reports
+`changed_when: false`.
 
 ## D4. Verify the deployed files
 

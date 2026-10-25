@@ -56,6 +56,17 @@ def test_role_refreshes_only_when_a_profile_changed() -> None:
     refresh = next(
         task for task in tasks if task.get("name") == "Refresh the active power profile after changing the Bluetooth setting"
     )
+    restart = next(
+        task for task in tasks if task.get("name") == "Restart power-options to reload the edited profiles"
+    )
+    assert restart["ansible.builtin.systemd_service"] == {
+        "name": "power-options.service",
+        "state": "restarted",
+    }
+    joined = " ".join(restart["when"])
+    assert "power_options_profile_dir_stat.stat.isdir | default(false)" in joined
+    assert "power_options_bt_replace.changed | default(false)" in joined
+    assert "power_options_marker_write.changed | default(false)" in joined
     assert refresh["ansible.builtin.command"]["argv"] == ["power-daemon-mgr", "refresh-full"]
     when = refresh["when"]
     assert "power_options_bt_replace.changed | default(false)" in " ".join(when)
@@ -77,4 +88,5 @@ def test_role_writes_the_policy_marker() -> None:
         task for task in tasks if task.get("name") == "Record that the Bluetooth profile policy is applied"
     )
     assert marker["ansible.builtin.copy"]["dest"] == "{{ power_options_marker }}"
-    assert marker["ansible.builtin.copy"]["content"] == "block_bt = false\n"
+    assert marker["ansible.builtin.copy"]["content"] == "{{ power_options_marker_content }}"
+    assert "policy_version = 2" in _role_vars()["power_options_marker_content"]
