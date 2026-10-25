@@ -1,0 +1,55 @@
+# power_options role tasks (REQ-003).
+#
+# Arch-only in practice: the power-options package and /etc/power-options come
+# from the Arch package set. On another distro the directory is absent and every
+# mutating task is skipped. The playbook runs with become:true (the profile
+# files and the daemon are system-scoped).
+- name: Check the power-options profile directory
+  ansible.builtin.stat:
+    path: "{{ power_options_profile_dir }}"
+  register: power_options_profile_dir_stat
+  changed_when: false
+
+- name: Check the expected power-options Bluetooth profiles exist
+  ansible.builtin.stat:
+    path: "{{ power_options_profile_dir }}/{{ item }}"
+  loop: "{{ power_options_bt_profiles }}"
+  register: power_options_profile_files
+  when: power_options_profile_dir_stat.stat.isdir | default(false)
+
+- name: Assert every expected power-options profile exists
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      the power-options profile {{ item.item }} is missing from
+      {{ power_options_profile_dir }}/. The package layout changed; update
+      power_options_bt_profiles instead of silently leaving Bluetooth blocked.
+  loop: "{{ power_options_profile_files.results }}"
+  when: power_options_profile_dir_stat.stat.isdir | default(false)
+
+- name: Disable Bluetooth soft-blocking in the power profiles
+  ansible.builtin.replace:
+    path: "{{ power_options_profile_dir }}/{{ item }}"
+    regexp: '^block_bt = true$'
+    replace: 'block_bt = false'
+  loop: "{{ power_options_bt_profiles }}"
+  register: power_options_bt_replace
+  when: power_options_profile_dir_stat.stat.isdir | default(false)
+
+- name: Refresh the active power profile after changing the Bluetooth setting
+  ansible.builtin.command:
+    argv:
+      - power-daemon-mgr
+      - refresh-full
+  changed_when: false
+  when:
+    - power_options_profile_dir_stat.stat.isdir | default(false)
+    - power_options_bt_replace.changed | default(false)
+
+- name: Record that the Bluetooth profile policy is applied
+  ansible.builtin.copy:
+    dest: "{{ power_options_marker }}"
+    content: "block_bt = false\n"
+    mode: "0644"
+  when: power_options_profile_dir_stat.stat.isdir | default(false)

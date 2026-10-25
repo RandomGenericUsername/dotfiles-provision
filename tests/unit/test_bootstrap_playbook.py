@@ -44,6 +44,7 @@ _PLAYBOOKS_DIR = _ANSIBLE_DIR / "playbooks"
 # imports-only.
 _EXPECTED_ORDER = [
     "packages.yaml",
+    "power-options.yaml",
     "cli-tools.yaml",
     "runtime-daemon.yaml",
     "runtime-clipboard.yaml",
@@ -78,7 +79,7 @@ class TestBootstrapPlaybook:
     _PATH = _PLAYBOOKS_DIR / "bootstrap.yaml"
 
     def test_parses_as_list_of_import_playbook_entries(self) -> None:
-        """The aggregate is a top-level list of exactly twenty-two
+        """The aggregate is a top-level list of exactly twenty-three
         `import_playbook` statements (one per per-role playbook + the
         runtime-seed step + the gloview-plugin lifecycle + the gui-tools apps +
         the P5-1-1 runtime-daemon unit + the runtime-clipboard unit + the
@@ -86,8 +87,8 @@ class TestBootstrapPlaybook:
         (AD-17/AD-23) + the ags-apps bar unit install and live-bar deploy
         (AD-1/AD-17/AD-23))."""
         imports = _load_imports()
-        assert len(imports) == 22, (
-            f"bootstrap.yaml must import exactly 22 playbooks; found {len(imports)}"
+        assert len(imports) == 23, (
+            f"bootstrap.yaml must import exactly 23 playbooks; found {len(imports)}"
         )
         for entry in imports:
             assert "import_playbook" in entry, (
@@ -95,8 +96,8 @@ class TestBootstrapPlaybook:
             )
 
     def test_imports_in_exact_dependency_order(self) -> None:
-        """AC 4: the twenty-two imports appear in the EXACT dependency order —
-        packages → cli-tools → runtime-daemon → runtime-clipboard → filesystem →
+        """AC 4: the twenty-three imports appear in the EXACT dependency order —
+        packages → power-options → cli-tools → runtime-daemon → runtime-clipboard → filesystem →
         assets → ags-platform → ags-apps → compositor-configs → gui-tools →
         config-copies → settings → zsh-tools → zsh-config → wlogout-config →
         kitty-config → btop-config → config-links → runtime-seed →

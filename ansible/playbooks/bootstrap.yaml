@@ -4,7 +4,7 @@
 # verifies it (done-criteria 1-10).
 #
 # Dependency order rationale (plan §11 step 7, story 2.12 AC 4, Epic 4):
-#   packages → cli_tools → filesystem → assets →
+#   packages → power_options → cli_tools → filesystem → assets →
 #   ags_platform → ags_apps → compositor_configs → gui_tools → config_copies → settings → zsh_tools → zsh_config →
 #   wlogout_config → kitty_config → btop_config → config_links → runtime-seed → display_manager →
 #   gloview-plugin → verify
@@ -53,6 +53,11 @@
 # host fact. NOTE: this file is imports-only — every top-level entry below is
 # an `import_playbook` statement; there is no play (no hosts/roles/tasks).
 - import_playbook: packages.yaml
+# power_options right after packages: it edits the power-options package's
+# profile TOMLs (become:true) and refreshes the active profile. No other role
+# depends on it; keeping it here means a failed profile write aborts before the
+# expensive CLI/image work.
+- import_playbook: power-options.yaml
 - import_playbook: cli-tools.yaml
 # runtime-daemon right after cli-tools: the unit's ExecStart needs the
 # dotfiles-runtime binary installed above; the daemon tolerates an unseeded

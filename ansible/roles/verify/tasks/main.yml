@@ -288,6 +288,42 @@
       `systemctl enable --now {{ verify_bluetooth_service }}`
   when: not ansible_check_mode
 
+# REQ-003: the power-options profiles must not re-block Bluetooth when the
+# user switches to Powersave/Balanced. The role rewrites `block_bt` to false;
+# this gate reads the deployed files so a package update that restores `true`
+# fails provisioning instead of silently disabling the radio later.
+- name: Check the power-options Bluetooth policy marker
+  ansible.builtin.stat:
+    path: "{{ verify_power_options_marker }}"
+  register: verify_power_options_marker_stat
+  when: not ansible_check_mode
+
+- name: Read the power-options Bluetooth profiles
+  ansible.builtin.slurp:
+    src: "{{ verify_power_options_profile_dir }}/{{ item }}"
+  loop: "{{ verify_power_options_bt_profiles }}"
+  register: verify_power_options_contents
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - verify_power_options_marker_stat.stat.exists | default(false)
+
+- name: Assert the power-options profiles do not soft-block Bluetooth
+  ansible.builtin.assert:
+    that:
+      - item.content is defined
+      - item.content | b64decode is search('(?m)^block_bt = false$')
+    fail_msg: >-
+      power-options profile {{ item.item }} still soft-blocks Bluetooth
+      ({{ item.msg | default('missing file or block_bt = true', true) }}) —
+      switching to Powersave/Balanced would disable the radio. The power_options
+      role rewrites this flag; re-run the power-options playbook or the
+      bootstrap aggregate.
+  loop: "{{ verify_power_options_contents.results }}"
+  when:
+    - not ansible_check_mode
+    - verify_power_options_marker_stat.stat.exists | default(false)
+
 # hyprpolkitagent ships no PATH binary (it runs from /usr/lib via its user
 # unit), so `command -v` cannot gate it. Gate on unit presence instead:
 # autostart.lua starts it at login, and a missing install fails that start

@@ -1,0 +1,14 @@
+# power_options role vars (REQ-003).
+#
+# power-options-daemon stores one TOML per profile. The powersave profiles and
+# Balanced ship `block_bt = true`; that soft-blocks the Bluetooth radio when the
+# profile is applied. Keep Bluetooth available in every profile by flipping the
+# flag in the profiles that ship it.
+power_options_profile_dir: /etc/power-options/profiles
+#: Written after the rewrite so `verify` can tell "the role ran" from "the
+#: package happens to be installed but this host was never provisioned".
+power_options_marker: /etc/power-options/.dotfiles-bt-ok
+power_options_bt_profiles:
+  - "Powersave++.toml"
+  - "Powersave.toml"
+  - "Balanced.toml"

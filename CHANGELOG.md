@@ -6,6 +6,19 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-10-24
+
+### Added
+
+- **`power_options` role (REQ-003):** `power-options-daemon` ships
+  `block_bt = true` in Powersave/Powersave++/Balanced, so switching profiles
+  soft-blocked Bluetooth. The role rewrites `block_bt` to false in those three
+  profiles, refreshes the active profile only when a file changed, and writes
+  `/etc/power-options/.dotfiles-bt-ok` as the applied marker. It is a no-op when
+  `/etc/power-options/profiles` is absent (non-Arch). `verify` reads the three
+  profiles and fails if any still blocks Bluetooth; it skips when the marker is
+  absent.
+
 ## [0.1.9] - 2026-10-24
 
 ### Fixed

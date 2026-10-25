@@ -1,0 +1,11 @@
+# power-options: keep Bluetooth available in every power profile (REQ-003).
+#
+# The power-options profiles ship `block_bt = true` for Powersave/Powersave++/
+# Balanced. This play rewrites that flag to false and refreshes the active
+# profile. It is a no-op when /etc/power-options/profiles is absent (non-Arch).
+- name: Keep Bluetooth available in the power-options profiles
+  hosts: localhost
+  gather_facts: true
+  become: true
+  roles:
+    - power_options

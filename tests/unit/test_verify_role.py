@@ -3058,6 +3058,10 @@ class TestVerifyVars:
             "verify_xdg_data_home",
             "verify_desktop_entry_files",
             "verify_assets_desktop_paths",
+            # Fixed system paths, not user/spine paths: power-options owns
+            # /etc/power-options and its applied marker (REQ-003).
+            "verify_power_options_profile_dir",
+            "verify_power_options_marker",
             "install_dir",
             "ansible_facts.env",
         )

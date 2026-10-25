@@ -410,6 +410,16 @@ verify_bluetooth_service: bluetooth.service
 #   regression is visible (a HARD block is physical and not asserted).
 verify_bluetooth_rfkill_type: bluetooth
 
+# verify_power_options_*: the power-options profiles that must not soft-block
+#   Bluetooth (REQ-003). power-options-daemon is Arch-only; on another distro
+#   the directory is absent and the check is skipped, like the package itself.
+verify_power_options_profile_dir: /etc/power-options/profiles
+verify_power_options_marker: /etc/power-options/.dotfiles-bt-ok
+verify_power_options_bt_profiles:
+  - "Powersave++.toml"
+  - "Powersave.toml"
+  - "Balanced.toml"
+
 # verify_bluetooth_audio_packages: the PipeWire package shipping the bluez5 SPA
 #   (libspa-bluez5.so). Without it WirePlumber creates NO Bluetooth audio sink,
 #   so a connected headset is silently unroutable — installing bluez alone is
