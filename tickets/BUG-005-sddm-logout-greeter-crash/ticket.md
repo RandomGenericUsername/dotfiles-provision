@@ -2,8 +2,8 @@
 id: BUG-005
 title: "Logout leaves a black VT — sddm-helper exits 1 and the greeter never restarts"
 kind: bug
-status: triage
-lane: 4
+status: in-progress
+lane: 2
 severity: high
 links:
   openspec: none
@@ -409,9 +409,17 @@ logout→greeter→login loop is not.
   handling. The lane stays 4 until the VM matrix confirms the graceful action;
   then re-triage to lane 2 and file the assets ticket.
 
+- **Resolution update (2026-10-26)** — re-triaged `lane: 4` → `lane: 2`: the
+  cause collapsed to a one-line action in `dotfiles-assets`
+  (`configs/wlogout/layout:15`), fixed in assets `v0.6.1` and consumed through
+  engine `v0.1.16` / `dotfiles-v3` `PIN-0115`. No `dotfiles-provision` code
+  changes. The VM matrix was waived by the user; the host logout cycle is the
+  behavioral acceptance, with the 3/5 formal-acceptance caveat recorded in
+  [Closeout](#closeout).
+
 Evidence: the repro/observed/expected front matter and the journal excerpts
 above; the cross-repo paths are quoted with line numbers.
-Verify: `rg -n '^kind: bug|^status: triage|^lane: 4|^severity: high' tickets/BUG-005-sddm-logout-greeter-crash/ticket.md`.
+Verify: `rg -n '^kind: bug|^status: (in-progress|done)|^lane: 2|^severity: high' tickets/BUG-005-sddm-logout-greeter-crash/ticket.md`.
 
 ## Done-when
 
