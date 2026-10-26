@@ -149,6 +149,43 @@ def _seam_extra_vars(install_dir: Path) -> dict[str, str]:
     }
 
 
+#: The six desktop-entry overrides `compositor_configs_desktop_entries` deploys
+#: from the pinned assets checkout (mirror of the role vars; a new entry makes
+#: this dry-run fail on a missing source, which is the intended loud signal).
+_COMPOSITOR_DESKTOP_ENTRIES = (
+    "tidal-hifi.desktop",
+    "antigravity-ide.desktop",
+    "code.desktop",
+    "devin-desktop.desktop",
+    "copilot.desktop",
+    "codex.desktop",
+)
+
+
+def _seed_compositor_desktop_inputs(root: Path) -> Path:
+    """Materialize the pinned-assets desktop inputs compositor-configs copies FROM.
+
+    On a real machine the assets role clones `dotfiles-assets@<tag>` before this
+    playbook runs. A single-playbook ``--check`` does not run the assets role,
+    and ``copy`` validates its source even in check mode, so without these inputs
+    the dry-run fails on the ABSENT SOURCE rather than on a provisioning defect.
+    The tree is seeded OUTSIDE ``install_dir`` (and passed as an override) so the
+    "dry-run never creates install_dir" assertion stays meaningful.
+    """
+    desktop = root / "assets-desktop"
+    (desktop / "applications").mkdir(parents=True)
+    (desktop / "scripts").mkdir()
+    helper = desktop / "scripts" / "toggle-touchpad"
+    helper.write_text("#!/bin/sh\nexit 0\n")
+    helper.chmod(0o755)
+    for name in _COMPOSITOR_DESKTOP_ENTRIES:
+        (desktop / "applications" / name).write_text(
+            "[Desktop Entry]\nType=Application\nName=dry-run fixture\nExec=true\n"
+        )
+    (desktop / "desktop.yaml").write_text("schema_major: 1\nentries: []\n")
+    return desktop
+
+
 def _run_check(
     playbook: Path,
     extra_vars: dict[str, str],
@@ -223,9 +260,17 @@ class TestDryRunEveryPlaybook:
         with tempfile.TemporaryDirectory() as tmp:
             install_dir = Path(tmp) / "install"
             env = _scrubbed_env(ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"))
+            extra_vars = _seam_extra_vars(install_dir)
+            if playbook_name == "compositor-configs.yaml":
+                # Copy validates its source even under --check; the assets role
+                # (which materializes it on a real machine) is not part of this
+                # single-playbook dry-run.
+                extra_vars["compositor_configs_assets_desktop_dir"] = str(
+                    _seed_compositor_desktop_inputs(Path(tmp))
+                )
             result = _run_check(
                 playbook,
-                _seam_extra_vars(install_dir),
+                extra_vars,
                 env,
             )
             _assert_clean_dry_run(playbook_name, result)
