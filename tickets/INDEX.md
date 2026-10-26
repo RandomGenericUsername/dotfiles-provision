@@ -16,7 +16,7 @@
 
 - [BUG-003-consume-ags-apps-v042/ticket.md](./BUG-003-consume-ags-apps-v042/ticket.md) — consume ags-apps v0.4.2 (color thumbnails) + release v0.1.12 | severity: low | `done` | worktree .worktrees/BUG-003, branch ticket/BUG-003-consume-ags-apps-v042
 - [BUG-004-sddm-wayland-greeter/ticket.md](./BUG-004-sddm-wayland-greeter/ticket.md) — SDDM Wayland greeter has no compositor (90 s session bounce) | severity: high | `done` | worktree .worktrees/BUG-004, branch ticket/BUG-004-sddm-wayland-greeter | tag: v0.1.13
-- [BUG-005-sddm-logout-greeter-crash/ticket.md](./BUG-005-sddm-logout-greeter-crash/ticket.md) — Logout leaves a black VT; sddm-helper exits 1 and the greeter never restarts (5-login acceptance blocked) | severity: high | `in-progress` | worktree .worktrees/BUG-005, branch ticket/BUG-005-sddm-logout-greeter-crash
+- [BUG-005-sddm-logout-greeter-crash/ticket.md](./BUG-005-sddm-logout-greeter-crash/ticket.md) — Logout leaves a black VT; sddm-helper exits 1 and the greeter never restarts (5-login acceptance blocked) | severity: high | `done` | worktree .worktrees/BUG-005, branch ticket/BUG-005-sddm-logout-greeter-crash | resolved in assets v0.6.1 (engine v0.1.16, PIN-0115); 3/5 formal acceptance, user-waived
 
 ## Ops tasks
 
