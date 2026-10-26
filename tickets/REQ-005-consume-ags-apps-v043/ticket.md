@@ -2,7 +2,7 @@
 id: REQ-005
 title: "Consume ags-apps v0.4.3 (selector collapses on Apply) + release v0.1.14"
 kind: requirement
-status: in-progress
+status: done
 lane: 1
 links:
   openspec: none
@@ -83,15 +83,15 @@ Verify: `rg -n "^kind: requirement|^lane: 1" tickets/REQ-005-consume-ags-apps-v0
 
 ## Acceptance
 
-- [ ] A red version-mirror/parity test fails at `v0.4.2` and passes at
+- [x] A red version-mirror/parity test fails at `v0.4.2` and passes at
       `v0.4.3`.
-- [ ] `ags_apps_version: v0.4.3` and `verify_ags_apps_version: v0.4.3`.
-- [ ] Engine version `0.1.14` (`pyproject.toml`, `src/provisioning/__init__.py`,
+- [x] `ags_apps_version: v0.4.3` and `verify_ags_apps_version: v0.4.3`.
+- [x] Engine version `0.1.14` (`pyproject.toml`, `src/provisioning/__init__.py`,
       `uv.lock`) and a CHANGELOG entry.
-- [ ] `make gates` green in the worktree.
-- [ ] Merged to `main`; annotated tag `v0.1.14`; GitHub Release carries the
+- [x] `make gates` green in the worktree.
+- [x] Merged to `main`; annotated tag `v0.1.14`; GitHub Release carries the
       sdist and wheel; branch/tag pushed.
-- [ ] Runtime (`v0.1.0`), assets (`v0.6.0`), ITR/weg/csg and ags-platform
+- [x] Runtime (`v0.1.0`), assets (`v0.6.0`), ITR/weg/csg and ags-platform
       (`v0.2.0`) pins unchanged.
 
 ## Out of scope
@@ -99,3 +99,44 @@ Verify: `rg -n "^kind: requirement|^lane: 1" tickets/REQ-005-consume-ags-apps-v0
 - ags-apps internals: the selector fix ships upstream in v0.4.3.
 - Runtime v0.2.0 mirror (`REQ-006`, separate ticket/agent).
 - Host deployment/provisioning (user-run, later via `dotfiles-v3` PIN-0114).
+
+## Closeout
+
+| Claim | Command | Result |
+| --- | --- | --- |
+| Red (old pins) | `pytest -q tests/unit/test_verify_role.py::TestVerifyAgsAppsPinMirror::test_engine_consumes_ags_apps_v0_4_3` in a detached worktree at `a30fc9a` | **exit 1** — 1 failed: `AssertionError: the ags_apps role must install ags-apps v0.4.3 … got 'v0.4.2'`; both legs read `v0.4.2` (`ansible/roles/ags_apps/vars/main.yml:102`, `ansible/roles/verify/vars/main.yml:709`). |
+| Green (v0.4.3) | same command at `e723622` (HEAD) | **exit 0** — 1 passed in 0.04s. |
+| Engine gates | `make gates` at `e723622` | **exit 0** — test 967 passed/32 skipped/54 deselected; hermetic 963 passed/36 skipped/54 deselected; ruff clean; `uv lock --check` resolved 33; docs-check present. |
+| Integration | not run | Not required by the release procedure for this XS pin bump: plan section 3.2 names `make gates` only (`/home/inumaki/.opencode/plan/09-release-train.md:50-53`). |
+| Pin scope | `git diff v0.1.13..e723622 -- ansible/roles` | Only the two ags-apps lines change (`v0.4.2` → `v0.4.3`). Runtime `v0.1.0`, assets `v0.6.0`, ITR/weg/csg and ags-platform `v0.2.0` are unchanged. |
+| Engine version | `rg -n 'version = "0.1.14"|__version__ = "0.1.14"' pyproject.toml src/provisioning/__init__.py`; `uv lock --check` | Both `0.1.14`; lock resolved 33. CHANGELOG has the `[0.1.14] - 2026-10-26` entry. |
+| Merge | `git log --oneline --graph` | `b0fc19a` — merge of `d2929fa` (main) + `e723622` (branch); pushed to `origin/main`. |
+| Tag | `git show v0.1.14`; `git ls-remote --tags origin 'refs/tags/v0.1.14*'` | Annotated `v0.1.14` → `b0fc19a`; remote peeled `b0fc19a`; pushed. |
+| Tag CI | `gh run view 40377829965 --json conclusion,jobs` | `completed/success` — all 8 jobs (test, lint, hermetic, lock-check, docs-check, ci-gates-parity, assets-parity, release). |
+| Release assets | `gh release view v0.1.14 --json assets` | `dotfiles_provision-0.1.14-py3-none-any.whl` (244898 bytes), `dotfiles_provision-0.1.14.tar.gz` (442474 bytes); both `uploaded`. |
+| Release URL | `gh release view v0.1.14 --json url` | https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.14 |
+
+Post-tag note: `v0.1.14` is immutable and points at `b0fc19a` (implementation +
+tests). This closeout commit is docs-only, lands after the tag, and matches the
+`v0.1.12`/`v0.1.13` closeout pattern; it changes no packaged file
+(`pyproject.toml` packages only `src/provisioning`).
+
+### User host steps (sudo; user-run — the agent must not provision/reboot)
+
+1. In `dotfiles-v3`, this slice deploys through the normal pin flow: advance
+   `dotfiles/provisioning/installer.pin` to `v0.1.14` for a standalone deploy,
+   or to the final engine tag at `PIN-0114` (planned `v0.1.15`) so the selector
+   and runtime palette fixes land together. Commit/push in `dotfiles-v3`.
+2. Run the host provision with sudo (become scope installs the ags-apps
+   `v0.4.3` unit and repoints the live links):
+   `make bootstrap ARGS="--ask-become-pass"` (or `./bootstrap.sh`).
+3. Verify the deployed engine and pins:
+   `make provision ARGS="--output-format plain verify --expected-engine-tag v0.1.14"`.
+4. Selector acceptance (manual): open the wallpaper selector, choose a
+   wallpaper, click Apply — the drawer collapses immediately, the apply
+   completes, a palette error (if any) surfaces through the notification, and
+   reopening the selector works.
+5. Rollback if needed: ags-apps units are versioned
+   (`<install>/ags-apps/<tag>`); pin `ags_apps_version` /
+   `verify_ags_apps_version` to `v0.4.2` in a follow-up engine release and
+   re-provision. `v0.1.14` itself is never moved or deleted.
