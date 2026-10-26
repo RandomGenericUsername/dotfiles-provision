@@ -6,6 +6,18 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-10-26
+
+### Changed
+
+- **`ags-apps` pin `v0.4.3` (ags-apps BUG-002):** the wallpaper selector now
+  collapses its drawer immediately on Apply instead of staying open over the
+  wallpaper change; the apply completes and a palette error surfaces through
+  the notification. The engine installs the monorepo unit at v0.4.3
+  (`ags_apps_version`) and the verify mirror (`verify_ags_apps_version`)
+  follows, locked by `TestVerifyAgsAppsPinMirror`. No runtime or assets pin
+  moves.
+
 ## [0.1.13] - 2026-10-26
 
 ### Fixed
