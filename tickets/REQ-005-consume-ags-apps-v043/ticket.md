@@ -2,13 +2,13 @@
 id: REQ-005
 title: "Consume ags-apps v0.4.3 (selector collapses on Apply) + release v0.1.14"
 kind: requirement
-status: proposed
+status: in-progress
 lane: 1
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: none
+worktree: .worktrees/REQ-005/
+branch: ticket/REQ-005-consume-ags-apps-v043
 ---
 
 # REQ-005 — Consume ags-apps v0.4.3 (selector collapses on Apply) + release v0.1.14
