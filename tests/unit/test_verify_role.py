@@ -3114,6 +3114,25 @@ class TestVerifyAgsAppsPinMirror:
             == apps_vars["ags_apps_platform_version"]
         )
 
+    def test_engine_consumes_ags_apps_v0_4_3(self) -> None:
+        """REQ-005: both legs name the selector-collapse release.
+
+        ags-apps v0.4.3 (BUG-002) collapses the wallpaper-selector drawer on
+        Apply. The engine installs one monorepo unit, so the installer pin and
+        its hand-maintained verify mirror must both move. This is the red/green
+        guard for the bump: it fails while either leg still says v0.4.2.
+        """
+        verify_vars = _vars()
+        apps_vars = _sibling_vars("ags_apps")
+        assert apps_vars["ags_apps_version"] == "v0.4.3", (
+            "the ags_apps role must install ags-apps v0.4.3 (selector collapses "
+            f"on Apply); got {apps_vars['ags_apps_version']!r}"
+        )
+        assert verify_vars["verify_ags_apps_version"] == "v0.4.3", (
+            "verify_ags_apps_version must mirror ags_apps_version v0.4.3; got "
+            f"{verify_vars['verify_ags_apps_version']!r}"
+        )
+
     def test_the_live_links_are_asserted_against_the_mirror(self) -> None:
         tasks = _load_tasks()
         by_name = {str(t.get("name", "")): t for t in tasks}
