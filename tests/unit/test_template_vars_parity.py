@@ -271,8 +271,9 @@ class TestPinMirrorsMatchTheManifest:
             "the fixture manifest assets.tag must be "
             f"{expected}; got {manifest['assets']['tag']!r}"
         )
+        entries = {str(entry["name"]): entry for entry in manifest["entries"]}
         for name in ("wallpapers", "icon-templates", "icon-mappings"):
-            source = str(manifest[name]["source"])
+            source = str(entries[name]["source"])
             assert source.startswith(
                 f"{{{{ install_dir | trim }}}}/assets/{expected}/"
             ), (
