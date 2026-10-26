@@ -3142,6 +3142,44 @@ class TestVerifyAgsAppsPinMirror:
         assert "verify_ags_apps_platform_version" in that
 
 
+class TestVerifyRuntimePinMirror:
+    """REQ-006: the runtime pin is one version across role, verify and tool.
+
+    v0.1.0 shipped the runtime as a pinned CLI; v0.2.0 is the mandatory-palette
+    release. The installer pin and its hand-maintained verify mirror are
+    separate literals, so this guard fails while either leg still says v0.1.0.
+    `verify_runtime_tool_version` is the tag without its leading `v` — the
+    runtime's `version` subcommand prints package metadata, not the tag.
+    """
+
+    def test_engine_consumes_runtime_v0_2_0(self) -> None:
+        verify_vars = _vars()
+        cli_tools_vars = _sibling_vars("cli_tools")
+        runtime = next(
+            entry
+            for entry in cli_tools_vars["cli_tools"]
+            if entry["name"] == "dotfiles-runtime"
+        )
+        assert runtime["tag"] == "v0.2.0", (
+            "the cli_tools role must install dotfiles-runtime v0.2.0 "
+            f"(mandatory palette); got {runtime['tag']!r}"
+        )
+        assert verify_vars["verify_runtime_version"] == "v0.2.0", (
+            "verify_runtime_version must mirror the role pin v0.2.0; got "
+            f"{verify_vars['verify_runtime_version']!r}"
+        )
+        assert verify_vars["verify_runtime_tool_version"] == "0.2.0", (
+            "verify_runtime_tool_version must be the tag without its leading "
+            f"'v' (0.2.0); got {verify_vars['verify_runtime_tool_version']!r}"
+        )
+
+    def test_tool_version_is_the_tag_without_its_prefix(self) -> None:
+        verify_vars = _vars()
+        assert str(verify_vars["verify_runtime_tool_version"]) == str(
+            verify_vars["verify_runtime_version"]
+        ).removeprefix("v")
+
+
 class TestVerifyAssetsSchemaWindow:
     """S5 (AD-12): the deployed pin and contracts are re-asserted, not assumed."""
 
