@@ -112,17 +112,17 @@ added**, and the real composition manifest
 
 ## Acceptance
 
-- [ ] A red version-mirror guard fails at `v0.1.0` and passes at `v0.2.0`.
-- [ ] `verify_runtime_version: v0.2.0` and `verify_runtime_tool_version: 0.2.0`.
-- [ ] The `cli_tools` role tag and the fixture composition manifest mirror both
+- [x] A red version-mirror guard fails at `v0.1.0` and passes at `v0.2.0`.
+- [x] `verify_runtime_version: v0.2.0` and `verify_runtime_tool_version: 0.2.0`.
+- [x] The `cli_tools` role tag and the fixture composition manifest mirror both
       say `v0.2.0`; the existing literal assertions are updated.
-- [ ] Engine version `0.1.15` (`pyproject.toml`, `src/provisioning/__init__.py`,
+- [x] Engine version `0.1.15` (`pyproject.toml`, `src/provisioning/__init__.py`,
       `uv.lock`) and a CHANGELOG entry.
-- [ ] `make gates` green in the worktree; `make test-integration` not required
+- [x] `make gates` green in the worktree; `make test-integration` not required
       by release-train section 3.3 (it names `make gates` only).
 - [ ] Merged to `main`; annotated tag `v0.1.15`; GitHub Release carries the
       sdist and wheel; branch/tag pushed.
-- [ ] ags-apps (`v0.4.3`), assets (`v0.6.0`), ITR/weg/csg and ags-platform
+- [x] ags-apps (`v0.4.3`), assets (`v0.6.0`), ITR/weg/csg and ags-platform
       (`v0.2.0`) pins unchanged.
 
 ## Out of scope
@@ -144,16 +144,21 @@ fail on the runtime leg by design.
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Red (old pins) | pending | pending |
-| Green (v0.2.0) | pending | pending |
-| Engine gates | pending | pending |
-| Integration | not run | Release-train section 3.3 names `make gates` only. |
-| Pin scope | pending | pending |
-| Engine version | pending | pending |
+| Red (old pins) | `uv run pytest -q tests/unit/test_verify_role.py::TestVerifyRuntimePinMirror` at `a22b06e` | **exit 1** — 1 failed, 1 passed: `AssertionError: the cli_tools role must install dotfiles-runtime v0.2.0 (mandatory palette); got 'v0.1.0'` (`ansible/roles/cli_tools/vars/main.yml:130`). |
+| Green (v0.2.0) | same command at `47af8bf` | **exit 0** — 2 passed in 0.25s. |
+| Related pins | `uv run pytest -q tests/unit/test_verify_role.py::TestVerifyVars::test_runtime_pin_is_asserted_by_execution tests/unit/test_verify_role.py::TestVerifyVars::test_itr_pin_mirrors_the_cli_tools_role tests/unit/test_cli_tools_role.py::TestCliToolsPinnedCheckout` | **exit 0** — 3 passed. Parity `test_cli_tools_parity_with_manifest` + the pinned-checkout class → 9 passed. |
+| Engine gates | `make gates` at `47af8bf` | **exit 0** — test 969 passed/32 skipped/54 deselected; lint all checks passed; hermetic 965 passed/36 skipped/54 deselected; `uv lock --check` resolved 33; docs-check present. |
+| Integration | not run | Release-train section 3.3 names `make gates` only (`/home/inumaki/.opencode/plan/09-release-train.md:55-58`). |
+| Pin scope | `git diff v0.1.14..47af8bf -- ansible/roles` | Only the runtime literals change (`v0.1.0` → `v0.2.0`); ags-apps `v0.4.3`, assets `v0.6.0`, ITR/weg/csg and ags-platform `v0.2.0` unchanged. |
+| Engine version | `rg -n 'version = "0.1.15"\|__version__ = "0.1.15"' pyproject.toml src/provisioning/__init__.py`; `uv lock --check` | `pyproject.toml:3`, `src/provisioning/__init__.py:6`, `uv.lock:238` all `0.1.15`; lock resolved 33. CHANGELOG has `[0.1.15] - 2026-10-26`. |
 | Merge | pending | pending |
 | Tag | pending | pending |
 | Release assets | pending | pending |
 | Release URL | pending | pending |
+
+Evidence: commands and observed results in the table above, run in
+`.worktrees/REQ-006/` on the listed commits.
+Verify: re-run the red/green commands and `make gates` from the worktree.
 
 ### User host steps (sudo; user-run — the agent must not provision/reboot)
 
