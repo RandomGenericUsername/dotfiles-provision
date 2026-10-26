@@ -10,7 +10,7 @@
 
 ## Requirements
 
-(none)
+- [REQ-006-mirror-runtime-v020/ticket.md](./REQ-006-mirror-runtime-v020/ticket.md) — Mirror runtime v0.2.0 in verify + release v0.1.15 | `in-progress` | openspec: none | worktree .worktrees/REQ-006, branch ticket/REQ-006-mirror-runtime-v020
 
 ## Bugs
 
