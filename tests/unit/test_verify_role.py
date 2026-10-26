@@ -1594,6 +1594,15 @@ class TestVerifyTasks:
             "verify_xdg_data_home",
             "verify_desktop_entry_files",
             "verify_assets_desktop_paths",
+            # BUG-004 fixed system paths: SDDM owns /etc/sddm.conf.d and
+            # /usr/share/sddm/themes (not the user scope / install spine).
+            "verify_sddm_conf",
+            "verify_sddm_display_server",
+            "verify_sddm_compositor_command",
+            "verify_greeter_compositor_packages",
+            "verify_pixie_themedir",
+            "verify_pixie_main_qml",
+            "verify_pixie_repo_ref",
             "<install>",
             "install_dir",
             "ansible_facts.env",
@@ -1645,6 +1654,15 @@ class TestVerifyVars:
         "verify_btop_default_theme",
         "verify_btop_save_config_on_exit",
         "verify_itr_list_target",
+        # BUG-004: the SDDM Wayland greeter needs a compositor; these mirror the
+        # display_manager role's fixed system paths + pins.
+        "verify_sddm_conf",
+        "verify_sddm_display_server",
+        "verify_sddm_compositor_command",
+        "verify_greeter_compositor_packages",
+        "verify_pixie_themedir",
+        "verify_pixie_main_qml",
+        "verify_pixie_repo_ref",
     }
 
     def test_vars_parse_with_required_keys(self) -> None:
@@ -3062,6 +3080,16 @@ class TestVerifyVars:
             # /etc/power-options and its applied marker (REQ-003).
             "verify_power_options_profile_dir",
             "verify_power_options_marker",
+            # Fixed system paths, not user/spine paths: SDDM owns
+            # /etc/sddm.conf.d and /usr/share/sddm/themes (BUG-004). verify
+            # asserts the greeter compositor + the pinned Pixie checkout.
+            "verify_sddm_conf",
+            "verify_sddm_display_server",
+            "verify_sddm_compositor_command",
+            "verify_greeter_compositor_packages",
+            "verify_pixie_themedir",
+            "verify_pixie_main_qml",
+            "verify_pixie_repo_ref",
             "install_dir",
             "ansible_facts.env",
         )
@@ -3232,6 +3260,113 @@ class TestVerifyAssetsSchemaWindow:
         output = result.stdout + result.stderr
         assert result.returncode == 0, output
         assert f"skipped={len(tasks)}" in output, output
+
+
+class TestVerifyDisplayManagerGreeter:
+    """BUG-004: verify must prove the SDDM Wayland greeter can start.
+
+    The 90 s session bounce happened because `DisplayServer=wayland` had no
+    compositor: SDDM fell back to `x11-user`, the login got a new VT, and the
+    session was torn down. These checks are STATIC — verify never restarts SDDM
+    (that would kill the live session); the behavioral gate is the post-reboot
+    OPS-0113 five-login check.
+    """
+
+    def test_weston_is_the_pinned_greeter_compositor(self) -> None:
+        data = _vars()
+        role = _sibling_vars("display_manager")
+        assert [str(p) for p in data["verify_greeter_compositor_packages"]] == ["weston"]
+        role_packages = [str(p) for p in role["display_manager_sddm_packages"]]
+        assert "weston" in role_packages, (
+            "verify would pass only by accident: the role no longer installs weston"
+        )
+
+    def test_sddm_config_expectations_mirror_the_role(self) -> None:
+        data = _vars()
+        role = _sibling_vars("display_manager")
+        assert str(data["verify_sddm_conf"]) == str(role["display_manager_sddm_conf"])
+        assert str(data["verify_sddm_display_server"]) == str(
+            role["display_manager_sddm_display_server"]
+        )
+        assert str(data["verify_sddm_compositor_command"]) == str(
+            role["display_manager_sddm_compositor_command"]
+        )
+        assert data["verify_sddm_display_server"] == "wayland", (
+            "the greeter must stay Wayland — x11 reintroduces the GPU freeze"
+        )
+        assert data["verify_sddm_compositor_command"] == "weston --shell=kiosk"
+
+    def test_pixie_pin_mirrors_the_role(self) -> None:
+        data = _vars()
+        role = _sibling_vars("display_manager")
+        assert str(data["verify_pixie_repo_ref"]) == str(
+            role["display_manager_pixie_repo_ref"]
+        )
+        assert str(data["verify_pixie_themedir"]) == str(
+            role["display_manager_pixie_themedir"]
+        )
+        assert str(data["verify_pixie_main_qml"]) == (
+            "{{ verify_pixie_themedir }}/Main.qml"
+        )
+        assert len(str(data["verify_pixie_repo_ref"])) == 40, (
+            "the theme pin must be a commit SHA, not a moving branch"
+        )
+
+    def test_compositor_config_and_pixie_pin_are_asserted(self) -> None:
+        """The tasks exist, are gated for check mode, and assert the exact
+        failure modes: missing weston, a non-Wayland config, a drifted Pixie
+        checkout, and an unpatched login timeout."""
+        tasks = _load_tasks()
+        by_name = {str(task.get("name")): task for task in tasks}
+
+        probe = by_name["Check the greeter compositor is on PATH"]
+        assert _module_key(probe) == "ansible.builtin.shell"
+        assert "command -v {{ item }}" in _module_text(probe)
+        assert probe.get("loop") == "{{ verify_greeter_compositor_packages }}"
+        assert probe.get("when") == "not ansible_check_mode"
+        probe_assert = by_name["Assert the greeter compositor is on PATH"]
+        assert "verify_greeter_compositor_checks" in str(
+            _module(probe_assert).get("that")
+        )
+        assert "x11-user" in str(_module(probe_assert).get("fail_msg"))
+        assert probe_assert.get("when") == "not ansible_check_mode"
+
+        conf = by_name["Read the rendered SDDM config"]
+        assert _module_key(conf) == "ansible.builtin.slurp"
+        assert _module(conf).get("src") == "{{ verify_sddm_conf }}"
+        assert conf.get("when") == "not ansible_check_mode"
+        conf_assert = by_name[
+            "Assert the SDDM config keeps the Wayland greeter and names its compositor"
+        ]
+        that = str(_module(conf_assert).get("that"))
+        assert "DisplayServer=" in that
+        assert "[Wayland]" in that
+        assert "CompositorCommand=" in that
+        assert conf_assert.get("when") == "not ansible_check_mode"
+
+        head = by_name["Read the installed Pixie theme HEAD"]
+        assert _module_key(head) == "ansible.builtin.command"
+        argv = [str(arg) for arg in _module(head)["argv"]]
+        assert argv[:2] == ["git", "-c"]
+        assert "safe.directory=*" in argv, (
+            "the theme checkout is root-owned; git refuses it as the verify user "
+            "without safe.directory (observed live: dubious ownership)"
+        )
+        assert "rev-parse" in argv and "HEAD" in argv
+        assert head.get("when") == "not ansible_check_mode"
+        head_assert = by_name["Assert the installed Pixie theme is the pinned commit"]
+        assert "verify_pixie_repo_ref" in str(_module(head_assert).get("that"))
+        assert head_assert.get("when") == "not ansible_check_mode"
+
+        qml = by_name["Read the installed Pixie theme login timeout"]
+        assert _module_key(qml) == "ansible.builtin.slurp"
+        assert _module(qml).get("src") == "{{ verify_pixie_main_qml }}"
+        assert qml.get("when") == "not ansible_check_mode"
+        patch_assert = by_name["Assert the Pixie login-timeout patch is applied exactly once"]
+        that = str(_module(patch_assert).get("that"))
+        assert "interval: 0" in that
+        assert "interval: 5000" in that
+        assert patch_assert.get("when") == "not ansible_check_mode"
 
 
 class TestVerifyPlaybook:
