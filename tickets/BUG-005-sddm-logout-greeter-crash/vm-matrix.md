@@ -118,15 +118,17 @@ Expected: `KillSignal=15`, `SendSIGHUP=yes`, `KillMode=control-group`;
 as the host capture.
 
 Per-case capture — start a timestamp, run the action in kitty, then wait 30 s
-and collect:
+and collect. Paste the whole block into the host shell; it pauses at
+`read`, so switch to the VM's kitty, run the case command, then press Enter
+in the host shell.
 
 ```sh
 CASE=A-force-user          # change per case
 mkdir -p "$OUT/$CASE"
 T0=$(sudo incus exec "$VM" -- date +%s)
 sudo incus exec "$VM" -- logger -t bug005 "CASE=$CASE START"
-
-# ... run the one-line action in the VM's kitty here ...
+printf 'Run the case action in the VM kitty, then press Enter here: '
+read -r _
 
 sleep 30
 sudo incus exec "$VM" -- journalctl -b --since "@$T0" --no-pager -o short-precise \
@@ -138,12 +140,16 @@ echo "== sessions =="; loginctl list-sessions --no-pager
 echo "== weston =="; pgrep -a weston || true
 echo "== greeter =="; pgrep -a sddm-greeter || true
 echo "== sddm =="; systemctl is-active sddm
+echo "== coredump =="; coredumpctl list sddm-helper --no-pager 2>&1 || true
 ' > "$OUT/$CASE/state.txt"
 sudo incus exec "$VM" -- logger -t bug005 "CASE=$CASE END"
 
 grep -nE 'Adding new display|Removing display|Display server started|Greeter starting|Greeter stopped|Session started|sddm-helper|Process crashed|exited with' \
   "$OUT/$CASE/sddm.log"
 ```
+
+Time to greeter: the timestamp of the first `Greeter starting...` after `T0`
+minus `T0` (or the stopwatch from the action to the visible Pixie greeter).
 
 Also record the journal's session/scope lines for each case:
 
@@ -159,8 +165,8 @@ reproduces the wlogout action; the last two test the proposed graceful paths.
 
 | # | Case | Exact command in the VM session | Expected |
 | --- | --- | --- | --- |
-| A | Force user (wlogout equivalent) | `loginctl terminate-user "$USER"` | **Black VT; no greeter.** `crashed (exit code 1)` / `exited with 1`; sessions 2 and 3 removed; no weston/greeter; `sddm` active. |
-| B | Graceful session | `loginctl terminate-session "$XDG_SESSION_ID"` | To be recorded. Expected: same helper exit 1/no greeter (the scope still gets SIGTERM+SIGHUP); session 3 remains. |
+| A | Force user (wlogout equivalent) | `loginctl terminate-user "$USER"` | **Black VT; no greeter.** `crashed (exit code 1)` / `exited with 1`; the user and manager sessions removed; no weston/greeter; `sddm` active. |
+| B | Graceful session | `loginctl terminate-session "$XDG_SESSION_ID"` | To be recorded. Expected: same helper exit 1/no greeter (the scope still gets SIGTERM+SIGHUP); the manager session remains. |
 | C | uwsm stop | `uwsm stop` | **Pixie greeter returns <30 s.** `Auth: sddm-helper exited successfully`; second `Greeter starting...` / `Display server started.`; weston + greeter processes present. |
 | D | Compositor exit | `hyprctl dispatch exit` | **Pixie greeter returns <30 s.** Same clean helper exit/second greeter as C. |
 
@@ -217,7 +223,7 @@ compositor's own shutdown path.
 
 ## 3. Results table (paste back)
 
-| Case | Greeter returned? | Time to greeter | Helper exit line | Session 2 removed? | Session 3 removed? | Weston/greeter after? | Notes |
+| Case | Greeter returned? | Time to greeter | Helper exit line | User session removed? | Manager session removed? | Weston/greeter after? | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | A force-user | | | | | | | |
 | B terminate-session | | | | | | | |
