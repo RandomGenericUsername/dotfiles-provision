@@ -2,14 +2,14 @@
 id: BUG-004
 title: "SDDM Wayland greeter has no compositor — 90 s session bounce"
 kind: bug
-status: triage
+status: in-progress
 lane: 2
 severity: high
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: none
+worktree: .worktrees/BUG-004/
+branch: ticket/BUG-004-sddm-wayland-greeter
 repro: 'journalctl -b -u sddm | grep -c "falling back to DisplayServer=x11-user"'
 observed: "4 × this boot: 'Failed to launch the display server, falling back to DisplayServer=x11-user'; 'command -v weston' exits 1; 3 × 'Session started false' after the x11-user fallback"
 expected: "0 fallbacks; weston present; /etc/sddm.conf.d/10-dotfiles.conf carries DisplayServer=wayland + [Wayland] CompositorCommand=weston --shell=kiosk; no 'Session started false'"
