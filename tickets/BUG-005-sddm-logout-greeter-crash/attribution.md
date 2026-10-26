@@ -1,8 +1,16 @@
 # BUG-005 attribution — logout leaves a black VT
 
+> **Resolution (2026-10-26):** the recommended `uwsm stop` fix shipped in
+> `dotfiles-assets` `v0.6.1` and was consumed via engine `v0.1.16` /
+> `dotfiles-v3` `PIN-0115`; no provision code change. This file remains the
+> pre-fix attribution snapshot. The VM matrix was waived by the user; the host
+> acceptance — two clean cycles, formal run stopped at 3/5 — is recorded in
+> [ticket.md § Closeout](./ticket.md#closeout).
+
 **Date:** 2026-10-26
-**Status:** root cause attributed; **no fix implemented**; VM confirmation
-matrix pending.
+**Status:** pre-fix attribution snapshot; the fix shipped in assets `v0.6.1`
+(see the resolution note above). No fix was implemented in this repo; the VM
+confirmation matrix was waived.
 **Scope:** read-only host journal and upstream source. No host logout, no VM
 run, no `sudo`, and no wlogout/Pixie/SDDM edits.
 

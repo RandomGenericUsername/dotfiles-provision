@@ -5,8 +5,9 @@ which reproduces the helper exit-1 black screen.
 **Run only in the disposable Incus VM.** Never run these commands on the host;
 the host logout is currently destructive (black VT + power cycle). `sudo` and
 the VM are user-run steps.
-**Status:** prepared, not run. Paste the results back into BUG-005 before the
-fix is implemented.
+**Status:** prepared, not run. **Superseded 2026-10-26:** the user waived the
+VM matrix and accepted the host logout cycles; see
+[ticket.md § Closeout](./ticket.md#closeout).
 
 The matrix follows the attribution in
 [attribution.md](./attribution.md). The expected result is:

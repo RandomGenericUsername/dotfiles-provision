@@ -2,15 +2,15 @@
 id: BUG-005
 title: "Logout leaves a black VT — sddm-helper exits 1 and the greeter never restarts"
 kind: bug
-status: triage
-lane: 4
+status: done
+lane: 2
 severity: high
 links:
   openspec: none
   bmad: none
 worktree: .worktrees/BUG-005/
 branch: ticket/BUG-005-sddm-logout-greeter-crash
-repro: "In the VM: AGS bar power menu -> wlogout -> Logout (key e), which runs `loginctl terminate-user $USER`; the screen drops to a black VT with a blinking cursor and never returns to the greeter"
+repro: "At dotfiles-assets v0.6.0 or earlier, in the VM: AGS bar power menu -> wlogout -> Logout (key e), which ran `loginctl terminate-user $USER`; the screen dropped to a black VT with a blinking cursor and never returned to the greeter"
 observed: "Boot ccd99035 (2026-10-26): `Session started true` at 14:31:34; at 14:35:11 sddm-helper is SIGTERM-killed inside session-2.scope, SDDM logs `ERROR_INTERNAL \"Process crashed\"` / `sddm-helper ... crashed (exit code 1)`; no `Greeter starting` or `Display server started` afterwards; power key at 14:36:31. The same crash appears on 8 boots from 2026-10-23 to 2026-10-26."
 expected: "Logout returns to the Pixie greeter on seat0 within a sane time (< 30 s), no sddm-helper `Process crashed`, and a subsequent login succeeds; repeated 5 times."
 ---
@@ -28,7 +28,8 @@ no `falling back to DisplayServer=x11-user`, and no `sddm-helper exited with 2`.
 The recurring signature is the **user-session helper being killed while its
 session scope is torn down** (`SIGTERM` by `systemd[1]`), which SDDM reports as
 `ERROR_INTERNAL "Process crashed"` / exit 1. SDDM then never starts a second
-greeter. Triage only: no fix is implemented here.
+greeter. Triage snapshot: no fix was implemented in this repo; the resolution
+ships in assets `v0.6.1` — see [Closeout](#closeout).
 
 ## Repro
 
@@ -238,11 +239,16 @@ Verify: `grep -n 'interval' /usr/share/sddm/themes/pixie/Main.qml | head` and
 
 ## Attribution (2026-10-26)
 
-**Verdict:** root cause attributed; **no fix implemented**. The trigger is the
-wlogout Logout action (`loginctl terminate-user $USER`). The failure mode is
-SDDM 0.21.0 mapping the SIGHUP-killed user-session helper (exit code 1) to
-`Auth::HELPER_AUTH_ERROR` and skipping the greeter restart. weston, the Pixie
-patch, and uwsm/PAM are not the cause.
+> **Resolution 2026-10-26:** this is the pre-fix attribution snapshot. The
+> recommended `uwsm stop` fix shipped in `dotfiles-assets` `v0.6.1`; the
+> resolution evidence and the 3/5 acceptance caveat are in
+> [Closeout](#closeout).
+
+**Verdict:** root cause attributed; **no fix implemented** at the time of this
+snapshot. The trigger is the wlogout Logout action (`loginctl terminate-user
+$USER`). The failure mode is SDDM 0.21.0 mapping the SIGHUP-killed user-session
+helper (exit code 1) to `Auth::HELPER_AUTH_ERROR` and skipping the greeter
+restart. weston, the Pixie patch, and uwsm/PAM are not the cause.
 
 **Mechanism.** (1) `terminate-user` stops every session; the helper lives in
 `session-2.scope`. (2) The scope has `KillSignal=15` + `SendSIGHUP=yes`; the
@@ -282,9 +288,9 @@ Verify: `sed -n '14,17p' dotfiles-assets/configs/wlogout/layout` and
 ## Investigation plan (next session, self-contained)
 
 **Status 2026-10-26:** step 1 (capture) and step 3 (layer attribution) are
-done — see [attribution.md](./attribution.md). Step 2 is the VM matrix in
-[vm-matrix.md](./vm-matrix.md); it is the remaining gate before implementing
-the one-line assets fix. Step 4 is the post-fix acceptance.
+done — see [attribution.md](./attribution.md). **Resolved 2026-10-26:** step 2
+(the VM matrix) was waived by the user; step 4 is the host acceptance recorded
+in [Closeout](#closeout). No provision code change was required.
 
 Do **not** reproduce on the host: every logout currently costs a power cycle.
 Use the Incus VM from `dotfiles-v3` (`make vm-up` / `make vm-fresh`; sudo is a
@@ -384,23 +390,29 @@ ticket in `dotfiles-v3`. Only the SDDM config/weston/Pixie part belongs here.
 
 ## Blocked acceptance
 
-The **5-login session acceptance** is blocked by this bug. Every logout
-currently ends on a black VT and requires a power cycle, so five logout/login
-cycles cannot be completed. Do not mark the session work fully accepted until
-BUG-005 is fixed and the five-cycle acceptance passes. This also affects the
-BUG-004 closeout's “5 logins” evidence: first login is fine, but the
-logout→greeter→login loop is not.
+**Resolved 2026-10-26 — see [Closeout](#closeout).** The fix ships in
+`dotfiles-assets` `v0.6.1` and was deployed through engine `v0.1.16` /
+`PIN-0115`. The formal 5-login acceptance was stopped by the user at **3/5
+successful logins**; the user accepted the fix after two clean
+logout→greeter→login cycles and waived the remaining two cycles. The pre-fix
+block is preserved below.
+
+The **5-login session acceptance** was blocked by this bug. Before the fix,
+every logout ended on a black VT and required a power cycle, so five
+logout/login cycles could not be completed. This also affected the BUG-004
+closeout's “5 logins” evidence: first login is fine, but the
+logout→greeter→login loop was not.
 
 ## Triage
 
 - **kind: bug** — repro/observed/expected are present; the failure is executable
   evidence from the captured boot and is deterministic across 8 boots.
-- **lane: 4 (bmad-advisory)** — the root cause is not yet attributed; four
-  candidate layers (wlogout/assets, weston greeter, sddm-helper/uwsm/PAM,
-  Pixie) span three repos. This needs exploration before a spec/change; the
-  normal bug flow (`triage → in-progress → done`) and regression test still
-  apply. If the investigation collapses the cause to one bounded role/config
-  edit, re-triage to lane 2/3 before implementation.
+- **lane: 4 (bmad-advisory), original triage** — the root cause was not yet
+  attributed; four candidate layers (wlogout/assets, weston greeter,
+  sddm-helper/uwsm/PAM, Pixie) span three repos. This needed exploration before
+  a spec/change; the normal bug flow (`triage → in-progress → done`) and
+  regression test still apply. If the investigation collapses the cause to one
+  bounded role/config edit, re-triage to lane 2/3 before implementation.
 - **severity: high** — every logout loses the graphical session and requires a
   hard power cycle; no data loss, but the machine is not usable across
   logins and the session acceptance is blocked.
@@ -409,15 +421,108 @@ logout→greeter→login loop is not.
   handling. The lane stays 4 until the VM matrix confirms the graceful action;
   then re-triage to lane 2 and file the assets ticket.
 
+- **Resolution update (2026-10-26)** — re-triaged `lane: 4` → `lane: 2`: the
+  cause collapsed to a one-line action in `dotfiles-assets`
+  (`configs/wlogout/layout:15`), fixed in assets `v0.6.1` and consumed through
+  engine `v0.1.16` / `dotfiles-v3` `PIN-0115`. No `dotfiles-provision` code
+  changes. The VM matrix was waived by the user; the host logout cycle is the
+  behavioral acceptance, with the 3/5 formal-acceptance caveat recorded in
+  [Closeout](#closeout).
+
 Evidence: the repro/observed/expected front matter and the journal excerpts
 above; the cross-repo paths are quoted with line numbers.
-Verify: `rg -n '^kind: bug|^status: triage|^lane: 4|^severity: high' tickets/BUG-005-sddm-logout-greeter-crash/ticket.md`.
+Verify: `rg -n '^kind: bug|^status: (in-progress|done)|^lane: 2|^severity: high' tickets/BUG-005-sddm-logout-greeter-crash/ticket.md`.
 
 ## Done-when
 
-- [ ] Root cause attributed to a layer with captured VM/host evidence.
-- [ ] The identified repo has its own ticket if the fix is outside
-      `dotfiles-provision` (assets/v3), cross-linked here.
-- [ ] Logout returns to the greeter; a subsequent login works, 5 times.
-- [ ] Regression test/check covers the logout→greeter path.
-- [ ] `make gates` green on the implementation commit; docs/ticket updated.
+- [x] Root cause attributed to a layer with captured host evidence: the
+      wlogout `terminate-user` trigger plus SDDM 0.21's helper exit-1 handling
+      ([attribution.md](./attribution.md)).
+- [x] The identified repo has its own ticket, cross-linked here:
+      `dotfiles-assets` BUG-001; the one-line `configs/wlogout/layout:15`
+      change shipped in assets `v0.6.1`.
+- [x] Logout returns to the greeter; a subsequent login works. Host evidence:
+      two clean cycles (17:26:34 → 17:26:45; 17:36:33 → 17:36:54) plus the
+      post-reboot login at 17:16:59. **The formal 5-login acceptance was
+      stopped by the user at 3/5 successful logins; the user accepted the fix
+      after the two clean cycles and waived the remaining two. This ticket
+      does not claim 5/5.**
+- [x] Regression test/check covers the logout→greeter path: the assets
+      `make validate-configs` gate pins the Logout action to `uwsm stop`; the
+      behavioral check is the host cycle above. No provision regression test is
+      possible or needed because no provision code changed.
+- [x] Docs/ticket updated and docs gates green on the closeout commit. No
+      provision implementation commit exists for this fix; the assets `v0.6.1`
+      fix and engine `v0.1.16` were released green before this closeout.
+
+## Closeout
+
+**Verdict: resolved by `dotfiles-assets` `v0.6.1`; no provision code change;
+fixed in assets.** The fix is the one-line wlogout Logout action, consumed by
+engine `v0.1.16` and deployed by `dotfiles-v3` `PIN-0115`. This closeout is
+paperwork only (`ticket.md`, `attribution.md`, `vm-matrix.md`,
+`tickets/INDEX.md`); it cuts no tag or release.
+
+### Resolution chain
+
+| Leg | Evidence | Result |
+| --- | --- | --- |
+| Root cause | [attribution.md](./attribution.md) §1–4; upstream SDDM [#1908](https://github.com/sddm/sddm/issues/1908), PR [#2103](https://github.com/sddm/sddm/pull/2103) (not in 0.21.0) | `loginctl terminate-user $USER` → logind sends `SIGTERM`+`SIGHUP` to the session scope → the helper catches TERM but not HUP, exits 1 → SDDM casts 1 to `Auth::HELPER_AUTH_ERROR` and skips the greeter restart. |
+| Assets fix | commit `19e82f6`; annotated tag `v0.6.1` (tag object `b2ad3a9`, peeled `f8cc828`); [release](https://github.com/RandomGenericUsername/dotfiles-assets/releases/tag/v0.6.1) | `configs/wlogout/layout:15` is `"action" : "uwsm stop"`. `git diff v0.6.0..v0.6.1 -- configs/wlogout/layout` → 1 insertion, 1 deletion. `9acadc3` adds the `make validate-configs` guard that fails unless the Logout action is exactly `uwsm stop`. |
+| Engine consume | `dotfiles-provision` annotated tag `v0.1.16` (tag object `692928f`, peeled `7ee4e2a`); [release](https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.16) | All nine `*_assets_pinned_tag` mirrors, including `verify_assets_pinned_tag`, are `v0.6.1` (REQ-007). |
+| Composition deploy | `dotfiles-v3` `PIN-0115` [commit `b53f0c25`](https://github.com/RandomGenericUsername/dotfiles-v3/commit/b53f0c25e7c996240d673b323c7aac26d910902e) (merge `c2333deb`); `dotfiles/provisioning/assets.yaml:20` `tag: v0.6.1` (sources at `:31,34,37`); `installer.pin` `v0.1.16` | Host provision deployed `~/.config/wlogout/layout:14-17` with `uwsm stop`; deployed mtime `2026-10-26 17:08:10 -05`. |
+
+### Host acceptance (2026-10-26, local -05)
+
+Boot `bb5c10d4addb4abd8af9660ccefc2164`, the post-provision reboot (reboot
+requested 17:16:27; SDDM started 17:16:54).
+
+| Cycle | Logout | Greeter restarted | Login | Prior session |
+| --- | --- | --- | --- | --- |
+| 1 | 17:26:34.863 `Auth: sddm-helper exited successfully`, `Removing display`, `Adding new display` | 17:26:34.868 `Greeter starting`; 17:26:34.987 `Greeter session started successfully` | 17:26:44.957 authentication successful; 17:26:45.507 `Session started true` | 17:16:59.339 → 17:26:34.863 ≈ 575 s |
+| 2 | 17:36:33.339 `Auth: sddm-helper exited successfully`, `Removing display`, `Adding new display` | 17:36:33.343 `Greeter starting`; 17:36:33.460 `Greeter session started successfully` | 17:36:54.433 authentication successful; 17:36:54.589 `Session started true` | 17:26:45.507 → 17:36:33.339 ≈ 588 s |
+
+- Greeter ready in **0.12 s** (cycle 1) and **0.12 s** (cycle 2), far below the
+  30 s target.
+- User-observed: no black VT and no blinking cursor on either cycle.
+- Boot 0: `journalctl -b -u sddm --no-pager | grep -c 'ERROR_INTERNAL "Process
+  crashed"'` → **0**; `grep -c 'falling back to DisplayServer=x11-user'` →
+  **0**. The only `Process crashed` near the fix window is at 17:16:27 in the
+  previous boot, when the user requested the reboot and the old SDDM instance
+  was torn down — not a logout.
+- The only `Auth: sddm-helper exited with 1` on boot 0 is 17:36:49.422, after a
+  mistyped password (`Authentication error: SDDM::Auth::ERROR_AUTHENTICATION
+  "Authentication failure"`), not `ERROR_INTERNAL "Process crashed"`; the
+  immediate retry at 17:36:54 succeeded.
+- `python3 scripts/check-session-bounce.py --boot 0` (from `dotfiles-v3`) →
+  **exit 0**, `RESULT: PASS — 5 login attempt(s), no bounce or x11-user
+  fallback`. That is 5 *attempts* (the 17:36:47 login request and the 17:36:49
+  failed auth are two of them), **not** 5 successful logins.
+
+**Formal acceptance caveat.** The planned 5-login acceptance was stopped by
+the user at **3/5 successful logins** — 17:16:59, 17:26:45 and 17:36:54
+(`Session started true` count = 3). The user accepted the fix after the two
+clean logout→greeter→login cycles and waived the remaining two cycles. This
+ticket does **not** claim 5/5.
+
+### Regression coverage
+
+- **Static guard:** `dotfiles-assets` `make validate-configs` parses
+  `configs/wlogout/layout` and fails unless the single Logout tile action is
+  exactly `uwsm stop` (added in `9acadc3`; green on the `v0.6.1` release).
+- **Behavioral check:** the two host cycles above are the regression evidence
+  for the `uwsm stop` action replacing the old `repro:` command.
+- **VM matrix:** waived by the user 2026-10-26; no VM was run.
+- **Provision regression test:** none, because this repo has no code delta.
+  The engine only mirrors the assets tag.
+
+Evidence: the journal lines above from
+`journalctl -b -u sddm --no-pager -o short-precise`; tag/commit IDs from
+`git ls-remote --tags` and `git show`; the deployed file
+`~/.config/wlogout/layout:14-17`; `check-session-bounce.py --boot 0`.
+Verify: `journalctl -b -u sddm --no-pager -o short-precise | grep -E 'Auth:
+sddm-helper exited|Greeter starting|Greeter session started|Session started
+true'`; `git -C dotfiles-assets diff v0.6.0..v0.6.1 -- configs/wlogout/layout`;
+`git -C dotfiles-v3 show b53f0c25 -- dotfiles/provisioning/assets.yaml
+dotfiles/provisioning/installer.pin`; `sed -n '14,17p'
+~/.config/wlogout/layout`.
