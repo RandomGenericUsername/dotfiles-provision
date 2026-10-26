@@ -80,6 +80,8 @@ session:
 
 ```sh
 echo "USER=$USER XDG_SESSION_ID=$XDG_SESSION_ID XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+command -v uwsm        # expect /usr/bin/uwsm (the proposed action runs from wlogout)
+command -v wlogout     # expect /usr/bin/wlogout
 ```
 
 Expected: `USER=arch`, a non-empty session ID (usually `2`), and

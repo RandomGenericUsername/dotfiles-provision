@@ -160,6 +160,17 @@ Evidence: boot `ccd99035…` sddm log; no `Loading file:///…/Main.qml` or
 Verify:
 `journalctl -b -1 -u sddm --no-pager | grep -nE 'Greeter stopped|Session started true|Greeter starting'`.
 
+weston itself is not left half-running: the boot log shows the greeter's
+compositor finishing normally (`wayland compositor finished 0
+QProcess::NormalExit`, 14:31:34.351617). There is no deployed `weston.ini`;
+SDDM launches it with `--shell=kiosk` from `[Wayland]
+CompositorCommand` (`/etc/sddm.conf.d/10-dotfiles.conf:14-15`), so there is no
+weston configuration to fix.
+Evidence: `find /etc /home/inumaki/.config -maxdepth 3 -iname '*weston*'`
+returns only `/etc/pam.d/weston-remote-access`; `10-dotfiles.conf:14-15`.
+Verify: `sed -n '14,15p' /etc/sddm.conf.d/10-dotfiles.conf` and
+`find /etc /home/inumaki/.config -maxdepth 3 -iname '*weston*'`.
+
 ### 6. The intended clean path
 
 On a normal session end the compositor exits first; `uwsm`'s
