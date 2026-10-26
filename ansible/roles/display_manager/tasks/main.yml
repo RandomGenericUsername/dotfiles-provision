@@ -36,6 +36,33 @@
   become: true
   when: display_manager_type == 'sddm-pixie'
 
+# BUG-004 (fail-closed greeter preflight): DisplayServer=wayland is useless
+# without a Wayland compositor. SDDM's implicit default is `weston --shell=kiosk`
+# (sddm.conf(5)); when the binary is missing it silently falls back to
+# `DisplayServer=x11-user`, the login gets a new VT, and the session is torn
+# down ~90 s later (`Session started false`). Assert the package landed instead
+# of letting the role "succeed" into that fallback.
+- name: Check the Wayland greeter compositor is installed
+  ansible.builtin.shell: "command -v weston"
+  register: display_manager_weston_check
+  changed_when: false
+  failed_when: false
+  when: display_manager_type == 'sddm-pixie' and not ansible_check_mode
+
+- name: Assert the Wayland greeter compositor is installed
+  ansible.builtin.assert:
+    that:
+      - display_manager_weston_check.rc == 0
+      - display_manager_weston_check.stdout | trim | length > 0
+    fail_msg: >-
+      `weston` is missing after the SDDM package install. DisplayServer=wayland
+      requires a Wayland compositor; without one SDDM silently falls back to
+      x11-user and tears the session down after ~90 s (BUG-004). Fix
+      display_manager_sddm_packages / install weston — do not accept the
+      x11-user fallback.
+  become: true
+  when: display_manager_type == 'sddm-pixie' and not ansible_check_mode
+
 - name: Fetch the Pixie theme (Qt6)
   ansible.builtin.git:
     repo: "{{ display_manager_pixie_repo }}"
@@ -48,6 +75,34 @@
     force: true
   become: true
   when: display_manager_type == 'sddm-pixie'
+
+# BUG-004: the Pixie ref is pinned, but it is still a third-party tree. A blind
+# `lineinfile` with `state: present` is a NO-OP when the pattern is absent (a
+# moved/renamed timeout) and would silently restore the greeter auto-logout.
+# Read the file first and fail unless the pattern matches exactly once; only
+# then replace it.
+- name: Read the Pixie theme login timeout source
+  ansible.builtin.slurp:
+    src: "{{ display_manager_pixie_themedir }}/Main.qml"
+  register: display_manager_pixie_main_qml
+  become: true
+  when: display_manager_type == 'sddm-pixie' and not ansible_check_mode
+
+- name: Assert the login-timeout patch matches exactly once
+  ansible.builtin.assert:
+    that:
+      - >-
+        (display_manager_pixie_main_qml.content | b64decode
+         | regex_findall('(?m)^\\s*interval: 5000\\s*$')) | length == 1
+    fail_msg: >-
+      {{ display_manager_pixie_themedir }}/Main.qml must contain exactly one
+      `interval: 5000` login-timeout line, but found
+      {{ (display_manager_pixie_main_qml.content | b64decode
+          | regex_findall('(?m)^\\s*interval: 5000\\s*$')) | length }}.
+      The pinned Pixie commit changed shape; update the patch deliberately
+      instead of silently no-opping (BUG-004).
+  become: true
+  when: display_manager_type == 'sddm-pixie' and not ansible_check_mode
 
 - name: Fix SDDM theme login timeout
   ansible.builtin.lineinfile:
@@ -66,6 +121,10 @@
   when: display_manager_type == 'sddm-pixie'
 
 - name: Render SDDM config (Pixie theme, Wayland greeter)
+  # Assets v0.6.0's sddm.conf.j2 renders
+  # `[Wayland] CompositorCommand={{ display_manager_sddm_compositor_command }}`
+  # (default weston --shell=kiosk). The role var is in scope as the render
+  # context; the preflight above proves the command's package is present.
   ansible.builtin.template:
     src: "{{ display_manager_assets_templates_dir }}/display-manager/sddm.conf.j2"
     dest: "{{ display_manager_sddm_conf }}"

@@ -3527,6 +3527,7 @@ class TestVerifyRuntime:
                         str(self._PATH),
                         "-e",
                         f"install_dir={install}",
+                        *_display_manager_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
                     text=True,
@@ -3751,6 +3752,7 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -3824,7 +3826,13 @@ class TestVerifyRuntime:
                 PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
             )
             result = subprocess.run(
-                [ansible_playbook, str(self._PATH), "-e", f"install_dir={install}"],
+                [
+                    ansible_playbook,
+                    str(self._PATH),
+                    "-e",
+                    f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
+                ],
                 capture_output=True,
                 text=True,
                 env=env,
@@ -3886,7 +3894,13 @@ class TestVerifyRuntime:
                 PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
             )
             result = subprocess.run(
-                [ansible_playbook, str(self._PATH), "-e", f"install_dir={install}"],
+                [
+                    ansible_playbook,
+                    str(self._PATH),
+                    "-e",
+                    f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
+                ],
                 capture_output=True,
                 text=True,
                 env=env,
@@ -3943,7 +3957,13 @@ class TestVerifyRuntime:
                 PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
             )
             result = subprocess.run(
-                [ansible_playbook, str(self._PATH), "-e", f"install_dir={install}"],
+                [
+                    ansible_playbook,
+                    str(self._PATH),
+                    "-e",
+                    f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
+                ],
                 capture_output=True,
                 text=True,
                 env=env,
@@ -4003,6 +4023,7 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -4057,6 +4078,7 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -4107,6 +4129,7 @@ class TestVerifyRuntime:
                         str(self._PATH),
                         "-e",
                         f"install_dir={install}",
+                        *_display_manager_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
                     text=True,
@@ -4155,6 +4178,7 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -4195,6 +4219,65 @@ def _synthetic_verify_machine(tmp: Path) -> tuple[Path, Path, Path, dict[str, st
     return install, home, bin_dir, env
 
 
+def _display_manager_extra_vars(tmp: Path) -> list[str]:
+    """Seed a rootless display-manager fixture and return its `-e` overrides.
+
+    Production reads /etc/sddm.conf.d/10-dotfiles.conf and the root-owned Pixie
+    checkout under /usr/share/sddm; the synthetic machine substitutes temp
+    paths so the REAL verify task bodies run the same assertions without root.
+    `weston` itself is a stub on PATH (see `_write_stub_binaries`).
+    """
+    root = tmp / "display-manager"
+    conf = root / "10-dotfiles.conf"
+    conf.parent.mkdir(parents=True, exist_ok=True)
+    conf.write_text(
+        "[General]\n"
+        "DisplayServer=wayland\n"
+        "GreeterEnvironment=QT_QPA_PLATFORM=wayland\n"
+        "\n"
+        "[Wayland]\n"
+        "CompositorCommand=weston --shell=kiosk\n"
+        "\n"
+        "[Theme]\n"
+        "Current=pixie\n"
+    )
+    pixie = root / "pixie"
+    pixie.mkdir(parents=True, exist_ok=True)
+    qml = pixie / "Main.qml"
+    qml.write_text("interval: 0\n")
+    git_env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "fixture",
+        "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+        "GIT_COMMITTER_NAME": "fixture",
+        "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+    }
+    if not (pixie / ".git").exists():
+        for command in (
+            ["git", "init", "-q", str(pixie)],
+            ["git", "-C", str(pixie), "add", "Main.qml"],
+            ["git", "-C", str(pixie), "commit", "-q", "-m", "verify fixture"],
+        ):
+            subprocess.run(command, check=True, capture_output=True, env=git_env)
+    sha = subprocess.run(
+        ["git", "-C", str(pixie), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=git_env,
+    ).stdout.strip()
+    return [
+        "-e",
+        f"verify_sddm_conf={conf}",
+        "-e",
+        f"verify_pixie_themedir={pixie}",
+        "-e",
+        f"verify_pixie_main_qml={qml}",
+        "-e",
+        f"verify_pixie_repo_ref={sha}",
+    ]
+
+
 def _test_env(**overrides: str) -> dict[str, str]:
     """A scrubbed env for playbook subprocesses (review findings 2026-08-12 and
     2026-08-13): drop ambient ANSIBLE_* vars (a developer's ANSIBLE_INVENTORY /
@@ -4217,7 +4300,7 @@ def _write_stub_binaries(home: Path) -> Path:
     machine: report `NetworkManager` as active."""
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi"):
+    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston"):
         stub = bin_dir / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
