@@ -236,7 +236,55 @@ shows no `Loading file:///…/Main.qml` after 14:31:22.
 Verify: `grep -n 'interval' /usr/share/sddm/themes/pixie/Main.qml | head` and
 `grep -n 'SessionTimeout' /etc/sddm.conf.d/10-dotfiles.conf`.
 
+## Attribution (2026-10-26)
+
+**Verdict:** root cause attributed; **no fix implemented**. The trigger is the
+wlogout Logout action (`loginctl terminate-user $USER`). The failure mode is
+SDDM 0.21.0 mapping the SIGHUP-killed user-session helper (exit code 1) to
+`Auth::HELPER_AUTH_ERROR` and skipping the greeter restart. weston, the Pixie
+patch, and uwsm/PAM are not the cause.
+
+**Mechanism.** (1) `terminate-user` stops every session; the helper lives in
+`session-2.scope`. (2) The scope has `KillSignal=15` + `SendSIGHUP=yes`; the
+helper catches SIGTERM but not SIGHUP, so SIGHUP kills it. (3) Qt reports
+`CrashExit` with exit code 1 (the signal number); SDDM casts 1 to
+`HELPER_AUTH_ERROR` and `Display::slotHelperFinished()` does not call `stop()`.
+(4) The greeter was already stopped after login, so the VT is left empty.
+This is upstream SDDM #1908 (open PR #2103, not in 0.21.0).
+
+**Hypotheses:** H1 confirmed trigger; H2 refuted as root cause (weston is never
+asked to restart); H3 confirmed failure mode (SDDM exit-code handling, not a
+PAM crash); H4 refuted (no greeter process exists).
+
+**Remaining unknown:** whether `uwsm stop` / `hyprctl dispatch exit` produce a
+normal helper exit and a second greeter on this stack, and whether
+`terminate-session` also reproduces. **The VM matrix is required before
+implementing the fix.** See [vm-matrix.md](./vm-matrix.md).
+
+**Recommended fix (pending user approval):** in `dotfiles-assets`
+`configs/wlogout/layout:15`, replace `loginctl terminate-user $USER` with
+`uwsm stop`. Do not edit wlogout until approved. The assets corpus is pinned
+at `v0.6.0` (`dotfiles-v3/dotfiles/provisioning/assets.yaml:20`), so the fix
+needs an assets tag, a v3 pin bump, and a re-provision. A ready-to-file assets
+ticket is proposed in
+[attribution.md](./attribution.md#proposed-assets-ticket-not-filed-needs-approval).
+
+**Acceptance:** logout returns to Pixie <30 s with no helper crash; the next
+login works; 5 cycles; `check-session-bounce.py` stays green.
+
+Evidence: [attribution.md](./attribution.md) (mechanism, source line ranges,
+journal commands) and the captured boot log excerpts above; upstream
+<https://github.com/sddm/sddm/issues/1908> and
+<https://github.com/sddm/sddm/pull/2103>.
+Verify: `sed -n '14,17p' dotfiles-assets/configs/wlogout/layout` and
+`curl -fsSL https://raw.githubusercontent.com/sddm/sddm/v0.21.0/src/daemon/Display.cpp | sed -n '524,532p'`.
+
 ## Investigation plan (next session, self-contained)
+
+**Status 2026-10-26:** step 1 (capture) and step 3 (layer attribution) are
+done — see [attribution.md](./attribution.md). Step 2 is the VM matrix in
+[vm-matrix.md](./vm-matrix.md); it is the remaining gate before implementing
+the one-line assets fix. Step 4 is the post-fix acceptance.
 
 Do **not** reproduce on the host: every logout currently costs a power cycle.
 Use the Incus VM from `dotfiles-v3` (`make vm-up` / `make vm-fresh`; sudo is a
@@ -356,6 +404,10 @@ logout→greeter→login loop is not.
 - **severity: high** — every logout loses the graphical session and requires a
   hard power cycle; no data loss, but the machine is not usable across
   logins and the session acceptance is blocked.
+- **Attribution update (2026-10-26)** — root cause attributed (see below):
+  the wlogout `terminate-user` trigger plus SDDM 0.21's helper exit-code
+  handling. The lane stays 4 until the VM matrix confirms the graceful action;
+  then re-triage to lane 2 and file the assets ticket.
 
 Evidence: the repro/observed/expected front matter and the journal excerpts
 above; the cross-repo paths are quoted with line numbers.
