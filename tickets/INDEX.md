@@ -10,7 +10,7 @@
 
 ## Requirements
 
-(none)
+- [REQ-007-consume-assets-v061-runtime-v022/ticket.md](./REQ-007-consume-assets-v061-runtime-v022/ticket.md) — Consume assets v0.6.1 + runtime v0.2.2 in one pin release (engine v0.1.16) | `in-progress` | openspec: none | worktree .worktrees/REQ-007, branch ticket/REQ-007-consume-assets-v061-runtime-v022
 
 ## Bugs
 
