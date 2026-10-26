@@ -6,6 +6,20 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-10-25
+
+### Fixed
+
+- **`ags-apps` pin `v0.4.2` (ags-apps BUG-001):** the wallpaper-selector
+  rendered every PNG card in black & white — gdk-pixbuf's JPEG writer
+  mishandles 4-channel (RGBA) pixbuf buffers, so all disk thumbnails derived
+  from `.png` sources stored fully desaturated jpegs that kept re-hitting
+  forever (the cache key counts path+mtime+size, which never move). ags-apps
+  `49adc30`/`v0.4.2` flattens RGBA onto an opaque 3-channel pixbuf over black
+  before the save and bumps the thumb-cache entry format to v2, so the
+  poisoned entries fall out on the first open of the fixed build. The verify
+  mirror (`verify_ags_apps_version`) moves to v0.4.2 with the pin.
+
 ## [0.1.11] - 2026-10-24
 
 ### Fixed
