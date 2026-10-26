@@ -321,6 +321,13 @@ ticket in `dotfiles-v3`. Only the SDDM config/weston/Pixie part belongs here.
 - `dotfiles-v3/dotfiles/provisioning/` — manifests that pin the installer and
   `uwsm`; `dev/README.md` §Host 5-login acceptance and
   `scripts/check-session-bounce.py`; `dev/vm-session-loop.sh` for VM repros.
+  Note: as read on 2026-10-26, `dotfiles-v3/dotfiles/` contains only
+  `provisioning/` manifests — there is no uwsm/session/autostart file there.
+  The Hyprland startup block is `dotfiles-assets/configs/hypr/autostart.lua`
+  (deployed as `~/.config/hypr/autostart.lua`), and
+  `/usr/share/wayland-sessions/hyprland-uwsm.desktop` is package-provided
+  (`Exec=uwsm start -e -D Hyprland hyprland.desktop`). Check the deployed
+  config/package before attributing a session-layer cause to v3.
 - `ags-apps/bar/bar/widgets/power-menu.tsx:18` — the bar button just execs
   `wlogout`; the action lives in the assets layout.
 - `dotfiles-provision` — SDDM config (`display_manager` role), weston package,
