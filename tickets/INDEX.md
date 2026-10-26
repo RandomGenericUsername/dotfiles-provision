@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- [REQ-007-consume-assets-v061-runtime-v022/ticket.md](./REQ-007-consume-assets-v061-runtime-v022/ticket.md) — Consume assets v0.6.1 + runtime v0.2.2 in one pin release (engine v0.1.16) | `in-progress` | openspec: none | worktree .worktrees/REQ-007, branch ticket/REQ-007-consume-assets-v061-runtime-v022
+(none)
 
 ## Bugs
 
@@ -39,3 +39,4 @@
 - [BUG-002-group-vars-wheel](./BUG-002-group-vars-wheel/ticket.md) — Installed engine wheel drops `inventory/group_vars` | `done` | openspec: group-vars-wheel | tag: v0.1.9
 - [REQ-005-consume-ags-apps-v043](./REQ-005-consume-ags-apps-v043/ticket.md) — Consume ags-apps v0.4.3 (selector collapses on Apply) + release v0.1.14 | `done` | openspec: none | tag: v0.1.14
 - [REQ-006-mirror-runtime-v020](./REQ-006-mirror-runtime-v020/ticket.md) — Mirror runtime v0.2.0 in verify + release v0.1.15 | `done` | openspec: none | tag: v0.1.15
+- [REQ-007-consume-assets-v061-runtime-v022](./REQ-007-consume-assets-v061-runtime-v022/ticket.md) — Consume assets v0.6.1 + runtime v0.2.2 in one pin release (engine v0.1.16) | `done` | openspec: none | tag: v0.1.16

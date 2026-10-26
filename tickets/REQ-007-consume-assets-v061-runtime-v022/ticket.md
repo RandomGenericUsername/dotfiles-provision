@@ -2,7 +2,7 @@
 id: REQ-007
 title: "Consume assets v0.6.1 + runtime v0.2.2 in one pin release (engine v0.1.16)"
 kind: requirement
-status: in-progress
+status: done
 lane: 1
 links:
   openspec: none
@@ -193,24 +193,23 @@ Verify: same `rg`.
 
 ## Acceptance
 
-- [ ] A red version/parity guard fails at `v0.6.0`/`v0.2.0` and passes at
+- [x] A red version/parity guard fails at `v0.6.0`/`v0.2.0` and passes at
       `v0.6.1`/`v0.2.2`.
-- [ ] Every `*_assets_pinned_tag` mirror is `v0.6.1` (assets, btop_config,
+- [x] Every `*_assets_pinned_tag` mirror is `v0.6.1` (assets, btop_config,
       compositor_configs, config_copies, display_manager, kitty_config, verify,
       wlogout_config, zsh_config); the fixture `assets.yaml` tag and its three
       checkout sources are `v0.6.1`.
-- [ ] The `cli_tools` runtime tag, `verify_runtime_version: v0.2.2`,
+- [x] The `cli_tools` runtime tag, `verify_runtime_version: v0.2.2`,
       `verify_runtime_tool_version: 0.2.2`, and the fixture `cli-tools.yaml`
       runtime tag are `v0.2.2`; existing literal assertions updated.
-- [ ] Engine version `0.1.16` (`pyproject.toml`,
+- [x] Engine version `0.1.16` (`pyproject.toml`,
       `src/provisioning/__init__.py`, `uv.lock`) and a CHANGELOG entry covering
       both pins and the wlogout Logout fix.
-- [ ] `make gates` green in the worktree; `make assets-parity` green at
-      `v0.6.1`; `make test-integration` recorded (run or explicitly not
-      required by the release procedure).
-- [ ] Merged to `main`; annotated tag `v0.1.16`; GitHub Release carries the
+- [x] `make gates` green in the worktree; `make assets-parity` green at
+      `v0.6.1`; `make test-integration` green.
+- [x] Merged to `main`; annotated tag `v0.1.16`; GitHub Release carries the
       sdist and wheel; branch/tag pushed.
-- [ ] ags-apps (`v0.4.3`), csg/weg/itr and ags-platform (`v0.2.0`) pins
+- [x] ags-apps (`v0.4.3`), csg/weg/itr and ags-platform (`v0.2.0`) pins
       unchanged; no runtime install pin added in this repo.
 
 ## Out of scope
@@ -236,15 +235,22 @@ Verify: same `rg`.
 | Build | `make build` at `c834c28` | **exit 0** — `dotfiles_provision-0.1.16-py3-none-any.whl` + `.tar.gz`; wheel-contents check PASS. |
 | Pin scope | `git diff main...HEAD -- ansible/roles` | Only the nine assets mirrors (`v0.6.0` → `v0.6.1`) and three runtime literals (`v0.2.0` → `v0.2.2`) change. ags-apps `v0.4.3`; csg/weg/itr and ags-platform `v0.2.0` unchanged. |
 | Engine version | `rg -n 'version = "0.1.16"\|__version__ = "0.1.16"' pyproject.toml uv.lock src/provisioning/__init__.py`; `uv run dotfiles-provision version` | `pyproject.toml:3`, `uv.lock:238`, `src/provisioning/__init__.py:6` all `0.1.16`; CLI prints `{"version": "0.1.16"}`. CHANGELOG has `[0.1.16] - 2026-10-26`. |
-| Merge | pending | pending |
-| Tag | pending | pending |
-| Tag CI | pending | pending |
-| Release assets | pending | pending |
-| Release URL | pending | pending |
+| Merge | `git log --oneline --graph` | `7ee4e2a` — merge of `1089073` (main) + `b109db2` (branch); pushed to `origin/main`. |
+| Tag | `git show v0.1.16`; `git ls-remote --tags origin 'refs/tags/v0.1.16*'` | Annotated `v0.1.16` → `7ee4e2a`; remote tag object `692928f`, peeled `7ee4e2a`; pushed. |
+| Tag CI | `gh run view 40408534994 --json conclusion,jobs` | `completed/success` — all 8 jobs (test, lint, hermetic, lock-check, docs-check, ci-gates-parity, assets-parity, release). |
+| Release assets | `gh release view v0.1.16 --json assets` | `dotfiles_provision-0.1.16-py3-none-any.whl` (244897 bytes), `dotfiles_provision-0.1.16.tar.gz` (444162 bytes); both `uploaded`. |
+| Release URL | `gh release view v0.1.16 --json url` | https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.16 |
 
 Evidence: the commands and observed results above, run in
-`.worktrees/REQ-007/` on the listed commits (`2bbee7c` red, `c834c28` fix).
-Verify: re-run the red/green selectors and `make gates` from the worktree.
+`.worktrees/REQ-007/` on the listed commits (`2bbee7c` red, `c834c28` fix) and
+on `main` for the merge/tag/release rows.
+Verify: re-run the red/green selectors and `make gates` from the worktree;
+inspect the release with `gh release view v0.1.16`.
+
+Post-tag note: `v0.1.16` is immutable and points at `7ee4e2a` (implementation +
+tests + first closeout). This final closeout commit is docs-only, lands after
+the tag, and matches the `v0.1.14`/`v0.1.15` pattern; it changes no packaged
+file (`pyproject.toml` packages only `src/provisioning`).
 
 ### User host steps (sudo; user-run — the agent must not provision/reboot)
 
