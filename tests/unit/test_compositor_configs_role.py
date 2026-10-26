@@ -249,7 +249,7 @@ def _seed_assets_configs(install: Path) -> None:
 
 
 #: The seeded `desktop/` corpus: file -> (Exec line, TryExec, requires, optional).
-#: The Exec/TryExec/requires/optional values mirror `dotfiles-assets@v0.6.0`'s
+#: The Exec/TryExec/requires/optional values mirror `dotfiles-assets@v0.6.1`'s
 #: `desktop/desktop.yaml` and entries. The fixtures are what THIS role reads; the
 #: corpus's own `make validate-desktop` proves the real bytes (S4 layer 1), so a
 #: fixture here is a role input, not a second copy of the contract.

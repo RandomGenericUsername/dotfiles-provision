@@ -43,7 +43,7 @@
 #   `assets.tag` (AD-6/AD-11). Trim lock: the checkout path consumes the same
 #   validated {{ install_dir | trim }} value the fail-loud first-task assert
 #   enforces.
-compositor_configs_assets_pinned_tag: v0.6.0
+compositor_configs_assets_pinned_tag: v0.6.1
 compositor_configs_assets_configs_dir: "{{ install_dir | trim }}/assets/{{ compositor_configs_assets_pinned_tag }}/configs"
 compositor_configs_assets_desktop_dir: "{{ install_dir | trim }}/assets/{{ compositor_configs_assets_pinned_tag }}/desktop"
 

@@ -164,7 +164,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.6.0
+verify_assets_pinned_tag: v0.6.1
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -333,8 +333,8 @@ verify_itr_contract_version: 0.2.0
 #   `dotfiles-runtime` has no `--version` flag and no contract token: the
 #   `version` subcommand prints the package version, which equals the tag
 #   without its leading `v`.
-verify_runtime_version: v0.2.0
-verify_runtime_tool_version: 0.2.0
+verify_runtime_version: v0.2.2
+verify_runtime_tool_version: 0.2.2
 verify_runtime_checkout: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/{{ verify_runtime_version }}"
 verify_runtime_pin_file: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/pinned"
 

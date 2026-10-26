@@ -6,6 +6,37 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-10-26
+
+### Changed
+
+- **`dotfiles-assets` pin `v0.6.1` (assets BUG-001):** the wlogout Logout tile
+  now runs `uwsm stop` instead of `loginctl terminate-user $USER`, so logout
+  stops the compositor unit and lets the SDDM helper exit normally instead of
+  tearing down every user session (the `sddm-helper` SIGHUP crash behind the
+  black VT; provision BUG-005). Every `*_assets_pinned_tag` mirror moves from
+  `v0.6.0` to `v0.6.1` (assets, btop_config, compositor_configs,
+  config_copies, display_manager, kitty_config, verify, wlogout_config,
+  zsh_config), and the fixture composition manifest carries the same tag in
+  `assets.tag` and its three checkout sources. The corpus is otherwise
+  unchanged.
+- **`dotfiles-runtime` pin `v0.2.2` (runtime BUG-003; BUG-004 retained):** the
+  icon-contrast prefs reader now accepts its own canonical document at any
+  entry count (four or more prefs round-trip instead of falling back to
+  defaults), and BUG-004's btop-theme-studio skip stays so a wallpaper change
+  does not discard unsaved studio edits. The engine's `cli_tools` mirror, the
+  hand-maintained verify mirror (`verify_runtime_version` /
+  `verify_runtime_tool_version`) and the fixture `cli-tools.yaml` move from
+  `v0.2.0` to `v0.2.2`, locked by `TestVerifyRuntimePinMirror`.
+
+### Fixed
+
+- **Logout returns to the greeter instead of a black VT (provision BUG-005):**
+  consuming assets `v0.6.1` ships the one-line `uwsm stop` logout action; the
+  host acceptance (logout → greeter, then five logins) runs after the
+  `dotfiles-v3` `PIN-0115` re-provision. This release adds no engine-side
+  runtime install pin; the composition install pin remains in `dotfiles-v3`.
+
 ## [0.1.15] - 2026-10-26
 
 ### Changed

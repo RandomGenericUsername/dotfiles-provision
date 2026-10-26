@@ -938,7 +938,7 @@ class TestCliToolsPinnedCheckout:
         assert pinned[3]["repo"] == (
             "https://github.com/RandomGenericUsername/dotfiles-runtime"
         )
-        assert pinned[3]["tag"] == "v0.2.0"
+        assert pinned[3]["tag"] == "v0.2.2"
 
     def test_pinned_clone_is_shallow_single_branch_and_tag_qualified(self) -> None:
         task = self._clone_task()

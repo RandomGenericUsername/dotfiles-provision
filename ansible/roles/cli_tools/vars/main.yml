@@ -127,4 +127,4 @@ cli_tools:
     tag: v0.2.0
   - name: dotfiles-runtime
     repo: https://github.com/RandomGenericUsername/dotfiles-runtime
-    tag: v0.2.0
+    tag: v0.2.2
