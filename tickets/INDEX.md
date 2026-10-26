@@ -10,7 +10,7 @@
 
 ## Requirements
 
-(none)
+- [REQ-005-consume-ags-apps-v043/ticket.md](./REQ-005-consume-ags-apps-v043/ticket.md) — consume ags-apps v0.4.3 (selector collapses on Apply) + release v0.1.14 | `proposed` | worktree none, branch none
 
 ## Bugs
 
