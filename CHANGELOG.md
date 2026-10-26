@@ -6,6 +6,27 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-10-26
+
+### Fixed
+
+- **SDDM's Wayland greeter had no compositor (BUG-004):** the rendered
+  `/etc/sddm.conf.d/10-dotfiles.conf` set `DisplayServer=wayland` while none of
+  `weston`/`kwin_wayland`/`cage`/`sway`/`wayfire`/`labwc` was installed. The
+  greeter display server could not start, so SDDM silently fell back to
+  `DisplayServer=x11-user` on every login, the session got a new VT, and it was
+  torn down ~90 s later (`Session started false`; 4 fallbacks on the
+  2026-10-26 boot). The role now installs `weston`, renders
+  `[Wayland] CompositorCommand=weston --shell=kiosk` from the assets v0.6.0
+  template (`req-006`), and fails closed with a `command -v weston` preflight
+  instead of accepting the fallback. The Pixie theme is pinned to the tested
+  commit `1e1a8637` (was the moving `main`) and the `interval: 5000`
+  login-timeout patch now fails if the pattern is absent or duplicated. `verify`
+  statically asserts weston, the Wayland config lines, the Pixie HEAD and the
+  applied patch (it never restarts SDDM). Every `*_assets_pinned_tag` mirror
+  moves to v0.6.0. The greeter change takes effect after the next host
+  provision + reboot.
+
 ## [0.1.12] - 2026-10-25
 
 ### Fixed

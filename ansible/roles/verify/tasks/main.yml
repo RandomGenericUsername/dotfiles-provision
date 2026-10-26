@@ -177,6 +177,7 @@
       - verify_btop_theme_files | length > 0
       - verify_icons_samples | length > 0
       - verify_derivation_template_dirs | length > 0
+      - verify_greeter_compositor_packages | length > 0
     fail_msg: >-
       a verify list var is empty — a runtime override or a manifest desync
       silently disabled a criterion: every count assert is
@@ -456,6 +457,109 @@
       slider would be a silent no-op. The packages role installs brightnessctl
       and its udev rule grants the session user access; run the packages
       playbook or check `{{ verify_backlight_binary }} -m` as the user
+  when: not ansible_check_mode
+
+# ── Display manager: the SDDM Wayland greeter must be able to start ──────────
+# BUG-004: the machine booted into SDDM with DisplayServer=wayland but no
+# Wayland compositor. SDDM fell back to x11-user on every login; the session
+# got a new VT and was torn down after ~90 s (journal: `falling back to
+# DisplayServer=x11-user`, `Session started false`). The install-time preflight
+# in the display_manager role fails closed; these post-provision probes prove
+# the deployed state still holds. STATIC ONLY: never restart SDDM here (it
+# would kill the live session); the behavioral check is after the next reboot.
+- name: Check the greeter compositor is on PATH
+  ansible.builtin.shell: "command -v {{ item }}"
+  loop: "{{ verify_greeter_compositor_packages }}"
+  register: verify_greeter_compositor_checks
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert the greeter compositor is on PATH
+  ansible.builtin.assert:
+    that:
+      - verify_greeter_compositor_checks.results | selectattr('rc', 'equalto', 0) | list | length == verify_greeter_compositor_packages | length
+      - verify_greeter_compositor_checks.results | map(attribute='stdout') | reject('equalto', '') | list | length == verify_greeter_compositor_packages | length
+    fail_msg: >-
+      the SDDM Wayland greeter has no compositor (expected {{
+      verify_greeter_compositor_packages | join(', ') }} on PATH). SDDM falls
+      back to DisplayServer=x11-user and the session is torn down after ~90 s
+      (BUG-004). The display_manager role installs the compositor and asserts
+      it; re-run the display-manager playbook.
+  when: not ansible_check_mode
+
+- name: Read the rendered SDDM config
+  ansible.builtin.slurp:
+    src: "{{ verify_sddm_conf }}"
+  register: verify_sddm_conf_raw
+  when: not ansible_check_mode
+
+- name: Assert the SDDM config keeps the Wayland greeter and names its compositor
+  ansible.builtin.assert:
+    that:
+      - ('DisplayServer=' ~ verify_sddm_display_server) in (verify_sddm_conf_raw.content | b64decode).splitlines()
+      - "'[Wayland]' in (verify_sddm_conf_raw.content | b64decode).splitlines()"
+      - ('CompositorCommand=' ~ verify_sddm_compositor_command) in (verify_sddm_conf_raw.content | b64decode).splitlines()
+    fail_msg: >-
+      {{ verify_sddm_conf }} does not configure the Wayland greeter compositor
+      (expected an exact `DisplayServer={{ verify_sddm_display_server }}` line,
+      a `[Wayland]` section and
+      `CompositorCommand={{ verify_sddm_compositor_command }}`). Without the
+      compositor SDDM falls back to x11-user and the session bounces after
+      ~90 s (BUG-004). Re-run the display-manager playbook; do NOT switch the
+      display server to x11 (that reintroduces the GPU hard-freeze).
+  when: not ansible_check_mode
+
+- name: Read the installed Pixie theme HEAD
+  ansible.builtin.command:
+    argv:
+      - git
+      # The theme checkout is root-owned; a bare `git -C` fails with
+      # "detected dubious ownership" as the (non-root) verify user.
+      - -c
+      - safe.directory=*
+      - -C
+      - "{{ verify_pixie_themedir }}"
+      - rev-parse
+      - HEAD
+  register: verify_pixie_head
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert the installed Pixie theme is the pinned commit
+  ansible.builtin.assert:
+    that:
+      - verify_pixie_head.rc == 0
+      - verify_pixie_head.stdout | trim == verify_pixie_repo_ref
+    fail_msg: >-
+      the Pixie theme at {{ verify_pixie_themedir }} is not the pinned commit
+      (expected {{ verify_pixie_repo_ref }}, got
+      '{{ verify_pixie_head.stdout | trim }}'). The display_manager role pins a
+      commit — not the moving `main` branch — because the login-timeout patch
+      edits Main.qml. Re-run the display-manager playbook.
+  when: not ansible_check_mode
+
+- name: Read the installed Pixie theme login timeout
+  ansible.builtin.slurp:
+    src: "{{ verify_pixie_main_qml }}"
+  register: verify_pixie_main_qml_raw
+  when: not ansible_check_mode
+
+- name: Assert the Pixie login-timeout patch is applied exactly once
+  ansible.builtin.assert:
+    that:
+      - >-
+        (verify_pixie_main_qml_raw.content | b64decode
+         | regex_findall('(?m)^\\s*interval: 0\\s*$')) | length == 1
+      - >-
+        (verify_pixie_main_qml_raw.content | b64decode
+         | regex_findall('(?m)^\\s*interval: 5000\\s*$')) | length == 0
+    fail_msg: >-
+      {{ verify_pixie_main_qml }} does not carry the applied login-timeout
+      patch (expected exactly one `interval: 0` line and no `interval: 5000`).
+      The display_manager role fails closed when the source pattern is absent
+      or duplicated; re-run the display-manager playbook (BUG-004).
   when: not ansible_check_mode
 
 # Sibling of the system-binary probe above: same declared gate, same already-

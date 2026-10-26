@@ -15,7 +15,7 @@
 ## Bugs
 
 - [BUG-003-consume-ags-apps-v042/ticket.md](./BUG-003-consume-ags-apps-v042/ticket.md) — consume ags-apps v0.4.2 (color thumbnails) + release v0.1.12 | severity: low | `done` | worktree .worktrees/BUG-003, branch ticket/BUG-003-consume-ags-apps-v042
-- [BUG-004-sddm-wayland-greeter/ticket.md](./BUG-004-sddm-wayland-greeter/ticket.md) — SDDM Wayland greeter has no compositor (90 s session bounce) | severity: high | `triage` | worktree none, branch none
+- [BUG-004-sddm-wayland-greeter/ticket.md](./BUG-004-sddm-wayland-greeter/ticket.md) — SDDM Wayland greeter has no compositor (90 s session bounce) | severity: high | `in-progress` | worktree .worktrees/BUG-004, branch ticket/BUG-004-sddm-wayland-greeter
 
 ## Ops tasks
 

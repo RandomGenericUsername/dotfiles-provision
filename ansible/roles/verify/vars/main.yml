@@ -164,7 +164,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.5.0
+verify_assets_pinned_tag: v0.6.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -433,6 +433,29 @@ verify_bluetooth_audio_packages:
 #   rule grants the session user access; this gate runs the machine-readable
 #   read as the user so a slider that would silently no-op fails provisioning.
 verify_backlight_binary: brightnessctl
+
+# ── Display manager: SDDM's Wayland greeter (BUG-004) ────────────────────────
+# DisplayServer=wayland needs a Wayland compositor. With none installed, SDDM
+# silently falls back to `DisplayServer=x11-user`, starts the login on a new VT
+# and tears the session down after ~90 s (`Session started false`). These mirror
+# the display_manager role's vars; the role's preflight is the install-time
+# fail-closed half, these are the post-provision static assertions.
+#
+# Fixed system paths, not user/spine paths: SDDM owns /etc/sddm.conf.d and its
+# theme tree under /usr/share/sddm (the trim lock lists these as fixed system
+# paths, like /etc/power-options).
+verify_sddm_conf: /etc/sddm.conf.d/10-dotfiles.conf
+verify_sddm_display_server: wayland
+verify_sddm_compositor_command: "weston --shell=kiosk"
+verify_greeter_compositor_packages:
+  - weston
+verify_pixie_themedir: /usr/share/sddm/themes/pixie
+verify_pixie_main_qml: "{{ verify_pixie_themedir }}/Main.qml"
+# verify_pixie_repo_ref: the display_manager role's commit pin, mirrored. The
+# theme is root-owned, so the `git rev-parse` probe runs with
+# `-c safe.directory=*` (a bare git call fails "dubious ownership" as the
+# verify user — observed live). Bump procedure lives on the role var.
+verify_pixie_repo_ref: 1e1a863761f742e8d509d569382b17c112e29fdc
 
 # verify_masked_user_units: systemd --user units that must be MASKED, not just
 #   stopped, on a provisioned machine. The notifications overlay owns
