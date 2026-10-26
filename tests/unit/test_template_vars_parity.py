@@ -238,6 +238,48 @@ class TestPinMirrorsMatchTheManifest:
         )
         print(f"parity: assets.tag {tag} mirrored by {', '.join(sorted(mirrors))}")
 
+    def test_every_assets_pin_mirror_is_v0_6_1(self) -> None:
+        """REQ-007: assets v0.6.1 carries the wlogout Logout fix.
+
+        Every role that reads the pinned corpus keeps its own literal mirror
+        (spine AD-6), and the fixture manifest repeats the tag in its checkout
+        sources. This guard fails while any leg still says v0.6.0.
+        """
+        mirrors = {
+            "assets": "assets_pinned_tag",
+            "btop_config": "btop_config_assets_pinned_tag",
+            "compositor_configs": "compositor_configs_assets_pinned_tag",
+            "config_copies": "config_copies_assets_pinned_tag",
+            "display_manager": "display_manager_assets_pinned_tag",
+            "kitty_config": "kitty_config_assets_pinned_tag",
+            "verify": "verify_assets_pinned_tag",
+            "wlogout_config": "wlogout_config_assets_pinned_tag",
+            "zsh_config": "zsh_config_assets_pinned_tag",
+        }
+        expected = "v0.6.1"
+        drift = {
+            role: str(assets_templates.role_vars(role)[key])
+            for role, key in mirrors.items()
+            if str(assets_templates.role_vars(role)[key]) != expected
+        }
+        assert not drift, (
+            f"every *_assets_pinned_tag mirror must be {expected} (wlogout "
+            f"Logout uses `uwsm stop`); got {drift}"
+        )
+        manifest = yaml.safe_load((manifests_dir() / "assets.yaml").read_text())
+        assert str(manifest["assets"]["tag"]) == expected, (
+            "the fixture manifest assets.tag must be "
+            f"{expected}; got {manifest['assets']['tag']!r}"
+        )
+        for name in ("wallpapers", "icon-templates", "icon-mappings"):
+            source = str(manifest[name]["source"])
+            assert source.startswith(
+                f"{{{{ install_dir | trim }}}}/assets/{expected}/"
+            ), (
+                f"fixture entry {name!r} must read the {expected} checkout; "
+                f"got {source!r}"
+            )
+
 
 class TestTheCorpusActuallyHasTheseTemplates:
     def test_the_declared_templates_and_schemas_exist_in_the_corpus(self) -> None:

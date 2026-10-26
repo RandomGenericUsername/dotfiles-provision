@@ -3143,16 +3143,17 @@ class TestVerifyAgsAppsPinMirror:
 
 
 class TestVerifyRuntimePinMirror:
-    """REQ-006: the runtime pin is one version across role, verify and tool.
+    """REQ-007: the runtime pin is one version across role, verify and fixture.
 
-    v0.1.0 shipped the runtime as a pinned CLI; v0.2.0 is the mandatory-palette
-    release. The installer pin and its hand-maintained verify mirror are
-    separate literals, so this guard fails while either leg still says v0.1.0.
-    `verify_runtime_tool_version` is the tag without its leading `v` — the
-    runtime's `version` subcommand prints package metadata, not the tag.
+    v0.2.2 carries BUG-003's icon-contrast parser fix and keeps BUG-004's
+    btop-theme-studio skip. The installer pin, its hand-maintained verify
+    mirror and the fixture manifest are separate literals, so this guard fails
+    while any leg still says v0.2.0. `verify_runtime_tool_version` is the tag
+    without its leading `v` — the runtime's `version` subcommand prints package
+    metadata, not the tag.
     """
 
-    def test_engine_consumes_runtime_v0_2_0(self) -> None:
+    def test_engine_consumes_runtime_v0_2_2(self) -> None:
         verify_vars = _vars()
         cli_tools_vars = _sibling_vars("cli_tools")
         runtime = next(
@@ -3160,17 +3161,34 @@ class TestVerifyRuntimePinMirror:
             for entry in cli_tools_vars["cli_tools"]
             if entry["name"] == "dotfiles-runtime"
         )
-        assert runtime["tag"] == "v0.2.0", (
-            "the cli_tools role must install dotfiles-runtime v0.2.0 "
-            f"(mandatory palette); got {runtime['tag']!r}"
+        assert runtime["tag"] == "v0.2.2", (
+            "the cli_tools role must install dotfiles-runtime v0.2.2 "
+            f"(BUG-003 + retained BUG-004); got {runtime['tag']!r}"
         )
-        assert verify_vars["verify_runtime_version"] == "v0.2.0", (
-            "verify_runtime_version must mirror the role pin v0.2.0; got "
+        assert verify_vars["verify_runtime_version"] == "v0.2.2", (
+            "verify_runtime_version must mirror the role pin v0.2.2; got "
             f"{verify_vars['verify_runtime_version']!r}"
         )
-        assert verify_vars["verify_runtime_tool_version"] == "0.2.0", (
+        assert verify_vars["verify_runtime_tool_version"] == "0.2.2", (
             "verify_runtime_tool_version must be the tag without its leading "
-            f"'v' (0.2.0); got {verify_vars['verify_runtime_tool_version']!r}"
+            f"'v' (0.2.2); got {verify_vars['verify_runtime_tool_version']!r}"
+        )
+        fixture = yaml.safe_load(
+            (
+                composition_root()
+                / "dotfiles"
+                / "provisioning"
+                / "cli-tools.yaml"
+            ).read_text()
+        )
+        fixture_runtime = next(
+            entry
+            for entry in fixture["entries"]
+            if entry["name"] == "dotfiles-runtime"
+        )
+        assert fixture_runtime["tag"] == "v0.2.2", (
+            "the fixture cli-tools.yaml runtime tag must mirror the role pin "
+            f"v0.2.2; got {fixture_runtime['tag']!r}"
         )
 
     def test_tool_version_is_the_tag_without_its_prefix(self) -> None:
