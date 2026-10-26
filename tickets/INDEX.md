@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- [REQ-006-mirror-runtime-v020/ticket.md](./REQ-006-mirror-runtime-v020/ticket.md) — Mirror runtime v0.2.0 in verify + release v0.1.15 | `in-progress` | openspec: none | worktree .worktrees/REQ-006, branch ticket/REQ-006-mirror-runtime-v020
+(none)
 
 ## Bugs
 
@@ -37,3 +37,4 @@
 - [BUG-001-runtime-seed-installed](./BUG-001-runtime-seed-installed/ticket.md) — `runtime-seed` invokes the deleted composition `src/runtime` | `done` | openspec: runtime-seed-installed | tag: v0.1.8
 - [BUG-002-group-vars-wheel](./BUG-002-group-vars-wheel/ticket.md) — Installed engine wheel drops `inventory/group_vars` | `done` | openspec: group-vars-wheel | tag: v0.1.9
 - [REQ-005-consume-ags-apps-v043](./REQ-005-consume-ags-apps-v043/ticket.md) — Consume ags-apps v0.4.3 (selector collapses on Apply) + release v0.1.14 | `done` | openspec: none | tag: v0.1.14
+- [REQ-006-mirror-runtime-v020](./REQ-006-mirror-runtime-v020/ticket.md) — Mirror runtime v0.2.0 in verify + release v0.1.15 | `done` | openspec: none | tag: v0.1.15

@@ -2,7 +2,7 @@
 id: REQ-006
 title: "Mirror runtime v0.2.0 in verify + release v0.1.15"
 kind: requirement
-status: in-progress
+status: done
 lane: 1
 links:
   openspec: none
@@ -120,7 +120,7 @@ added**, and the real composition manifest
       `uv.lock`) and a CHANGELOG entry.
 - [x] `make gates` green in the worktree; `make test-integration` not required
       by release-train section 3.3 (it names `make gates` only).
-- [ ] Merged to `main`; annotated tag `v0.1.15`; GitHub Release carries the
+- [x] Merged to `main`; annotated tag `v0.1.15`; GitHub Release carries the
       sdist and wheel; branch/tag pushed.
 - [x] ags-apps (`v0.4.3`), assets (`v0.6.0`), ITR/weg/csg and ags-platform
       (`v0.2.0`) pins unchanged.
@@ -151,14 +151,20 @@ fail on the runtime leg by design.
 | Integration | not run | Release-train section 3.3 names `make gates` only (`/home/inumaki/.opencode/plan/09-release-train.md:55-58`). |
 | Pin scope | `git diff v0.1.14..47af8bf -- ansible/roles` | Only the runtime literals change (`v0.1.0` → `v0.2.0`); ags-apps `v0.4.3`, assets `v0.6.0`, ITR/weg/csg and ags-platform `v0.2.0` unchanged. |
 | Engine version | `rg -n 'version = "0.1.15"\|__version__ = "0.1.15"' pyproject.toml src/provisioning/__init__.py`; `uv lock --check` | `pyproject.toml:3`, `src/provisioning/__init__.py:6`, `uv.lock:238` all `0.1.15`; lock resolved 33. CHANGELOG has `[0.1.15] - 2026-10-26`. |
-| Merge | pending | pending |
-| Tag | pending | pending |
-| Release assets | pending | pending |
-| Release URL | pending | pending |
+| Merge | `git log --oneline --graph` | `e567d80` — merge of `d58b781` (main) + `eedadd4` (branch); pushed to `origin/main`. |
+| Tag | `git show v0.1.15`; `git ls-remote --tags origin 'refs/tags/v0.1.15*'` | Annotated `v0.1.15` → `e567d80`; remote tag object `512d274`, peeled `e567d80`; pushed. |
+| Tag CI | `gh run view 40381503386 --json conclusion,jobs` | `completed/success` — all 8 jobs (test, lint, hermetic, lock-check, docs-check, ci-gates-parity, assets-parity, release). |
+| Release assets | `gh release view v0.1.15 --json assets` | `dotfiles_provision-0.1.15-py3-none-any.whl` (244897 bytes), `dotfiles_provision-0.1.15.tar.gz` (443009 bytes); both `uploaded`. |
+| Release URL | `gh release view v0.1.15 --json url` | https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.15 |
 
 Evidence: commands and observed results in the table above, run in
 `.worktrees/REQ-006/` on the listed commits.
 Verify: re-run the red/green commands and `make gates` from the worktree.
+
+Post-tag note: `v0.1.15` is immutable and points at `e567d80` (implementation +
+tests). This closeout commit is docs-only, lands after the tag, and matches the
+`v0.1.13`/`v0.1.14` closeout pattern; it changes no packaged file
+(`pyproject.toml` packages only `src/provisioning`).
 
 ### User host steps (sudo; user-run — the agent must not provision/reboot)
 
