@@ -49,6 +49,7 @@ from tests.integration.btop_theme_harness import (
     assert_theme_applied,
     btop_binary,
 )
+from tests.support import FIXTURE_COMPOSITION
 from tests.unit import assets_templates
 
 pytestmark = pytest.mark.integration
@@ -125,7 +126,19 @@ def _run_playbook(playbook: Path, install: Path, home: Path, xdg: Path) -> str:
         }
     )
     result = subprocess.run(
-        [_ANSIBLE_PLAYBOOK, str(playbook), "-e", f"install_dir={install}"],
+        [
+            _ANSIBLE_PLAYBOOK,
+            str(playbook),
+            "-e",
+            f"install_dir={install}",
+            # The btop_config role asserts the AD-17 composition seam: it uses
+            # composition_root for the pre-R-07 active-theme migration. The
+            # production CLI always passes it; a direct playbook run must too,
+            # or the role fails closed before rendering (this harness used to
+            # omit it, so every e2e case errored in fixture setup).
+            "-e",
+            f"composition_root={FIXTURE_COMPOSITION}",
+        ],
         capture_output=True,
         text=True,
         env=env,
