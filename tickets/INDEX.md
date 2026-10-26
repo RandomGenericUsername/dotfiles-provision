@@ -14,7 +14,7 @@
 
 ## Bugs
 
-(none)
+- [BUG-003-consume-ags-apps-v042/ticket.md](./BUG-003-consume-ags-apps-v042/ticket.md) — consume ags-apps v0.4.2 (color thumbnails) + release v0.1.12 | severity: low | `in-progress` | worktree .worktrees/BUG-003
 
 ## Ops tasks
 
