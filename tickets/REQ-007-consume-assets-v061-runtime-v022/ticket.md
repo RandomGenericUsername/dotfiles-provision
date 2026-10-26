@@ -226,23 +226,25 @@ Verify: same `rg`.
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Red (old pins) | pending | pending |
-| Green (new pins) | pending | pending |
-| Related tests | pending | pending |
-| Engine gates | pending | pending |
-| Assets parity | pending | pending |
-| Integration | pending | pending |
-| Pin scope | pending | pending |
-| Engine version | pending | pending |
+| Red (old pins) | `uv run pytest -q tests/unit/test_template_vars_parity.py::TestPinMirrorsMatchTheManifest::test_every_assets_pin_mirror_is_v0_6_1 tests/unit/test_verify_role.py::TestVerifyRuntimePinMirror::test_engine_consumes_runtime_v0_2_2` at `2bbee7c` | **exit 1** — 2 failed: all nine mirrors `v0.6.0`; `cli_tools` runtime `v0.2.0` (`AssertionError: … got 'v0.2.0'`). |
+| Green (new pins) | same command at `c834c28` | **exit 0** — 2 passed in 0.10s. |
+| Related tests | `uv run pytest -q tests/unit/test_cli_tools_role.py tests/unit/test_verify_role.py tests/unit/test_assets_role.py tests/unit/test_template_vars_parity.py tests/unit/test_compositor_skeleton_configs.py tests/unit/test_btop_config_role.py tests/unit/test_config_copies_role.py tests/unit/test_compositor_configs_role.py tests/unit/test_kitty_config_role.py tests/unit/test_wlogout_config_role.py tests/unit/test_zsh_config_role.py tests/unit/test_display_manager_role.py` at `c834c28` | **exit 0** — 393 passed, 30 skipped in 549.40s. |
+| Engine gates | `make gates` at `c834c28` | **exit 0** — test 970 passed/32 skipped/54 deselected; lint all checks passed; hermetic 966 passed/36 skipped/54 deselected; `uv lock --check` resolved 33; docs-check present. |
+| Assets parity | `make assets-parity` at `c834c28` | **exit 0** — cloned `dotfiles-assets@v0.6.1`; 8 tests executed, 0 skipped. |
+| Integration | `make test-integration` at `c834c28` | **exit 0** — 28 passed, 27 skipped, 1001 deselected in 642.01s. |
+| CI gate parity | `make ci-gates-parity` at `c834c28` | **exit 0** — `GATES` and workflow jobs match; exemptions `assets-parity`, `ci-gates-parity`, `release`. |
+| Build | `make build` at `c834c28` | **exit 0** — `dotfiles_provision-0.1.16-py3-none-any.whl` + `.tar.gz`; wheel-contents check PASS. |
+| Pin scope | `git diff main...HEAD -- ansible/roles` | Only the nine assets mirrors (`v0.6.0` → `v0.6.1`) and three runtime literals (`v0.2.0` → `v0.2.2`) change. ags-apps `v0.4.3`; csg/weg/itr and ags-platform `v0.2.0` unchanged. |
+| Engine version | `rg -n 'version = "0.1.16"\|__version__ = "0.1.16"' pyproject.toml uv.lock src/provisioning/__init__.py`; `uv run dotfiles-provision version` | `pyproject.toml:3`, `uv.lock:238`, `src/provisioning/__init__.py:6` all `0.1.16`; CLI prints `{"version": "0.1.16"}`. CHANGELOG has `[0.1.16] - 2026-10-26`. |
 | Merge | pending | pending |
 | Tag | pending | pending |
 | Tag CI | pending | pending |
 | Release assets | pending | pending |
 | Release URL | pending | pending |
 
-Evidence: filled after the implementation/gates run.
-Verify: rerun the red/green commands and `make gates` from
-`.worktrees/REQ-007/`.
+Evidence: the commands and observed results above, run in
+`.worktrees/REQ-007/` on the listed commits (`2bbee7c` red, `c834c28` fix).
+Verify: re-run the red/green selectors and `make gates` from the worktree.
 
 ### User host steps (sudo; user-run — the agent must not provision/reboot)
 
