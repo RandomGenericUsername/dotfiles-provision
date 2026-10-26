@@ -6,6 +6,20 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-10-26
+
+### Changed
+
+- **`dotfiles-runtime` pin `v0.2.0` (runtime BUG-001):** the runtime palette is
+  mandatory — applying a scheme either generates a palette or fails with a
+  traceable error and keeps the last-good state; `palette: null` is gone. The
+  engine's `cli_tools` mirror and its hand-maintained verify mirror both move
+  from `v0.1.0` to `v0.2.0` (`verify_runtime_version` /
+  `verify_runtime_tool_version`), locked by `TestVerifyRuntimePinMirror`. The
+  composition manifest (`dotfiles-v3/dotfiles/provisioning/cli-tools.yaml`) and
+  `installer.pin` move in the same deploy in `PIN-0114`. No ags-apps or assets
+  pin moves.
+
 ## [0.1.14] - 2026-10-26
 
 ### Changed

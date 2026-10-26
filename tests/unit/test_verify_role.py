@@ -2469,8 +2469,8 @@ class TestVerifyVars:
         so verify uses the `version` subcommand and asserts the exact tool
         version (the tag without its leading `v`)."""
         data = _vars()
-        assert str(data["verify_runtime_version"]) == "v0.1.0"
-        assert str(data["verify_runtime_tool_version"]) == "0.1.0"
+        assert str(data["verify_runtime_version"]) == "v0.2.0"
+        assert str(data["verify_runtime_tool_version"]) == "0.2.0"
         assert str(data["verify_runtime_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/"
             "{{ verify_runtime_version }}"
