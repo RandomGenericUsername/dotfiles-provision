@@ -598,8 +598,9 @@ class TestCliToolsImageBuildTasks:
             "weg's install verb takes --image-tag; csg's does not, so csg must "
             "be built through the env transport"
         )
+        expected_tags = {"csg": "v0.2.1", "weg": "v0.2.0"}
         for entry in _cli_tools_image_builds():
-            assert entry.get("tag") == "v0.2.0", (
+            assert entry.get("tag") == expected_tags[str(entry.get("name"))], (
                 f"{entry.get('name')} image tag must be the pinned repo tag"
             )
 
@@ -926,7 +927,7 @@ class TestCliToolsPinnedCheckout:
         assert pinned[0]["repo"] == (
             "https://github.com/RandomGenericUsername/color-scheme-generator"
         )
-        assert pinned[0]["tag"] == "v0.2.0"
+        assert pinned[0]["tag"] == "v0.2.1"
         assert pinned[1]["repo"] == (
             "https://github.com/RandomGenericUsername/wallpaper-effects-generator"
         )
@@ -938,7 +939,7 @@ class TestCliToolsPinnedCheckout:
         assert pinned[3]["repo"] == (
             "https://github.com/RandomGenericUsername/dotfiles-runtime"
         )
-        assert pinned[3]["tag"] == "v0.2.2"
+        assert pinned[3]["tag"] == "v0.2.3"
 
     def test_pinned_clone_is_shallow_single_branch_and_tag_qualified(self) -> None:
         task = self._clone_task()
@@ -1097,8 +1098,9 @@ class TestCliToolsVars:
         names = {str(b["name"]) for b in builds}
         assert names == {"csg", "weg"}, "image builds must be exactly the container-mode CLIs"
         by_name = {str(b["name"]): b for b in builds}
+        expected_tags = {"csg": "v0.2.1", "weg": "v0.2.0"}
         for name in ("csg", "weg"):
-            assert by_name[name].get("repo") and by_name[name].get("tag") == "v0.2.0", (
+            assert by_name[name].get("repo") and by_name[name].get("tag") == expected_tags[name], (
                 f"{name} is pinned — its build context is the tag-qualified "
                 f"checkout and its image tag is the pin"
             )

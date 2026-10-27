@@ -337,8 +337,8 @@ verify_itr_contract_version: 0.2.0
 #   `dotfiles-runtime` has no `--version` flag and no contract token: the
 #   `version` subcommand prints the package version, which equals the tag
 #   without its leading `v`.
-verify_runtime_version: v0.2.2
-verify_runtime_tool_version: 0.2.2
+verify_runtime_version: v0.2.3
+verify_runtime_tool_version: 0.2.3
 verify_runtime_checkout: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/{{ verify_runtime_version }}"
 verify_runtime_pin_file: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/pinned"
 
@@ -368,7 +368,7 @@ verify_weg_image_reference: >-
 #   a missing backend is a named failure, not a count. The pin is the manifest
 #   `csg.tag` (AD-7/AD-11) — never `latest`; the cli_tools role builds them at
 #   this tag by passing `COLORSCHEME__CONTAINER__IMAGE_TAG={{ pin }}`.
-verify_csg_version: v0.2.0
+verify_csg_version: v0.2.1
 verify_csg_checkout: "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
 verify_csg_pin_file: "{{ verify_cli_tools_checkout_root }}/csg/pinned"
 verify_csg_contract_version: 0.2.0
