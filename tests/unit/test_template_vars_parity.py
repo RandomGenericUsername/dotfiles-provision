@@ -38,7 +38,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.support import manifests_dir
+from tests.support import ENGINE_ROOT, manifests_dir
 from tests.unit import assets_templates
 
 _TASK_KEYWORDS = {
@@ -280,6 +280,104 @@ class TestPinMirrorsMatchTheManifest:
                 f"fixture entry {name!r} must read the {expected} checkout; "
                 f"got {source!r}"
             )
+
+
+class TestCsgAndRuntimePinMirrors:
+    """REQ-009: one cross-leg guard for every csg/runtime literal the engine owns.
+
+    csg v0.2.1 has five independent literals (role, assets csg-template mirror,
+    settings rendered image tag, verify, fixture) plus the fixture source path;
+    the runtime has three (role, both verify literals, fixture). The
+    role-specific tests also cover their own leg, but this guard names the whole
+    set so a bump cannot leave one leg behind while every local test stays
+    green.
+    """
+
+    @staticmethod
+    def _role_vars(role: str) -> dict[str, Any]:
+        loaded = yaml.safe_load(
+            (ENGINE_ROOT / "ansible" / "roles" / role / "vars" / "main.yml").read_text()
+        )
+        assert isinstance(loaded, dict), f"roles/{role}/vars/main.yml must be a mapping"
+        return loaded
+
+    @staticmethod
+    def _cli_entry(name: str) -> dict[str, Any]:
+        manifest = yaml.safe_load((manifests_dir() / "cli-tools.yaml").read_text())
+        return next(entry for entry in manifest["entries"] if entry.get("name") == name)
+
+    def test_all_five_csg_mirrors_and_fixture_source_are_v0_2_1(self) -> None:
+        expected = "v0.2.1"
+        fixture_csg = self._cli_entry("csg")
+        role_csg = next(
+            entry
+            for entry in self._role_vars("cli_tools")["cli_tools"]
+            if entry.get("name") == "csg"
+        )
+        assets_vars = self._role_vars("assets")
+        settings_vars = self._role_vars("settings")
+        verify_vars = self._role_vars("verify")
+        assets_manifest = yaml.safe_load((manifests_dir() / "assets.yaml").read_text())
+        csg_source = next(
+            entry
+            for entry in assets_manifest["entries"]
+            if entry.get("name") == "csg-templates"
+        )["source"]
+
+        assert fixture_csg["tag"] == expected, (
+            f"fixture cli-tools.yaml csg.tag must be {expected}; got {fixture_csg['tag']!r}"
+        )
+        assert role_csg["tag"] == expected, (
+            f"roles/cli_tools csg tag must be {expected}; got {role_csg['tag']!r}"
+        )
+        assert assets_vars["assets_csg_pinned_tag"] == expected, (
+            "assets_csg_pinned_tag must mirror the csg pin; got "
+            f"{assets_vars['assets_csg_pinned_tag']!r}"
+        )
+        assert settings_vars["settings_csg_image_tag"] == expected, (
+            "settings_csg_image_tag must mirror the csg pin (the runtime renders "
+            f"this image tag); got {settings_vars['settings_csg_image_tag']!r}"
+        )
+        assert verify_vars["verify_csg_version"] == expected, (
+            f"verify_csg_version must be {expected}; got {verify_vars['verify_csg_version']!r}"
+        )
+        assert str(verify_vars["verify_csg_contract_version"]) == "0.2.0", (
+            "csg v0.2.1 still prints `0.2.1 contract 0.2.0`; the contract token "
+            "must not move with the package tag"
+        )
+        assert f"/cli-tools/csg/{expected}/src/" in str(csg_source), (
+            f"fixture csg-templates source must read the {expected} checkout; got {csg_source!r}"
+        )
+        assert "/cli-tools/csg/v0.2.0/" not in str(csg_source), (
+            "fixture csg-templates source still names the previous csg checkout"
+        )
+        assert str(assets_manifest["assets"]["tag"]) == "v0.6.1", (
+            "the assets corpus tag must stay v0.6.1; only the csg template source moves"
+        )
+
+    def test_runtime_mirrors_are_v0_2_3(self) -> None:
+        expected = "v0.2.3"
+        fixture_runtime = self._cli_entry("dotfiles-runtime")
+        role_runtime = next(
+            entry
+            for entry in self._role_vars("cli_tools")["cli_tools"]
+            if entry.get("name") == "dotfiles-runtime"
+        )
+        verify_vars = self._role_vars("verify")
+
+        assert fixture_runtime["tag"] == expected, (
+            f"fixture cli-tools.yaml runtime tag must be {expected}; got {fixture_runtime['tag']!r}"
+        )
+        assert role_runtime["tag"] == expected, (
+            f"roles/cli_tools runtime tag must be {expected}; got {role_runtime['tag']!r}"
+        )
+        assert verify_vars["verify_runtime_version"] == expected, (
+            f"verify_runtime_version must be {expected}; got {verify_vars['verify_runtime_version']!r}"
+        )
+        assert str(verify_vars["verify_runtime_tool_version"]) == "0.2.3", (
+            "verify_runtime_tool_version must be the tag without its leading 'v'; got "
+            f"{verify_vars['verify_runtime_tool_version']!r}"
+        )
 
 
 class TestTheCorpusActuallyHasTheseTemplates:
