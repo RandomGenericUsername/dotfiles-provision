@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- [REQ-008-ags-app-install-topology/ticket.md](./REQ-008-ags-app-install-topology/ticket.md) — Generic per-app AGS install topology and one-owner cutover | `proposed` | links: none
+(none)
 
 ## Bugs
 
@@ -41,3 +41,4 @@
 - [REQ-006-mirror-runtime-v020](./REQ-006-mirror-runtime-v020/ticket.md) — Mirror runtime v0.2.0 in verify + release v0.1.15 | `done` | openspec: none | tag: v0.1.15
 - [REQ-007-consume-assets-v061-runtime-v022](./REQ-007-consume-assets-v061-runtime-v022/ticket.md) — Consume assets v0.6.1 + runtime v0.2.2 in one pin release (engine v0.1.16) | `done` | openspec: none | tag: v0.1.16
 - [REQ-009-consume-csg-v021-runtime-v023](./REQ-009-consume-csg-v021-runtime-v023/ticket.md) — Consume csg v0.2.1 + runtime v0.2.3 in one pin release (engine v0.1.17) | `done` | openspec: none | tag: v0.1.17
+- [REQ-008-ags-app-install-topology](./REQ-008-ags-app-install-topology/ticket.md) — Generic per-app AGS install topology and one-owner cutover | `done` | worktree .worktrees/REQ-008, branch ticket/REQ-008-ags-app-install-topology | tag: v0.1.18
