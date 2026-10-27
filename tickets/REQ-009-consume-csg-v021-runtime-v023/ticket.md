@@ -80,8 +80,11 @@ install pin is added here**; the composition install pin remains in
   ```
 
   Evidence: quoted `gh` output (asset URLs/ids elided for length; sizes and
-  `state: uploaded` are verbatim).
-  Verify: `gh release view v0.2.1 --repo RandomGenericUsername/color-scheme-generator --json tagName,url,assets`.
+  `state: uploaded` are verbatim). Tag CI is green:
+  `gh run list --repo RandomGenericUsername/color-scheme-generator --branch v0.2.1`
+  → run `40428261469`, event `push`, `completed/success` (`gates`).
+  Verify: `gh release view v0.2.1 --repo RandomGenericUsername/color-scheme-generator --json tagName,url,assets`;
+  `gh run list --repo RandomGenericUsername/color-scheme-generator --branch v0.2.1`.
 
 - The consumed behavior is recorded in the upstream changelog at the tag:
 
@@ -136,8 +139,11 @@ install pin is added here**; the composition install pin remains in
   ```
 
   Evidence: quoted `gh` output (asset URLs/ids elided; sizes and
-  `state: uploaded` verbatim).
-  Verify: `gh release view v0.2.3 --repo RandomGenericUsername/dotfiles-runtime --json tagName,url,assets`.
+  `state: uploaded` verbatim). Tag CI is green:
+  `gh run list --repo RandomGenericUsername/dotfiles-runtime --branch v0.2.3`
+  → run `40428185474`, event `push`, `completed/success` (`gates`).
+  Verify: `gh release view v0.2.3 --repo RandomGenericUsername/dotfiles-runtime --json tagName,url,assets`;
+  `gh run list --repo RandomGenericUsername/dotfiles-runtime --branch v0.2.3`.
 
 - The consumed behavior is recorded in the upstream changelog at the tag:
 
@@ -212,23 +218,23 @@ Verify: `rg -n '^kind: requirement|^lane: 1' tickets/REQ-009-consume-csg-v021-ru
 
 ## Acceptance
 
-- [ ] A focused red guard fails at `v0.2.0`/`v0.2.2` and passes at
+- [x] A focused red guard fails at `v0.2.0`/`v0.2.2` and passes at
       `v0.2.1`/`v0.2.3`; the red and green outputs are recorded below.
-- [ ] All five csg mirrors are `v0.2.1`: `cli_tools` `csg.tag`,
+- [x] All five csg mirrors are `v0.2.1`: `cli_tools` `csg.tag`,
       `assets_csg_pinned_tag`, `settings_csg_image_tag`, `verify_csg_version`,
       fixture `cli-tools.yaml` `csg.tag`; the fixture `assets.yaml` csg source
       path is `v0.2.1`; `verify_csg_contract_version` stays `0.2.0`;
       `assets.tag` stays `v0.6.1`.
-- [ ] The `cli_tools` runtime tag, `verify_runtime_version: v0.2.3`,
+- [x] The `cli_tools` runtime tag, `verify_runtime_version: v0.2.3`,
       `verify_runtime_tool_version: 0.2.3`, and the fixture runtime tag are
       `v0.2.3`; existing literal assertions are updated.
-- [ ] weg/itr stay `v0.2.0`; `settings_weg_image_tag` and both `verify_weg_*`
+- [x] weg/itr stay `v0.2.0`; `settings_weg_image_tag` and both `verify_weg_*`
       image/version legs stay `v0.2.0`; all `verify_*_contract_version`
       values stay `0.2.0`; no assets/ags-apps/ags-platform pin moves.
-- [ ] Engine version `0.1.17` (`pyproject.toml`,
+- [x] Engine version `0.1.17` (`pyproject.toml`,
       `src/provisioning/__init__.py`, `uv.lock`) and a CHANGELOG entry covering
       both pins.
-- [ ] `make gates`, `make test-integration`, `make assets-parity` (at
+- [x] `make gates`, `make test-integration`, `make assets-parity` (at
       `v0.6.1`), `make build`, `uv run dotfiles-provision version`, and the
       wheel-contents check are green.
 - [ ] Merged to `main`; annotated tag `v0.1.17`; tag CI all green; GitHub
@@ -246,19 +252,66 @@ Verify: `rg -n '^kind: requirement|^lane: 1' tickets/REQ-009-consume-csg-v021-ru
 
 ## Closeout
 
+Focused selector used for the red/green rows (run from the repo/worktree root):
+
+```bash
+FOCUSED="tests/unit/test_template_vars_parity.py::TestCsgAndRuntimePinMirrors
+tests/unit/test_verify_role.py::TestVerifyRuntimePinMirror
+tests/unit/test_verify_role.py::TestVerifyVars::test_csg_pin_and_all_four_images_are_asserted_by_execution
+tests/unit/test_cli_tools_role.py::TestCliToolsPinnedCheckout::test_pinned_entries_are_the_manifest_repo_entries
+tests/unit/test_cli_tools_role.py::TestCliToolsImageBuildTasks::test_image_builds_derive_from_the_manifest_mirror
+tests/unit/test_cli_tools_role.py::TestCliToolsVars::test_image_builds_list_contains_only_container_mode_clis
+tests/unit/test_settings_role.py::TestSettingsCsgImageTag
+tests/unit/test_assets_role.py::TestAssetsVars::test_csg_templates_source_resolves_to_pinned_checkout
+tests/unit/test_assets_role.py::TestAssetsVars::test_parity_with_manifest"
+uv run pytest -q $FOCUSED
+```
+
 | Claim | Command | Result |
 | --- | --- | --- |
-| Red (old pins) | pending | pending |
-| Green (new pins) | pending | pending |
-| Engine gates | pending | pending |
-| Integration | pending | pending |
-| Assets parity | pending | pending |
-| Build / version | pending | pending |
-| Pin scope | pending | pending |
-| Merge / tag / release | pending | pending |
+| Red (old pins, committed guard) | `uv run pytest -q $FOCUSED` in a detached worktree at `a634cd5` (the test-only commit, pins still `v0.2.0`/`v0.2.2`) | **exit 1** — `7 failed, 6 passed in 11.78s`: both `TestCsgAndRuntimePinMirrors` cases, `TestVerifyRuntimePinMirror::test_engine_consumes_runtime_v0_2_3`, the verify csg execution pin, the cli_tools pinned list, the image-build tag loop and the image-build name/tag case. The two settings/assets cases pass because they derive from the still-old fixture; the cross-leg csg guard is what catches all five legs. |
+| Green (new pins) | same `uv run pytest -q $FOCUSED` at `75b4a5c` | **exit 0** — `13 passed in 9.92s`. |
+| Engine gates | `make gates` at `75b4a5c` | **exit 0** — test `1001 passed, 3 skipped, 54 deselected`; lint `All checks passed!`; hermetic `968 passed, 36 skipped, 54 deselected`; `uv lock --check` resolved 33 packages; `docs-check` passed. |
+| Integration | `make test-integration` at `75b4a5c` | **exit 0** — `45 passed, 10 skipped, 1003 deselected in 1129.51s (0:18:49)`. |
+| Assets parity | `make assets-parity` at `75b4a5c` | **exit 0** — cloned `dotfiles-assets@v0.6.1`; `10 passed`; `PASS assets-parity: 10 tests executed, 0 skipped`. |
+| Build / version | `make build`; `uv run dotfiles-provision version` at `75b4a5c` | **exit 0** — `dotfiles_provision-0.1.17-py3-none-any.whl` (244,904 B) + `.tar.gz` (445,790 B); wheel-contents check `PASS`; CLI prints `{"version": "0.1.17"}`. |
+| Wheel pins | `unzip -p dist/dotfiles_provision-0.1.17-py3-none-any.whl provisioning/_ansible/roles/{cli_tools,verify}/vars/main.yml` | Wheel carries csg `v0.2.1`, runtime `v0.2.3`, `verify_csg_version: v0.2.1`, `verify_runtime_version: v0.2.3`, `verify_runtime_tool_version: 0.2.3`; weg/itr `v0.2.0` unchanged. |
+| Rendered settings | `ansible-playbook ansible/playbooks/settings.yaml -e install_dir=<tmp>` with the committed roles | **exit 0** — `PLAY RECAP failed=0`; rendered csg `image_tag = "v0.2.1"`, weg `image_tag = "v0.2.0"`. The runtime therefore resolves the new csg image, not the previous one. |
+| Pin scope | `git diff --stat v0.1.16..75b4a5c -- ansible tests/fixtures` | **6 files, 10 insertions / 10 deletions** — only `cli_tools` (csg + runtime), `assets` csg mirror, `settings` csg image, `verify` (csg + runtime), and the two fixture files. weg/itr/ags-apps/ags-platform/assets-corpus/contract pins untouched. |
+| CI gate parity | `make ci-gates-parity` at `75b4a5c` | **exit 0** — `GATES` and workflow jobs match; exemptions `assets-parity`, `ci-gates-parity`, `release`. |
+| Merge | pending | pending |
+| Tag / CI | pending | pending |
+| Release assets | pending | pending |
+| Post-tag checkout | pending | pending |
 
-Evidence: pending.
-Verify: pending.
+Red excerpt (`a634cd5`):
+
+```text
+E       AssertionError: fixture cli-tools.yaml csg.tag must be v0.2.1; got 'v0.2.0'
+E       AssertionError: fixture cli-tools.yaml runtime tag must be v0.2.3; got 'v0.2.2'
+E       AssertionError: csg is pinned — its build context is the tag-qualified checkout and its image tag is the pin
+FAILED ...::test_all_five_csg_mirrors_and_fixture_source_are_v0_2_1
+FAILED ...::test_runtime_mirrors_are_v0_2_3
+FAILED ...::test_engine_consumes_runtime_v0_2_3
+FAILED ...::test_csg_pin_and_all_four_images_are_asserted_by_execution
+FAILED ...::test_pinned_entries_are_the_manifest_repo_entries
+FAILED ...::test_image_builds_derive_from_the_manifest_mirror
+FAILED ...::test_image_builds_list_contains_only_container_mode_clis
+7 failed, 6 passed in 11.78s
+```
+
+Green excerpt (`75b4a5c`):
+
+```text
+.............                                                            [100%]
+13 passed in 9.92s
+```
+
+Evidence: the commands and observed results above, run in
+`.worktrees/REQ-009/` on the listed commits (`a634cd5` red, `75b4a5c` fix).
+Verify: re-run `$FOCUSED`, `make gates`, `make test-integration`,
+`make assets-parity`, and `make build` from the worktree; inspect the tag and
+release with `gh release view v0.1.17`.
 
 ### User host steps (sudo; user-run — the agent must not provision/reboot)
 
