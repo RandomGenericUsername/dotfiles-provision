@@ -10,7 +10,7 @@ kind: cli-tools
 entries:
   - name: csg
     repo: https://github.com/RandomGenericUsername/color-scheme-generator
-    tag: v0.2.0
+    tag: v0.2.1
   - name: weg
     repo: https://github.com/RandomGenericUsername/wallpaper-effects-generator
     tag: v0.2.0
@@ -19,4 +19,4 @@ entries:
     tag: v0.2.0
   - name: dotfiles-runtime
     repo: https://github.com/RandomGenericUsername/dotfiles-runtime
-    tag: v0.2.2
+    tag: v0.2.3
