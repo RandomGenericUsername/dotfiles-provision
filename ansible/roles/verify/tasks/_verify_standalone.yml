@@ -1,0 +1,231 @@
+# Verify one `owner: standalone` app's declared ownership surfaces (AD-31/32).
+# READ-ONLY. The caller sets `app` from apps.yaml. Today this file is dormant
+# because every entry is `owner: legacy`; it becomes the host-side mirror for
+# the generic installer on the first cutover.
+
+- name: "{{ app.app }} : materialize the expected standalone paths"
+  ansible.builtin.set_fact:
+    verify_ags_unit_dir: "{{ verify_ags_apps_units_install_root }}/{{ app.installDir }}/{{ app.tag }}"
+    verify_ags_spine_link: "{{ verify_ags_apps_units_spine_config_dir }}/{{ app.spineLink }}"
+    verify_ags_xdg_link: "{{ verify_xdg_config_home }}/{{ app.xdgLink }}"
+    verify_ags_bin_link: >-
+      {{ (verify_cli_bin_dir | trim) ~ '/' ~ app.binLink
+         if app.binLink is defined else '' }}
+    verify_ags_launcher_path: >-
+      {{ (verify_cli_bin_dir | trim) ~ '/' ~ app.launcher
+         if app.launcher is defined else '' }}
+
+- name: "{{ app.app }} : stat the standalone unit, manifest and app entry"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ verify_ags_unit_dir }}"
+    - "{{ verify_ags_unit_dir }}/app.tsx"
+    - "{{ verify_ags_unit_dir }}/app.manifest.json"
+    - "{{ verify_ags_apps_units_platform_shortcut }}"
+    - "{{ verify_ags_spine_link }}"
+    - "{{ verify_ags_xdg_link }}"
+  register: verify_ags_standalone_paths
+
+- name: "{{ app.app }} : resolve the shared platform shortcut and spine link"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - "{{ verify_ags_apps_units_platform_shortcut }}"
+    - "{{ verify_ags_spine_link }}"
+  register: verify_ags_standalone_resolved
+
+- name: "{{ app.app }} : read and parse the deployed manifest"
+  ansible.builtin.slurp:
+    src: "{{ verify_ags_unit_dir }}/app.manifest.json"
+  register: verify_ags_standalone_manifest_raw
+
+- name: "{{ app.app }} : assert manifest identity, links and shared shortcut"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_standalone_paths.results[0].stat.isdir
+      - verify_ags_standalone_paths.results[1].stat.isreg
+      - verify_ags_standalone_paths.results[2].stat.isreg
+      - verify_ags_standalone_paths.results[3].stat.islnk
+      - verify_ags_standalone_paths.results[3].stat.lnk_target is search(verify_ags_tuple['ags-platform'])
+      - verify_ags_standalone_resolved.results[0].stat.isdir
+      - verify_ags_standalone_paths.results[4].stat.islnk
+      - verify_ags_standalone_paths.results[4].stat.lnk_target == verify_ags_unit_dir
+      - verify_ags_standalone_resolved.results[1].stat.isdir
+      - verify_ags_standalone_paths.results[5].stat.islnk
+      - verify_ags_standalone_paths.results[5].stat.lnk_target == verify_ags_spine_link
+      - (verify_ags_standalone_manifest_raw.content | b64decode | from_json).app == app.app
+      - (verify_ags_standalone_manifest_raw.content | b64decode | from_json).instance == app.instance
+      - (verify_ags_standalone_manifest_raw.content | b64decode | from_json).configDir == app.configDir
+      - (verify_ags_standalone_manifest_raw.content | b64decode | from_json).configDir == app.configLink
+      - (verify_ags_standalone_manifest_raw.content | b64decode | from_json).schemaVersion == 1
+    fail_msg: >-
+      {{ app.app }} does not have the declared standalone topology: expected
+      the immutable unit at {{ verify_ags_unit_dir }} (app.tsx + manifest), the
+      ONE shared {{ verify_ags_apps_units_platform_shortcut }} shortcut into the
+      tuple platform, {{ verify_ags_spine_link }} -> the unit, and
+      {{ verify_ags_xdg_link }} -> the spine link. Manifest identity must match
+      the app list (app/instance/configDir/configLink).
+
+- name: "{{ app.app }} : assert app.tsx declares the manifest instance"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -Eq
+      - "instanceName[[:space:]]*:[[:space:]]*[\"']{{ app.instance }}[\"']"
+      - "{{ verify_ags_unit_dir }}/app.tsx"
+  changed_when: false
+
+- name: "{{ app.app }} : assert a live app carries the palette-refresh handler"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -R
+      - -q
+      - --exclude-dir=.git
+      - palette-refresh
+      - "{{ verify_ags_unit_dir }}"
+  changed_when: false
+  when:
+    - (verify_ags_standalone_manifest_raw.content | b64decode | from_json).mode == 'live'
+
+- name: "{{ app.app }} : stat the optional bin link"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_bin_link }}"
+  register: verify_ags_bin_link_check
+  when: app.binLink is defined
+
+- name: "{{ app.app }} : stat the optional launcher"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_launcher_path }}"
+  register: verify_ags_optional_launcher_check
+  when: app.launcher is defined
+
+- name: "{{ app.app }} : assert the optional bin link is single-owner"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_bin_link_check.stat.islnk
+      - verify_ags_bin_link_check.stat.lnk_target == verify_ags_unit_dir ~ '/bin/' ~ app.binLink
+    fail_msg: >-
+      {{ app.app }} does not own its optional bin link declared in the app list.
+  when: app.binLink is defined
+
+- name: "{{ app.app }} : assert the optional launcher is executable"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_optional_launcher_check.stat.isreg
+      - verify_ags_optional_launcher_check.stat.executable
+    fail_msg: >-
+      {{ app.app }} does not own its optional launcher declared in the app list.
+  when: app.launcher is defined
+
+- name: "{{ app.app }} : stat the bar's colors.css stable pointer"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_unit_dir }}/colors.css"
+    follow: false
+  register: verify_ags_colors_pointer
+  when: app.barPalettePointer | default(false) | bool
+
+- name: "{{ app.app }} : assert colors.css resolves to the runtime-owned pointer"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_colors_pointer.stat.exists
+      - verify_ags_colors_pointer.stat.islnk
+      - verify_ags_colors_pointer.stat.lnk_target is search('dotfiles/current/colors\\.gtk\\.css$')
+      - verify_ags_colors_pointer.stat.lnk_target is not search(verify_ags_unit_dir)
+    fail_msg: >-
+      {{ app.app }}'s colors.css is not the stable runtime pointer
+      ({{ verify_ags_apps_units_colors_pointer }}) outside the immutable tag
+      (AD-37).
+  when: app.barPalettePointer | default(false) | bool
+
+- name: "{{ app.app }} : stat the platform and tag icons.json artifacts"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: true
+  loop:
+    - "{{ install_dir | trim }}/ags-platform/{{ verify_ags_tuple['ags-platform'] }}/icons.json"
+    - "{{ verify_ags_unit_dir }}/icons.json"
+  register: verify_ags_icons_checks
+
+- name: "{{ app.app }} : assert icons.json has one producer (platform byte equality)"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_icons_checks.results[0].stat.exists
+      - verify_ags_icons_checks.results[0].stat.isreg
+      - >-
+        (not verify_ags_icons_checks.results[1].stat.exists)
+        or (verify_ags_icons_checks.results[1].stat.checksum
+            == verify_ags_icons_checks.results[0].stat.checksum)
+    fail_msg: >-
+      {{ app.app }} carries an icons.json that is not the platform artifact from
+      the pinned dotfiles-assets tuple (AD-37). icons.json has one producer;
+      provisioning verifies byte equality and never writes it.
+
+- name: "{{ app.app }} : check the assets-owned autostart entry"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_apps_units_autostart_file }}"
+  register: verify_ags_autostart_check
+  when: app.autostart is defined
+
+- name: "{{ app.app }} : read the assets-owned autostart file"
+  ansible.builtin.slurp:
+    src: "{{ verify_ags_apps_units_autostart_file }}"
+  register: verify_ags_autostart_raw
+  when:
+    - app.autostart is defined
+    - verify_ags_autostart_check.stat.exists | default(false)
+
+- name: "{{ app.app }} : record the autostart content"
+  ansible.builtin.set_fact:
+    verify_ags_autostart_content: "{{ verify_ags_autostart_raw.content | default('') | b64decode }}"
+  when: app.autostart is defined
+
+- name: "{{ app.app }} : assert autostart launches the identity once under the shared lock"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_autostart_check.stat.exists | default(false)
+      - (verify_ags_autostart_content.split('--expect-instance ' ~ app.autostart) | length - 1) == 1
+      - "'ags-run-locked' in verify_ags_autostart_content"
+    fail_msg: >-
+      {{ app.app }} declares autostart '{{ app.autostart }}' but
+      {{ verify_ags_apps_units_autostart_file }} does not launch it exactly once
+      through ags-run-locked. The assets corpus owns that file
+      (dotfiles-assets REQ-007); update the autostart line in the same cutover
+      epoch (AD-32). Provisioning never writes assets-owned autostart content.
+  when: app.autostart is defined
+
+# Shared launch-lock proof for the whole topology: the wrapper must exist and
+# every provisioned AGS launcher must route its cold start through it.
+- name: "{{ app.app }} : stat the shared ags-run-locked wrapper"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_apps_units_run_locked }}"
+  register: verify_ags_run_locked_check
+  when: app.launcher is defined
+
+- name: "{{ app.app }} : stat the provisioned launcher for lock usage"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_launcher_path }}"
+  register: verify_ags_launcher_check
+  when: app.launcher is defined
+
+- name: "{{ app.app }} : read the provisioned launcher for lock usage"
+  ansible.builtin.slurp:
+    src: "{{ verify_ags_launcher_path }}"
+  register: verify_ags_launcher_raw
+  when:
+    - app.launcher is defined
+    - verify_ags_launcher_check.stat.exists | default(false)
+
+- name: "{{ app.app }} : assert every launcher cold start uses ags-run-locked"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_run_locked_check.stat.exists
+      - verify_ags_run_locked_check.stat.executable
+      - "'ags-run-locked' in (verify_ags_launcher_raw.content | default('') | b64decode)"
+      - "not ('exec ags run' in (verify_ags_launcher_raw.content | default('') | b64decode))"
+    fail_msg: >-
+      {{ app.app }}'s launcher does not route its cold start through the shared
+      {{ verify_ags_apps_units_run_locked }} wrapper (AD-28).
+  when: app.launcher is defined

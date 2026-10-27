@@ -5,7 +5,7 @@
 #
 # Dependency order rationale (plan §11 step 7, story 2.12 AC 4, Epic 4):
 #   packages → power_options → cli_tools → filesystem → assets →
-#   ags_platform → ags_apps → compositor_configs → gui_tools → config_copies → settings → zsh_tools → zsh_config →
+#   ags_platform → ags_apps → ags_apps_units → compositor_configs → gui_tools → config_copies → settings → zsh_tools → zsh_config →
 #   wlogout_config → kitty_config → btop_config → config_links → runtime-seed → display_manager →
 #   gloview-plugin → verify
 # `packages` first (it installs the system packages everything else assumes),
@@ -76,6 +76,13 @@
 # bar's apps resolve the shortcuts at session start, not during provisioning.
 - import_playbook: ags-platform.yaml
 - import_playbook: ags-apps.yaml
+# The generic per-app role reads the same composition app list and acts only on
+# `owner: standalone`; the legacy role above acts only on `owner: legacy`.
+# With the current all-legacy list this import is a no-op. On a cutover it
+# quiesces, installs <install>/apps/<installDir>/<tag>/, repoints the links and
+# starts through the shared launch lock before compositor_configs consumes the
+# live bar link.
+- import_playbook: ags-apps-units.yaml
 - import_playbook: compositor-configs.yaml
 - import_playbook: gui-tools.yaml
 - import_playbook: config-copies.yaml

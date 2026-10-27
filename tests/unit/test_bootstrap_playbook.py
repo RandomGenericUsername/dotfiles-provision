@@ -52,6 +52,7 @@ _EXPECTED_ORDER = [
     "assets.yaml",
     "ags-platform.yaml",
     "ags-apps.yaml",
+    "ags-apps-units.yaml",
     "compositor-configs.yaml",
     "gui-tools.yaml",
     "config-copies.yaml",
@@ -79,7 +80,7 @@ class TestBootstrapPlaybook:
     _PATH = _PLAYBOOKS_DIR / "bootstrap.yaml"
 
     def test_parses_as_list_of_import_playbook_entries(self) -> None:
-        """The aggregate is a top-level list of exactly twenty-three
+        """The aggregate is a top-level list of exactly twenty-four
         `import_playbook` statements (one per per-role playbook + the
         runtime-seed step + the gloview-plugin lifecycle + the gui-tools apps +
         the P5-1-1 runtime-daemon unit + the runtime-clipboard unit + the
@@ -87,7 +88,7 @@ class TestBootstrapPlaybook:
         (AD-17/AD-23) + the ags-apps bar unit install and live-bar deploy
         (AD-1/AD-17/AD-23))."""
         imports = _load_imports()
-        assert len(imports) == 23, (
+        assert len(imports) == 24, (
             f"bootstrap.yaml must import exactly 23 playbooks; found {len(imports)}"
         )
         for entry in imports:
@@ -96,9 +97,9 @@ class TestBootstrapPlaybook:
             )
 
     def test_imports_in_exact_dependency_order(self) -> None:
-        """AC 4: the twenty-three imports appear in the EXACT dependency order —
+        """AC 4: the twenty-four imports appear in the EXACT dependency order —
         packages → power-options → cli-tools → runtime-daemon → runtime-clipboard → filesystem →
-        assets → ags-platform → ags-apps → compositor-configs → gui-tools →
+        assets → ags-platform → ags-apps → ags-apps-units → compositor-configs → gui-tools →
         config-copies → settings → zsh-tools → zsh-config → wlogout-config →
         kitty-config → btop-config → config-links → runtime-seed →
         display-manager → gloview-plugin → verify (Epic 4: no default-palette/icons).

@@ -22,6 +22,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.support import manifests_dir
+
 _TASK_KEYWORDS = {
     "name",
     "when",
@@ -58,6 +60,14 @@ def _find_ansible_dir() -> Path:
 _ANSIBLE_DIR = _find_ansible_dir()
 _ROLES_DIR = _ANSIBLE_DIR / "roles" / "ags_apps"
 _PLAYBOOKS_DIR = _ANSIBLE_DIR / "playbooks"
+_APP_LISTS = _ANSIBLE_DIR.parent / "tests" / "fixtures" / "ags-apps" / "app-list"
+
+
+def _write_app_list_manifests(tmp_path: Path, fixture: str) -> Path:
+    manifests = tmp_path / "composition" / "dotfiles" / "provisioning"
+    manifests.mkdir(parents=True)
+    shutil.copyfile(_APP_LISTS / fixture, manifests / "apps.yaml")
+    return manifests
 
 
 def _load_tasks() -> list[dict[str, object]]:
@@ -411,11 +421,13 @@ class TestAgsAppsTasks:
         )
         assert module["force"] is True, "force makes a repoint converge in one run"
         assert module["dest"] == "{{ ags_apps_bar_dir }}/colors.css"
-        # UNCONDITIONAL: no `when` gate at all. The bug was the gate
-        # (`not islnk` + legacy-colors-exists) which skipped every version bump.
-        assert "when" not in ensure, (
-            "the ensure must run on EVERY deploy (fresh host AND version bump) — "
-            "any `when` gate reintroduces the dangling-pointer regression"
+        # UNCONDITIONAL for the legacy owner: the only gate is the owner
+        # filter (REQ-008) — any version-bump/path-state gate reintroduces the
+        # dangling-pointer regression. A standalone bar is verified by the
+        # generic role and must NOT be written by the legacy role.
+        assert ensure.get("when") == "'bar' in ags_apps_legacy_names", (
+            "the ensure must run on every legacy deploy (fresh host AND version "
+            "bump) and skip only when the bar is no longer owner: legacy"
         )
         # The source falls back to the runtime state pointer (fresh host) and
         # inherits the pre-existing target when the probe found one (bump).
@@ -653,9 +665,10 @@ class TestAgsAppsTasks:
         env = task.get("environment")
         assert isinstance(env, dict), "the assertion must prepend the bin dir"
         assert str(env.get("PATH", "")).startswith("{{ ags_apps_bin_dir | trim }}:")
-        assert task.get("when") == "not ansible_check_mode", (
+        assert "not ansible_check_mode" in str(task.get("when")), (
             "the link does not exist under --check, so the probe must be gated"
         )
+        assert "'capture' in ags_apps_legacy_names" in str(task.get("when"))
         names = [str(t.get("name", "")) for t in _load_tasks()]
         assert names.index(
             "Install the unit's capture-tool backend as the CLI entry point"
@@ -912,7 +925,9 @@ class TestAgsAppsExecution:
 
     _PATH = _PLAYBOOKS_DIR / "ags-apps.yaml"
 
-    def _run(self, install: Path, home: Path) -> subprocess.CompletedProcess[str]:
+    def _run(
+        self, install: Path, home: Path, manifests: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")
@@ -924,7 +939,14 @@ class TestAgsAppsExecution:
         env["XDG_STATE_HOME"] = str(home / ".local" / "state")
         env["ANSIBLE_CONFIG"] = str(_ANSIBLE_DIR / "ansible.cfg")
         return subprocess.run(
-            [ansible_playbook, str(self._PATH), "-e", f"install_dir={install}"],
+            [
+                ansible_playbook,
+                str(self._PATH),
+                "-e",
+                f"install_dir={install}",
+                "-e",
+                f"manifests_dir={manifests or manifests_dir()}",
+            ],
             capture_output=True,
             text=True,
             env=env,
@@ -1097,6 +1119,46 @@ class TestAgsAppsExecution:
         assert live_icme.resolve() == (unit_dir / "icme").resolve()
         assert live_studio.resolve() == (unit_dir / "btop-theme-studio").resolve()
         assert shortcut.resolve() == platform.resolve()
+
+    def test_mixed_owner_list_deploys_only_the_legacy_bar(self, tmp_path: Path) -> None:
+        """REQ-008: the old monorepo role acts only on `owner: legacy`. A mixed
+        list keeps the bar and must NOT deploy the standalone fake-app's live
+        link, launcher, or bin surfaces."""
+        home = tmp_path / "home"
+        install = tmp_path / "install"
+        home.mkdir()
+        install.mkdir()
+        (install / "config").mkdir()
+        platform, bar = self._seed_units(install)
+        manifests = _write_app_list_manifests(tmp_path, "mixed.apps.yaml")
+
+        result = self._run(install, home, manifests=manifests)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+        live = install / "config" / "ags"
+        assert live.is_symlink(), "the legacy bar must still deploy"
+        assert live.resolve() == bar.resolve()
+        assert not (install / "config" / "ags-fake-app").exists(), (
+            "a standalone entry must not be deployed by the legacy role"
+        )
+        assert not (home / ".local" / "bin" / "fake-app-tool").exists()
+        unit_dir = install / "ags-apps" / str(_vars()["ags_apps_version"])
+        shortcut = unit_dir / "node_modules" / "ags-platform"
+        assert shortcut.resolve() == platform.resolve()
+
+    def test_all_standalone_list_is_a_complete_noop(self, tmp_path: Path) -> None:
+        """REQ-008: with every app owned by the generic role, the old monorepo
+        role installs nothing (not even the set-aside bridge/backup dirs)."""
+        home = tmp_path / "home"
+        install = tmp_path / "install"
+        home.mkdir()
+        manifests = _write_app_list_manifests(tmp_path, "all-standalone.apps.yaml")
+
+        result = self._run(install, home, manifests=manifests)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not (install / "ags-apps").exists(), (
+            "the legacy role must not install the monorepo when every entry is standalone"
+        )
 
     def test_pano_legacy_bridge_is_moved_aside(self, tmp_path: Path) -> None:
         """Slice 3 upgrade from the per-file clipboard-overlay bridge: the

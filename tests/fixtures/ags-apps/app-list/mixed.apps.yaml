@@ -1,0 +1,31 @@
+# Mixed-owner fixture: the bar remains legacy; the fake app is standalone.
+# The old role must act only on bar, the generic role only on fake-app.
+apps:
+  - app: bar
+    installDir: bar
+    owner: legacy
+    instance: ags
+    configDir: ags
+    configLink: ags
+    spineLink: ags
+    xdgLink: ags
+    autostart: ags
+    launch: always
+    barPalettePointer: true
+    cutoverId: REQ-015
+
+  - app: fake-app
+    installDir: fake-app
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: fake-app
+    configDir: ags-fake-app
+    configLink: ags-fake-app
+    spineLink: ags-fake-app
+    xdgLink: ags-fake-app
+    binLink: fake-app-tool
+    launcher: fake-app-ui
+    autostart: fake-app
+    launch: always
+    cutoverId: REQ-999

@@ -1,0 +1,54 @@
+# Runtime verification for one standalone app that this run STARTED (AD-28).
+# It proves the new instance is the one on the AGS bus and, for live apps, that
+# its palette-refresh handler answers through the contract. Read-only: no file
+# is written and no palette state is changed by the verification itself.
+#
+# The caller sets `app`, `ags_apps_units_started_this_run` and the path facts.
+
+- name: "{{ app.app }} : list running AGS instances"
+  ansible.builtin.command:
+    cmd: ags list
+  register: ags_apps_units_running_list
+  changed_when: false
+
+- name: "{{ app.app }} : assert the new instance owns its bus name"
+  ansible.builtin.assert:
+    that:
+      - app.instance in (ags_apps_units_running_list.stdout_lines | map('trim') | list)
+    fail_msg: >-
+      {{ app.app }} started through {{ ags_apps_units_run_locked }}, but
+      '{{ app.instance }}' is not on the AGS bus. Identity is
+      manifest.instance == app.tsx instanceName == `ags list` (AD-26).
+
+- name: "{{ app.app }} : invoke the palette-refresh handler"
+  ansible.builtin.command:
+    argv:
+      - ags
+      - request
+      - palette-refresh
+      - 0000000000000000
+      - -i
+      - "{{ app.instance }}"
+  register: ags_apps_units_handler
+  changed_when: false
+  failed_when: false
+  when:
+    - ags_apps_units_manifest.mode == 'live'
+    - ags_apps_units_verify_handler | bool
+
+- name: "{{ app.app }} : assert the live palette-refresh handler answered"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_handler.rc | default(1) == 0
+      - >-
+        ags_apps_units_handler.stdout is search('"ok"[ ]*:[ ]*true')
+        or ags_apps_units_handler.stdout is search('"deferred"')
+    fail_msg: >-
+      {{ app.app }} is live but its palette-refresh handler did not return
+      {"ok":true} or {"ok":true,"deferred":"..."} (AD-27): rc={{
+      ags_apps_units_handler.rc | default('?') }}, stdout={{
+      ags_apps_units_handler.stdout | default('') | trim }}, stderr={{
+      ags_apps_units_handler.stderr | default('') | trim }}.
+  when:
+    - ags_apps_units_manifest.mode == 'live'
+    - ags_apps_units_verify_handler | bool

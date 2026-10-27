@@ -1,0 +1,117 @@
+# Rollback one standalone app to its previous owner state (AD-32 step 6).
+#
+# Restores exactly the surfaces captured before the cutover and restarts the
+# previous instance when it was running. The immutable tag is never modified:
+# rollback is a link repoint plus an external process start.
+
+- name: "{{ app.app }} : ROLLBACK — quiesce the new instance"
+  ansible.builtin.include_tasks: _quiesce.yml
+
+- name: "{{ app.app }} : ROLLBACK — restore the previous spine link"
+  ansible.builtin.file:
+    src: "{{ ags_apps_units_previous_spine_target }}"
+    dest: "{{ ags_apps_units_spine_link }}"
+    state: link
+    force: true
+  when:
+    - not ansible_check_mode
+    - ags_apps_units_previous_spine_target | default('') | length > 0
+
+- name: "{{ app.app }} : ROLLBACK — remove the new spine link when there was none"
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_spine_link }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - ags_apps_units_previous_spine_target | default('') | length == 0
+
+- name: "{{ app.app }} : ROLLBACK — restore the previous XDG link"
+  ansible.builtin.file:
+    src: "{{ ags_apps_units_previous_xdg_target }}"
+    dest: "{{ ags_apps_units_xdg_link }}"
+    state: link
+    force: true
+  when:
+    - not ansible_check_mode
+    - ags_apps_units_previous_xdg_target | default('') | length > 0
+
+- name: "{{ app.app }} : ROLLBACK — remove the new XDG link when there was none"
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_xdg_link }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - ags_apps_units_previous_xdg_target | default('') | length == 0
+
+- name: "{{ app.app }} : ROLLBACK — restore the previous bin link"
+  ansible.builtin.file:
+    src: "{{ ags_apps_units_previous_bin_target }}"
+    dest: "{{ ags_apps_units_bin_link }}"
+    state: link
+    force: true
+  when:
+    - not ansible_check_mode
+    - app.binLink is defined
+    - ags_apps_units_previous_bin_target | default('') | length > 0
+
+- name: "{{ app.app }} : ROLLBACK — remove the new bin link when there was none"
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_bin_link }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - app.binLink is defined
+    - ags_apps_units_previous_bin_target | default('') | length == 0
+
+- name: "{{ app.app }} : ROLLBACK — restore the previous launcher"
+  ansible.builtin.copy:
+    src: "{{ ags_apps_units_launcher_backup }}"
+    dest: "{{ ags_apps_units_launcher_path }}"
+    remote_src: true
+    mode: "0755"
+  when:
+    - not ansible_check_mode
+    - app.launcher is defined
+    - ags_apps_units_previous_launcher.stat.exists | default(false)
+
+- name: "{{ app.app }} : ROLLBACK — remove the new launcher when there was none"
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_launcher_path }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - app.launcher is defined
+    - not (ags_apps_units_previous_launcher.stat.exists | default(false))
+
+- name: "{{ app.app }} : ROLLBACK — restart the previous instance when it was running"
+  ansible.builtin.command:
+    argv:
+      - "{{ ags_apps_units_run_locked }}"
+      - --expect-instance
+      - "{{ app.instance }}"
+      - --lock-timeout
+      - "{{ ags_apps_units_lock_timeout }}"
+      - --register-timeout
+      - "{{ ags_apps_units_register_timeout }}"
+      - -d
+      - "{{ ags_apps_units_xdg_link }}"
+  environment:
+    PATH: "{{ ags_apps_units_bin_dir | trim }}:{{ ansible_facts.env.PATH }}"
+  register: ags_apps_units_rollback_start
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - ags_apps_units_was_running | default(false)
+    - ags_apps_units_previous_spine_target | default('') | length > 0
+
+- name: "{{ app.app }} : ROLLBACK — report a failed previous-instance restart"
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: {{ app.app }} rollback restored the links but could not restart
+      the previous instance: rc={{ ags_apps_units_rollback_start.rc | default('?') }}
+      {{ ags_apps_units_rollback_start.stderr | default('') | trim }}
+  when:
+    - not ansible_check_mode
+    - ags_apps_units_was_running | default(false)
+    - ags_apps_units_rollback_start.rc | default(0) != 0

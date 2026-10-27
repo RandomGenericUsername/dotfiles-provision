@@ -1,0 +1,15 @@
+# ags-apps-units playbook (REQ-008 / AD-31/AD-32/AD-37) — one-per-role
+# playbook for the generic per-app AGS installer.
+#
+# The role reads the composition's apps.yaml + program-tuple.yaml and acts only
+# on `owner: standalone` entries. With the current all-legacy composition it is
+# a no-op; the old ags-apps playbook remains the only owner until an entry flips.
+#
+# User-scoped: NO become (everything lands under the user's install_dir).
+# Distro-agnostic: git clone + symlinks are identical on Arch and Debian-family.
+# gather_facts: true — the role derives XDG/bin/state paths from env facts.
+- name: Install standalone AGS apps from the single composition app list
+  hosts: localhost
+  gather_facts: true
+  roles:
+    - ags_apps_units

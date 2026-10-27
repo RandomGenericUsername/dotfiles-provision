@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# {{ app.launcher }} launcher — provisioned from the composition app list by
+# the ags_apps_units role (AD-31/AD-32).
+#
+# Every cold start goes through `ags-run-locked`, the shared per-user AGS
+# launch-lock wrapper (AD-28): `ags run` bundles the shared AGS source, so two
+# concurrent starts can race. A warm instance is toggled through its
+# `palette-refresh`/request surface (no bundle, no lock); if the warm request
+# path is broken the zombie is quit and restarted under the lock.
+set -uo pipefail
+INSTANCE="{{ app.instance }}"
+DIR="{{ ags_apps_units_xdg_config_home }}/{{ app.xdgLink }}"
+LOG="{{ ags_apps_units_log_file }}"
+LOCKED="{{ ags_apps_units_run_locked }}"
+
+if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
+    if timeout 8 ags request toggle -i "$INSTANCE" >/dev/null 2>&1; then
+        exit 0
+    fi
+    # A stale/zombie instance with no live request handler: quit it before the
+    # locked cold start. The bounded wait happens inside ags-run-locked.
+    ags quit -i "$INSTANCE" 2>/dev/null || true
+    sleep 1
+fi
+
+exec "$LOCKED" \
+    --expect-instance "$INSTANCE" \
+    --lock-timeout {{ ags_apps_units_lock_timeout }} \
+    --register-timeout {{ ags_apps_units_register_timeout }} \
+    -d "$DIR" \
+    --log-file "$LOG"

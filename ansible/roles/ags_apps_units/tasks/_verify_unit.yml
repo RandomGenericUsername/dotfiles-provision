@@ -1,0 +1,97 @@
+# Static verification of one standalone tag (AD-26/AD-37). READ-ONLY: it never
+# writes colors.css or icons.json.
+#
+# The caller sets `app` and the per-app path facts from tasks/_one.yml.
+
+- name: "{{ app.app }} : read the deployed app manifest"
+  ansible.builtin.slurp:
+    src: "{{ ags_apps_units_unit_dir }}/app.manifest.json"
+  register: ags_apps_units_manifest_raw
+
+- name: "{{ app.app }} : parse the deployed app manifest"
+  ansible.builtin.set_fact:
+    ags_apps_units_manifest: "{{ ags_apps_units_manifest_raw.content | b64decode | from_json }}"
+
+- name: "{{ app.app }} : assert manifest identity and state class"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_manifest.schemaVersion == 1
+      - ags_apps_units_manifest.app == app.app
+      - ags_apps_units_manifest.instance == app.instance
+      - ags_apps_units_manifest.configDir == app.configDir
+      - ags_apps_units_manifest.configDir == app.configLink
+      - ags_apps_units_manifest.mode in ['live', 'restart']
+      - ags_apps_units_manifest.holdsUnsavedState is boolean
+      - not (ags_apps_units_manifest.mode == 'restart' and ags_apps_units_manifest.holdsUnsavedState)
+    fail_msg: >-
+      {{ app.app }} manifest identity does not match the app list
+      (app/instance/configDir/configLink) or its mode/holdsUnsavedState pair is
+      invalid (AD-26: restart is invalid when holdsUnsavedState is true).
+
+- name: "{{ app.app }} : assert app.tsx declares the app-list instance name"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -Eq
+      - "instanceName[[:space:]]*:[[:space:]]*[\"']{{ app.instance }}[\"']"
+      - "{{ ags_apps_units_unit_dir }}/app.tsx"
+  changed_when: false
+
+- name: "{{ app.app }} : assert the live palette-refresh handler exists"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -R
+      - -q
+      - --exclude-dir=.git
+      - palette-refresh
+      - "{{ ags_apps_units_unit_dir }}"
+  changed_when: false
+  when: ags_apps_units_manifest.mode == 'live'
+
+- name: "{{ app.app }} : stat the bar's stable colors.css pointer"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_unit_dir }}/colors.css"
+    follow: false
+  register: ags_apps_units_colors_pointer
+  when: app.barPalettePointer | default(false) | bool
+
+- name: "{{ app.app }} : assert colors.css is the stable runtime pointer, not tag state"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_colors_pointer.stat.exists
+      - ags_apps_units_colors_pointer.stat.islnk
+      - ags_apps_units_colors_pointer.stat.lnk_target is search('dotfiles/current/colors\\.gtk\\.css$')
+      - ags_apps_units_colors_pointer.stat.lnk_target is not search(ags_apps_units_unit_dir)
+    fail_msg: >-
+      {{ app.app }}'s colors.css is not a symlink to the stable runtime pointer
+      {{ ags_apps_units_runtime_colors_pointer }} (AD-37). Writable palette
+      state must live outside the immutable tag; provisioning only verifies it.
+  when: app.barPalettePointer | default(false) | bool
+
+- name: "{{ app.app }} : stat the platform's single-produced icons.json"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_platform_unit_dir }}/icons.json"
+    get_checksum: true
+  register: ags_apps_units_platform_icons
+
+- name: "{{ app.app }} : stat the tag's optional icons.json"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_unit_dir }}/icons.json"
+    get_checksum: true
+  register: ags_apps_units_unit_icons
+
+- name: "{{ app.app }} : assert the platform owns the one produced icons.json"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_platform_icons.stat.exists
+      - ags_apps_units_platform_icons.stat.isreg
+      - >-
+        (not ags_apps_units_unit_icons.stat.exists)
+        or (ags_apps_units_unit_icons.stat.checksum == ags_apps_units_platform_icons.stat.checksum)
+    fail_msg: >-
+      {{ app.app }}'s tag carries an icons.json that does not byte-match the
+      platform artifact {{ ags_apps_units_platform_unit_dir }}/icons.json
+      (AD-37). icons.json has ONE producer — the platform artifact from the
+      pinned dotfiles-assets tuple; app repos do not hand-author a second
+      manifest and provisioning never writes it.

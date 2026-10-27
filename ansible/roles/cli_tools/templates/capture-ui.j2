@@ -26,4 +26,4 @@ if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
     ags quit -i "$INSTANCE" 2>/dev/null
     sleep 1
 fi
-exec ags run -d "$DIR" --log-file "$LOG"
+exec ags-run-locked --expect-instance "$INSTANCE" -d "$DIR" --log-file "$LOG"

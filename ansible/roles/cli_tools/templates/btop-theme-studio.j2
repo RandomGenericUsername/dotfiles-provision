@@ -35,4 +35,4 @@ if [ -d "$REPO_ROOT" ]; then
     # comparisons.
     export BTOP_STUDIO_REPO_ROOT="$(pwd -P)"
 fi
-exec ags run -d "$DIR"
+exec ags-run-locked --expect-instance "$INSTANCE" -d "$DIR"

@@ -1,0 +1,235 @@
+# ags_apps_units role tasks — generic per-app AGS install/cutover (AD-31/32/37).
+#
+# Read the single composition app list + program tuple, validate the one-owner
+# partition, then act ONLY on `owner: standalone` entries. The current
+# all-legacy list makes every mutation task skip; the old `ags_apps` role is
+# the only owner. A cutover flips one entry's owner in the composition.
+#
+# Order is the AD-32 epoch for each standalone app:
+#   quiesce (confirmed quit, no bus name) -> install immutable tag ->
+#   repoint links -> start through the shared launch lock -> verify identity,
+#   handler and every ownership surface. A failure runs the rollback block:
+#   quiesce the new instance, restore the previous links and restart the old
+#   instance when it was running.
+#
+# No task writes inside <install>/apps/<installDir>/<tag>/ after the clone:
+# only the presence-guarded git clone and the one-time .git removal touch it.
+# colors.css and icons.json are verified, never authored here.
+
+- name: Assert install_dir seam is provided
+  ansible.builtin.assert:
+    that:
+      - install_dir is defined
+      - install_dir is string
+      - install_dir | trim | length > 0
+    fail_msg: >-
+      install_dir is undefined or empty — the ags_apps_units role requires the
+      install_dir seam extra-var (the orchestrator resolves
+      $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
+
+- name: Assert composition manifests seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined
+      - manifests_dir is string
+      - manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — the ags_apps_units role reads the
+      composition's apps.yaml + program-tuple.yaml. The engine CLI resolves it
+      from --manifests-dir; direct runs pass -e manifests_dir=...
+
+- name: Read the composition app list and program tuple
+  ansible.builtin.set_fact:
+    ags_apps_units_apps_document: "{{ lookup('file', ags_apps_units_apps_file) | from_yaml }}"
+    ags_apps_units_tuple: "{{ lookup('file', ags_apps_units_tuple_file) | from_yaml }}"
+
+- name: Assert the app list has the contract shape
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_apps_document is mapping
+      - ags_apps_units_apps_document.keys() | list == ['apps']
+      - ags_apps_units_apps_document.apps is sequence
+      - ags_apps_units_apps_document.apps | length > 0
+      - ags_apps_units_apps_document.apps | rejectattr('app', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('installDir', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('owner', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('instance', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('configDir', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('configLink', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('spineLink', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('xdgLink', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('launch', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('cutoverId', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | map(attribute='owner') | unique | list | difference(['legacy', 'standalone']) | length == 0
+      - ags_apps_units_apps_document.apps | map(attribute='launch') | unique | list | difference(['always', 'on-demand']) | length == 0
+      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | rejectattr('repo', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | rejectattr('tag', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | selectattr('repo', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | selectattr('tag', 'defined') | list | length == 0
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='app') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='installDir') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='instance') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='configDir') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='configLink') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='spineLink') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='xdgLink') | unique | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | selectattr('launcher', 'defined') | map(attribute='launcher') | unique | list | length
+        == ags_apps_units_apps_document.apps | selectattr('launcher', 'defined') | list | length
+      - >-
+        ags_apps_units_apps_document.apps | selectattr('binLink', 'defined') | map(attribute='binLink') | unique | list | length
+        == ags_apps_units_apps_document.apps | selectattr('binLink', 'defined') | list | length
+      - >-
+        ags_apps_units_apps_document.apps | selectattr('barPalettePointer', 'defined') | list | length == 1
+      - >-
+        ags_apps_units_apps_document.apps | selectattr('barPalettePointer', 'defined') | map(attribute='app') | list
+        == ['bar']
+    fail_msg: >-
+      the composition app list at {{ ags_apps_units_apps_file }} violates the
+      install-list contract (required fields, one owner, unique
+      app/installDir/instance/config/spine/XDG surfaces, launcher/bin
+      uniqueness, one bar palette pointer).
+
+- name: Assert every app-list scalar is one lowercase path segment or a tag
+  ansible.builtin.assert:
+    that:
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='app')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='installDir')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='instance')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='configDir')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='configLink')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='spineLink')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='xdgLink')
+        | select('match', '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$') | list | length
+        == ags_apps_units_apps_document.apps | length
+      - >-
+        ags_apps_units_apps_document.apps | map(attribute='configLink') | list
+        == ags_apps_units_apps_document.apps | map(attribute='configDir') | list
+      - >-
+        ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone')
+        | map(attribute='tag')
+        | select('match', '^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') | list | length
+        == ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | list | length
+    fail_msg: >-
+      every app-list identity field must be exactly one lowercase path
+      segment, configLink must equal configDir, and every standalone tag must
+      be an immutable vX.Y.Z annotated tag.
+
+- name: Assert the program tuple names exactly the three program tags
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_tuple is mapping
+      - ags_apps_units_tuple.keys() | sort == ['ags-platform', 'contracts', 'dotfiles-assets', 'schemaVersion']
+      - ags_apps_units_tuple.schemaVersion == 1
+      - ags_apps_units_tuple['ags-platform'] is match('^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+      - ags_apps_units_tuple.contracts is match('^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+      - ags_apps_units_tuple['dotfiles-assets'] is match('^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+    fail_msg: >-
+      the program tuple at {{ ags_apps_units_tuple_file }} must be schemaVersion
+      1 and exactly the ags-platform/contracts/dotfiles-assets semver tags.
+
+- name: Partition the app list by the single owner field
+  ansible.builtin.set_fact:
+    ags_apps_units_legacy_apps: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | list }}"
+    ags_apps_units_standalone_apps: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | list }}"
+    ags_apps_units_legacy_names: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
+    ags_apps_units_standalone_names: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | map(attribute='app') | list }}"
+
+- name: Assert every app has exactly one owner
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_legacy_apps | length + ags_apps_units_standalone_apps | length == ags_apps_units_apps_document.apps | length
+      - ags_apps_units_legacy_names | intersect(ags_apps_units_standalone_names) | length == 0
+    fail_msg: >-
+      the app list must assign every app exactly one owner (legacy XOR
+      standalone); overlapping/missing owners would let zero or two roles act.
+
+- name: Report the dormant owner split when no app is standalone
+  ansible.builtin.debug:
+    msg: >-
+      ags_apps_units is dormant: all {{ ags_apps_units_legacy_apps | length }}
+      app entries are owner=legacy; the ags_apps monorepo role remains the only
+      owner. No per-app install/repoint/start actions run.
+  when: ags_apps_units_standalone_apps | length == 0
+
+- name: Ensure the per-app install root exists
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_install_root }}"
+    state: directory
+    mode: "0755"
+  when: ags_apps_units_standalone_apps | length > 0
+
+- name: Ensure the shared platform shortcut dir exists
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_platform_shortcut_dir }}"
+    state: directory
+    mode: "0755"
+  when: ags_apps_units_standalone_apps | length > 0
+
+- name: Check the tuple's ags-platform unit is installed
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_platform_unit_dir }}/index.ts"
+  register: ags_apps_units_platform_unit_check
+  when: ags_apps_units_standalone_apps | length > 0
+
+- name: Assert the tuple's ags-platform unit is installed before linking it
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_platform_unit_check.stat.exists | default(false)
+    fail_msg: >-
+      the program tuple names ags-platform {{ ags_apps_units_tuple['ags-platform'] }},
+      but {{ ags_apps_units_platform_unit_dir }}/index.ts is missing. The
+      ags_platform role must install the SAME tuple tag before a standalone app
+      can resolve `ags-platform` (AD-31/AD-34). Re-pin the platform role's
+      ags_platform_version to the tuple tag as part of the adoption release —
+      never silently point the shared shortcut at a missing unit.
+  when: ags_apps_units_standalone_apps | length > 0
+
+- name: Point the one shared apps/node_modules shortcut at the tuple platform unit
+  ansible.builtin.file:
+    src: "{{ ags_apps_units_platform_unit_dir }}"
+    dest: "{{ ags_apps_units_platform_shortcut }}"
+    state: link
+    force: true
+  when: ags_apps_units_standalone_apps | length > 0
+
+- name: Install, repoint, start and verify each standalone app
+  ansible.builtin.include_tasks: _one.yml
+  loop: "{{ ags_apps_units_standalone_apps }}"
+  loop_control:
+    loop_var: app
+    label: "{{ app.app }}"
+  when: ags_apps_units_standalone_apps | length > 0

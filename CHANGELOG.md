@@ -6,6 +6,51 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-10-27
+
+### Added
+
+- **Generic per-app AGS install/cutover role (REQ-008; AD-31/AD-32/AD-37):**
+  `ags_apps_units` reads the composition's single `apps.yaml` +
+  `program-tuple.yaml`, validates the one-owner partition and acts only on
+  `owner: standalone`. It installs each app at
+  `<install>/apps/<installDir>/<tag>/`, creates the one shared
+  `<install>/apps/node_modules/ags-platform` shortcut, quiesces the old
+  instance, repoints spine/XDG/bin links and the optional launcher, starts
+  through the launch lock, then verifies identity, manifest, handler and every
+  ownership surface; a failure restores the previous links and restarts the old
+  instance. Installed tags are never written after install.
+- **Shared `ags-run-locked` wrapper:** `cli_tools` installs the per-user lock
+  helper and every provisioned launcher plus the gui_tools always-on start
+  paths route cold `ags run` through it. `ags request`/`toggle` remain
+  unlocked because they do not bundle.
+
+### Changed
+
+- **One-owner filters on the legacy roles (REQ-008):** `ags_apps` now deploys
+  only `owner: legacy` entries and is a complete no-op on an all-standalone
+  list; `config_links`, `gui_tools` and `cli_tools` consume the same list so a
+  standalone app's XDG/bin/launcher/process surfaces are not also written by
+  the legacy path. The current all-legacy composition behaves exactly as
+  before. The CLI `manifests` check deliberately skips the two composition
+  data records (`apps.yaml`, `program-tuple.yaml`).
+- **Verify mirrors the new topology (REQ-008):** the verify role partitions the
+  same app list, asserts one owner and unique surfaces, checks the program
+  tuple, and verifies every standalone unit/link/launcher/palette/icons/
+  autostart/launch-lock surface. Generated `icons.json` skeletons drop out for
+  standalone owners because the platform artifact is the single producer.
+
+### Notes
+
+- No real app cutover and no `dotfiles-v3` pin change: all seven composition
+  entries remain `owner: legacy`, so the new playbook is dormant and the legacy
+  roles keep their current pins (`ags-apps v0.4.3`, `ags-platform v0.2.0`).
+  Moving a standalone entry waits for the adoption tuple/platform re-pin and
+  the assets-owned autostart line.
+- Fake-app fixtures are GUI-free; the execution suite covers legacy, mixed and
+  all-standalone owner sets, the owner flip, tag immutability/tag bump, external
+  state preservation and rollback.
+
 ## [0.1.17] - 2026-10-26
 
 ### Changed

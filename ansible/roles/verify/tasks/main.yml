@@ -115,6 +115,91 @@
       -e install_dir=...; the trailing-slash rejection keeps the
       {{ install_dir | trim }}/<child> derivations single-slash)
 
+- name: Assert composition manifests seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined
+      - manifests_dir is string
+      - manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — verify consumes the composition's
+      apps.yaml + program-tuple.yaml to check exactly one owner for every AGS
+      app. The engine CLI resolves it from --manifests-dir; direct runs pass
+      -e manifests_dir=...
+
+- name: Read the composition app list and program tuple for the AGS owner audit
+  ansible.builtin.set_fact:
+    verify_ags_apps_document: "{{ lookup('file', verify_ags_apps_units_apps_file) | from_yaml }}"
+    verify_ags_tuple: "{{ lookup('file', verify_ags_apps_units_tuple_file) | from_yaml }}"
+
+- name: Partition the app list by its single owner field
+  ansible.builtin.set_fact:
+    verify_ags_legacy_apps: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | list }}"
+    verify_ags_standalone_apps: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | list }}"
+    verify_ags_legacy_names: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
+    verify_ags_standalone_names: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | map(attribute='app') | list }}"
+
+# Generated icons.json files land through a LEGACY live link because the
+# compositor_configs role generates them. A standalone app verifies the
+# platform's single-produced artifact instead (AD-37), so drop its generated
+# skeleton from the criterion-7 list without changing the legacy mirror.
+- name: Derive standalone apps' generated icon skeletons
+  ansible.builtin.set_fact:
+    verify_ags_standalone_icon_skeletons: >-
+      {{ verify_ags_standalone_apps
+         | map(attribute='spineLink')
+         | map('regex_replace', '^', verify_ags_apps_units_spine_config_dir ~ '/')
+         | map('regex_replace', '$', '/' ~ 'icons.json')
+         | list }}
+
+- name: Select the compositor skeletons still generated for legacy owners
+  ansible.builtin.set_fact:
+    verify_compositor_skeleton_active_files: >-
+      {{ verify_compositor_skeleton_files
+         | reject('in', verify_ags_standalone_icon_skeletons) | list }}
+
+- name: Assert every AGS app has exactly one owner and unique surfaces
+  ansible.builtin.assert:
+    that:
+      - verify_ags_legacy_apps | length + verify_ags_standalone_apps | length == verify_ags_apps_document.apps | length
+      - verify_ags_legacy_names | intersect(verify_ags_standalone_names) | length == 0
+      - >-
+        verify_ags_apps_document.apps | map(attribute='app') | unique | list | length
+        == verify_ags_apps_document.apps | length
+      - >-
+        verify_ags_apps_document.apps | map(attribute='instance') | unique | list | length
+        == verify_ags_apps_document.apps | length
+      - >-
+        verify_ags_apps_document.apps | map(attribute='configDir') | unique | list | length
+        == verify_ags_apps_document.apps | length
+      - >-
+        verify_ags_apps_document.apps | map(attribute='configLink') | unique | list | length
+        == verify_ags_apps_document.apps | length
+      - >-
+        verify_ags_apps_document.apps | map(attribute='spineLink') | unique | list | length
+        == verify_ags_apps_document.apps | length
+      - >-
+        verify_ags_apps_document.apps | map(attribute='xdgLink') | unique | list | length
+        == verify_ags_apps_document.apps | length
+      - >-
+        verify_ags_apps_document.apps | map(attribute='installDir') | unique | list | length
+        == verify_ags_apps_document.apps | length
+    fail_msg: >-
+      the composition app list must assign every AGS app exactly one owner and
+      unique identity/link/install surfaces (AD-31/AD-32).
+
+- name: Assert the program tuple names exactly the three program tags
+  ansible.builtin.assert:
+    that:
+      - verify_ags_tuple.keys() | sort == ['ags-platform', 'contracts', 'dotfiles-assets', 'schemaVersion']
+      - verify_ags_tuple.schemaVersion == 1
+      - verify_ags_tuple['ags-platform'] is match('^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+      - verify_ags_tuple.contracts is match('^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+      - verify_ags_tuple['dotfiles-assets'] is match('^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+    fail_msg: >-
+      the composition program-tuple.yaml is not the schemaVersion 1 tuple of
+      ags-platform/contracts/dotfiles-assets semver tags (AD-34).
+
 # R-17: the engine tag is machine state. `installer.pin` in the composition is
 # the one source, bootstrap passes it as `expected_engine_tag`, and verify
 # asserts the installed console reports that version. Without this, "which
@@ -1611,14 +1696,19 @@
   ansible.builtin.stat:
     path: "{{ item }}"
     follow: true
-  loop: "{{ verify_compositor_config_dirs + verify_compositor_skeleton_files }}"
+  loop: >-
+    {{ verify_compositor_config_dirs
+       + (verify_compositor_skeleton_active_files | default(verify_compositor_skeleton_files)) }}
   register: verify_compositor_checks
 
 - name: Assert compositor configs and skeletons are present with correct types
   ansible.builtin.assert:
     that:
       - verify_compositor_checks.results[:verify_compositor_config_dirs | length] | selectattr('stat.isdir') | list | length == verify_compositor_config_dirs | length
-      - verify_compositor_checks.results[verify_compositor_config_dirs | length:] | map(attribute='stat') | selectattr('isreg') | list | length == verify_compositor_skeleton_files | length
+      - >-
+        verify_compositor_checks.results[verify_compositor_config_dirs | length:]
+        | map(attribute='stat') | selectattr('isreg') | list | length
+        == (verify_compositor_skeleton_active_files | default(verify_compositor_skeleton_files)) | length
     fail_msg: >-
       not every compositor config dir or skeleton is present with the
       right inode type under {{ verify_xdg_config_home }} (done-criterion 7).
@@ -1740,7 +1830,9 @@
       pinned platform unit. Without them the live bar is absent or cannot
       resolve its bare-specifier `ags-platform` imports. The ags_apps role
       installs them; run the ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'bar' in (verify_ags_legacy_names | default([]))"
 
 # The clipboard overlay is deployed the same way as the bar (slice 3): the
 # unit's hypr-pano/ subdir is linked as the live <install>/config/ags-hypr-pano.
@@ -1783,7 +1875,9 @@
       {{ verify_ags_apps_live_pano_link }} as a symlink into it. Without them the
       live clipboard overlay is absent. The ags_apps role installs them; run the
       ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'hypr-pano' in (verify_ags_legacy_names | default([]))"
 
 # The notification overlay is deployed the same way as the bar and hypr-pano
 # (slice 4): the unit's notifications/ subdir is linked as the live
@@ -1828,7 +1922,9 @@
       them nothing owns org.freedesktop.Notifications (dunst is masked on
       purpose) and every notification is dropped silently. The ags_apps role
       installs them; run the ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'notifications' in (verify_ags_legacy_names | default([]))"
 
 # (slice 5): the unit's capture-tool/ subdir is linked as the live
 # <install>/config/ags-capture. verify asserts the unit files exist and the
@@ -1875,7 +1971,9 @@
       {{ verify_ags_apps_live_capture_link }} as a symlink into it. Without them
       the SUPER+PRINT keybind and the `capture-ui` launcher open a dead instance.
       The ags_apps role installs them; run the ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'capture' in (verify_ags_legacy_names | default([]))"
 
 # The CLI half of the same unit: <bin dir>/capture-tool must be a symlink into
 # the pinned unit's capture-tool/bin/capture-tool. A regular file means a stale
@@ -1907,7 +2005,9 @@
       link to {{ verify_ags_apps_capture_tool_backend }}. A regular file is a
       stale copy; a link to another tag lets the controller and the GUI disagree.
       The ags_apps role installs it; run the ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'capture' in (verify_ags_legacy_names | default([]))"
 
 # (slice 6): the unit's wallpaper-selector/ subdir is linked as the live
 # <install>/config/ags-wallpaper-selector. verify asserts the unit files exist and
@@ -1952,7 +2052,9 @@
       Without them the SUPER+W keybind and the `wallpaper-selector-ui` launcher
       open a dead instance. The ags_apps role installs them; run the ags-apps
       playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'wallpaper-selector' in (verify_ags_legacy_names | default([]))"
 
 # (slice 7): the unit's icme/ subdir is linked as the live
 # <install>/config/ags-icme. verify asserts the unit files exist and the
@@ -1998,7 +2100,9 @@
       SUPER+I keybind and the `icon-color-mapping-editor` launcher open a dead
       instance (and no icme.saved event can be published). The ags_apps role
       installs them; run the ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'icme' in (verify_ags_legacy_names | default([]))"
 
 # (slice 8): the unit's btop-theme-studio/ subdir is linked as the live
 # <install>/config/ags-btop-studio. verify asserts the unit files exist and the
@@ -2044,7 +2148,25 @@
       them the SUPER+B keybind and the `btop-theme-studio` launcher open a dead
       instance (and the live preview engine is unreachable). The ags_apps role
       installs them; run the ags-apps playbook first
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - "'btop-theme-studio' in (verify_ags_legacy_names | default([]))"
+
+# ── Generic standalone mirror (dormant while every entry is legacy) ─────────
+# The installer and verifier read the SAME single app list. For every
+# owner: standalone entry, verify the immutable unit, shared platform shortcut,
+# spine/XDG/bin/launcher surfaces, bar palette pointer, single-produced
+# icons.json, assets-owned autostart identity and the shared launch lock. No
+# task writes anything.
+- name: Verify each standalone app's ownership surfaces
+  ansible.builtin.include_tasks: _verify_standalone.yml
+  loop: "{{ verify_ags_standalone_apps | default([]) }}"
+  loop_control:
+    loop_var: app
+    label: "{{ app.app }}"
+  when:
+    - not ansible_check_mode
+    - verify_ags_standalone_apps | default([]) | length > 0
 
 # verify_gui_tools_app_files is EMPTY since slice 8 (the last per-file app moved
 # into the ags-apps unit), so this pair is a no-op on a stock install. It stays

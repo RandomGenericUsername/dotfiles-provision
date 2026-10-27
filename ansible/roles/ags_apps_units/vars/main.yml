@@ -1,0 +1,106 @@
+# ags_apps_units role vars — the generic per-app AGS install topology
+# (spine AD-31/AD-32/AD-37).
+#
+# The role is DATA-DRIVEN. It reads the composition's single app list
+# (`<manifests_dir>/apps.yaml`) and program tuple
+# (`<manifests_dir>/program-tuple.yaml`) and acts ONLY on entries whose
+# `owner` is `standalone`. With the current all-legacy list it is a no-op:
+# the old `ags_apps` monorepo role remains the only owner. A cutover flips one
+# entry's owner in the composition, and exactly one role then acts on it.
+#
+# INSTALL SHAPE (AD-31): <install>/apps/<installDir>/<tag>/. Every app unit is
+# immutable after install (AD-37): this role clones the tag, removes the
+# clone's .git ONCE, and never writes another file inside the tag. Config,
+# spine, XDG, bin, launcher and autostart surfaces are links/files OUTSIDE the
+# tag. `colors.css` is verified as the stable runtime pointer; `icons.json` is
+# verified against the platform's single artifact — never generated here.
+#
+# SHARED ANCESTOR (AD-31): exactly one
+# <install>/apps/node_modules/ags-platform shortcut points at the tuple's
+# ags-platform unit. It is an ancestor of every per-app checkout, so esbuild's
+# upward node_modules walk resolves the bare `ags-platform` specifier from the
+# real (realpathed) app tree without per-app copies.
+#
+# SEAM (AD-17): `manifests_dir` and `install_dir` arrive as extra-vars from
+# the engine CLI. Nothing here derives a composition path from
+# `{{ playbook_dir }}`.
+
+# ags_apps_units_manifests_dir: the composition's dotfiles/provisioning/.
+ags_apps_units_manifests_dir: "{{ manifests_dir }}"
+
+# The two composition-owned records this role consumes. They are DATA, not
+# manifests: the CLI's `manifests` seam check skips them deliberately.
+ags_apps_units_apps_file: "{{ ags_apps_units_manifests_dir | trim }}/apps.yaml"
+ags_apps_units_tuple_file: "{{ ags_apps_units_manifests_dir | trim }}/program-tuple.yaml"
+
+# ags_apps_units_install_root: the per-app install root (<install>/apps/).
+ags_apps_units_install_root: "{{ install_dir | trim }}/apps"
+
+# ags_apps_units_unit_dir: one app's immutable tag directory. The value is
+# materialized per app in tasks/_one.yml (it needs the loop variable).
+ags_apps_units_unit_dir: "{{ ags_apps_units_install_root }}/{{ app.installDir }}/{{ app.tag }}"
+
+# ags_apps_units_pin_file: <install>/apps/<installDir>/pinned — the
+#   observable installed tag, outside the immutable tag directory.
+ags_apps_units_pin_file: "{{ ags_apps_units_install_root }}/{{ app.installDir }}/pinned"
+
+# The shared platform unit the tuple names. The ags_platform role installs
+# the same tag when the composition is re-pinned for the adoption generation;
+# this role asserts the unit exists before creating the shared shortcut so a
+# tuple/platform-pin skew fails loud instead of shipping a dangling resolver.
+ags_apps_units_platform_install_root: "{{ install_dir | trim }}/ags-platform"
+ags_apps_units_platform_unit_dir: "{{ ags_apps_units_platform_install_root }}/{{ ags_apps_units_tuple['ags-platform'] }}"
+
+# ags_apps_units_platform_shortcut: the ONE shared ancestor shortcut
+#   (<install>/apps/node_modules/ags-platform). AD-31: only standalone installs
+#   use this ancestor; the legacy monorepo keeps its per-unit shortcut.
+ags_apps_units_platform_shortcut_dir: "{{ ags_apps_units_install_root }}/node_modules"
+ags_apps_units_platform_shortcut: "{{ ags_apps_units_platform_shortcut_dir }}/ags-platform"
+
+# ags_apps_units_spine_config_dir: the config-in-spine root
+#   (<install>/config/). Each app's spine link lives here.
+ags_apps_units_spine_config_dir: "{{ install_dir | trim }}/config"
+
+# ags_apps_units_xdg_config_home / _bin_dir: the user surfaces the role links
+#   into. Derivations are identical to config_links and cli_tools so the
+#   surfaces cannot disagree.
+ags_apps_units_xdg_config_home: "{{ ansible_facts.env.XDG_CONFIG_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.config', true) }}"
+ags_apps_units_bin_dir: >-
+  {{ ansible_facts.env.UV_TOOL_BIN_DIR
+     | default(ansible_facts.env.XDG_BIN_HOME | default(ansible_facts.env.HOME + '/.local/bin', true), true) }}
+
+# ags_apps_units_state_root / _runtime_colors_pointer: the runtime-owned stable
+#   palette pointer outside every tag (AD-37). A bar tag carries
+#   colors.css -> this pointer; provisioning only verifies that relationship,
+#   the runtime seeder updates the pointer.
+ags_apps_units_state_root: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}"
+ags_apps_units_runtime_colors_pointer: "{{ ags_apps_units_state_root }}/dotfiles/current/colors.gtk.css"
+
+# ags_apps_units_autostart_file: the Hyprland autostart Lua file owned by the
+#   assets corpus (dotfiles-assets REQ-007 owns its contents). This role never
+#   writes it; the verify role checks each standalone entry's `autostart`
+#   identity is present exactly once there.
+ags_apps_units_autostart_file: "{{ ags_apps_units_spine_config_dir }}/hypr/autostart.lua"
+
+# ags_apps_units_run_locked: the shared launch-lock wrapper installed by
+#   cli_tools (every `ags run` path uses it; ags request/toggle do not need
+#   the lock). Provisioning start paths invoke this, never raw `ags run`.
+ags_apps_units_run_locked: "{{ ags_apps_units_bin_dir | trim }}/ags-run-locked"
+
+# Bounded waits, matching the runtime's shared-lock contract (AD-28):
+# 10 s to acquire the launch lock, 10 s for the instance name to register.
+ags_apps_units_lock_timeout: 10
+ags_apps_units_register_timeout: 10
+
+# ags_apps_units_cutover: when true, on-demand standalone apps are also
+#   started during the run so the epoch can verify identity + handler, then
+#   stopped again (unless they were already running). Normal provisioning
+#   leaves on-demand apps for their launchers. No real cutover is activated
+#   by this role's defaults.
+ags_apps_units_cutover: false
+
+# ags_apps_units_verify_handler: verify the palette-refresh handler for every
+#   live app that this run started (cutover or always-on). The runtime is the
+#   only palette-refresh trigger in normal operation; this is install-time
+#   proof, not a second refresh path.
+ags_apps_units_verify_handler: true

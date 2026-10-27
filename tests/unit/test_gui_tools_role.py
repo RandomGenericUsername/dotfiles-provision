@@ -165,7 +165,7 @@ class TestGuiToolsTasks:
             task
             for task in _tasks()
             if task.keys() & {"ansible.builtin.shell"}
-            and "gui_tools_ags_always_on_instances" in str(task.get("loop", ""))
+            and "gui_tools_ags_always_on_active_instances" in str(task.get("loop", ""))
         ]
         assert len(matches) == 1, (
             f"expected exactly one always-on start-if-down task; found {len(matches)}"
@@ -179,7 +179,7 @@ class TestGuiToolsTasks:
             task
             for task in _tasks()
             if task.keys() & {"ansible.builtin.command"}
-            and "gui_tools_ags_instances" in str(task.get("loop", ""))
+            and "gui_tools_ags_active_instances" in str(task.get("loop", ""))
         ]
         assert len(matches) == 1, f"expected exactly one quit loop; found {len(matches)}"
         cmd = str(_module(matches[0]).get("cmd", ""))
@@ -513,14 +513,15 @@ class TestGuiToolsVars:
         ], f"the on-demand set drifted: {on_demand}"
 
     def test_always_on_entries_carry_a_launch_and_on_demand_do_not(self) -> None:
-        """Only always-on entries carry the `ags run` command the role re-issues
-        when they are down; on-demand entries must not (their keybind launchers
-        start them, so provisioning never opens an unrequested window)."""
+        """Only always-on entries carry the locked `ags run` command the role
+        re-issues when they are down; on-demand entries must not (their keybind
+        launchers start them, so provisioning never opens an unrequested
+        window)."""
         for entry in _vars()["gui_tools_ags_instances"]:
             if entry["always_on"]:
                 launch = str(entry.get("launch", "")).strip()
-                assert launch.startswith("ags run"), (
-                    f"always-on {entry['name']!r} needs an `ags run` launch command: {entry}"
+                assert launch.startswith("ags-run-locked --expect-instance"), (
+                    f"always-on {entry['name']!r} needs a locked `ags run` launch command: {entry}"
                 )
             else:
                 assert not entry.get("launch"), (

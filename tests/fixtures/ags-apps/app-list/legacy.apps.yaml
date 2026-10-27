@@ -1,0 +1,27 @@
+# Legacy-only app-list fixture for the ags_apps_units role tests.
+# All entries are owner: legacy, so the generic role must be a complete no-op.
+apps:
+  - app: bar
+    installDir: bar
+    owner: legacy
+    instance: ags
+    configDir: ags
+    configLink: ags
+    spineLink: ags
+    xdgLink: ags
+    autostart: ags
+    launch: always
+    barPalettePointer: true
+    cutoverId: REQ-015
+
+  - app: notifications
+    installDir: notifications
+    owner: legacy
+    instance: notifications
+    configDir: ags-notifications
+    configLink: ags-notifications
+    spineLink: ags-notifications
+    xdgLink: ags-notifications
+    autostart: notifications
+    launch: always
+    cutoverId: REQ-012

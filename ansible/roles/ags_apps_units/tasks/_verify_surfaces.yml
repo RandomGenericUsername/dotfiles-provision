@@ -1,0 +1,104 @@
+# Verify every ownership surface named by the app list (AD-31/AD-32):
+# spine link, XDG link, optional bin link, optional launcher. Read-only.
+#
+# The caller sets `app` and per-app path facts from tasks/_one.yml.
+
+- name: "{{ app.app }} : stat the spine and XDG link surfaces"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ ags_apps_units_spine_link }}"
+    - "{{ ags_apps_units_xdg_link }}"
+  register: ags_apps_units_surface_links
+
+- name: "{{ app.app }} : stat the optional bin link surface"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_bin_link }}"
+    follow: false
+  register: ags_apps_units_bin_link_check
+  when: app.binLink is defined
+
+- name: "{{ app.app }} : resolve the spine and XDG link surfaces"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - "{{ ags_apps_units_spine_link }}"
+    - "{{ ags_apps_units_xdg_link }}"
+  register: ags_apps_units_resolved_links
+
+- name: "{{ app.app }} : assert spine + XDG + bin links point at the single owner"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_surface_links.results[0].stat.islnk
+      - ags_apps_units_surface_links.results[0].stat.lnk_target == ags_apps_units_unit_dir
+      - ags_apps_units_resolved_links.results[0].stat.isdir
+      - ags_apps_units_surface_links.results[1].stat.islnk
+      - ags_apps_units_surface_links.results[1].stat.lnk_target == ags_apps_units_spine_link
+      - ags_apps_units_resolved_links.results[1].stat.isdir
+      - >-
+        app.binLink is not defined
+        or (ags_apps_units_bin_link_check.stat.islnk
+            and ags_apps_units_bin_link_check.stat.lnk_target
+                == ags_apps_units_unit_dir ~ '/bin/' ~ app.binLink)
+    fail_msg: >-
+      {{ app.app }} does not own every link surface: expected
+      {{ ags_apps_units_spine_link }} -> {{ ags_apps_units_unit_dir }},
+      {{ ags_apps_units_xdg_link }} -> {{ ags_apps_units_spine_link }}, and
+      (when declared) {{ ags_apps_units_bin_link }} -> the tag's bin entry.
+
+- name: "{{ app.app }} : stat the provisioned launcher"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_launcher_path }}"
+  register: ags_apps_units_launcher_check
+  when: app.launcher is defined
+
+- name: "{{ app.app }} : assert the provisioned launcher is executable"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_launcher_check.stat.exists
+      - ags_apps_units_launcher_check.stat.isreg
+      - ags_apps_units_launcher_check.stat.executable
+    fail_msg: >-
+      {{ app.app }} declares launcher '{{ app.launcher }}' but
+      {{ ags_apps_units_launcher_path }} is missing or not executable.
+  when: app.launcher is defined
+
+# The autostart file is assets-corpus content (dotfiles-assets REQ-007 owns its
+# bytes); provisioning never writes it. It must nevertheless launch the app-list
+# identity exactly once, through the shared launch lock — a raw `ags run` line
+# would race the runtime restart lane and a duplicate line would create a
+# second process for the same instance (AD-28/AD-32).
+- name: "{{ app.app }} : check the assets-owned autostart file"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_autostart_file }}"
+  register: ags_apps_units_autostart_check
+  when: app.autostart is defined
+
+- name: "{{ app.app }} : read the assets-owned autostart file"
+  ansible.builtin.slurp:
+    src: "{{ ags_apps_units_autostart_file }}"
+  register: ags_apps_units_autostart_raw
+  when:
+    - app.autostart is defined
+    - ags_apps_units_autostart_check.stat.exists | default(false)
+
+- name: "{{ app.app }} : record the autostart content"
+  ansible.builtin.set_fact:
+    ags_apps_units_autostart_content: "{{ ags_apps_units_autostart_raw.content | default('') | b64decode }}"
+  when: app.autostart is defined
+
+- name: "{{ app.app }} : assert autostart launches the identity once under the shared lock"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_autostart_check.stat.exists | default(false)
+      - (ags_apps_units_autostart_content.split('--expect-instance ' ~ app.autostart) | length - 1) == 1
+      - "'ags-run-locked' in ags_apps_units_autostart_content"
+    fail_msg: >-
+      {{ app.app }} declares autostart '{{ app.autostart }}' but
+      {{ ags_apps_units_autostart_file }} does not launch it exactly once
+      through ags-run-locked. The assets corpus owns that file
+      (dotfiles-assets REQ-007); update the autostart line in the same cutover
+      epoch (AD-32). Provisioning never writes assets-owned autostart content.
+  when: app.autostart is defined

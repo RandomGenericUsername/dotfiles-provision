@@ -29,6 +29,24 @@
       --composition-root; direct runs pass -e manifests_dir=... -e
       composition_root=...
 
+- name: Read the composition app list for legacy launcher ownership
+  ansible.builtin.set_fact:
+    cli_tools_composition_apps: "{{ lookup('file', cli_tools_manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
+
+- name: Partition the app list for the launcher owner filter
+  ansible.builtin.set_fact:
+    cli_tools_legacy_app_names: "{{ cli_tools_composition_apps.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
+
+# The shared launch-lock wrapper. Every provisioned `ags run` path (these
+# launchers, gui_tools' start-if-down, the ags_apps_units installer) invokes
+# it; `ags request`/`toggle` do not bundle and stay unlocked. Installed here
+# because cli_tools owns the user bin dir and runs before every launcher.
+- name: Install the shared AGS launch-lock wrapper
+  ansible.builtin.copy:
+    src: ags-run-locked
+    dest: "{{ cli_tools_bin_dir }}/ags-run-locked"
+    mode: "0755"
+
 - name: Check for uv
   ansible.builtin.shell: command -v uv
   register: uv_check
@@ -60,6 +78,7 @@
     src: icon-color-mapping-editor.j2
     dest: "{{ cli_tools_bin_dir }}/icon-color-mapping-editor"
     mode: "0755"
+  when: "'icme' in cli_tools_legacy_app_names"
 
 # The btop Theme Studio has the same "bundles TS at startup" lifecycle and the
 # same toggle/start-if-down contract as icme: provisioning quits the instance
@@ -69,6 +88,7 @@
     src: btop-theme-studio.j2
     dest: "{{ cli_tools_bin_dir }}/btop-theme-studio"
     mode: "0755"
+  when: "'btop-theme-studio' in cli_tools_legacy_app_names"
 
 # The capture UI is a standalone AGS instance with the same "bundles TS at
 # startup" lifecycle as icme. Provisioning (gui_tools role) quits it after
@@ -80,6 +100,7 @@
     src: capture-ui.j2
     dest: "{{ cli_tools_bin_dir }}/capture-ui"
     mode: "0755"
+  when: "'capture' in cli_tools_legacy_app_names"
 
 # The clipboard overlay has the same "bundles TS at startup" lifecycle; its
 # keybind entrypoint must restart a quit instance on demand (super+w toggles).
@@ -88,6 +109,7 @@
     src: hypr-pano-ui.j2
     dest: "{{ cli_tools_bin_dir }}/hypr-pano-ui"
     mode: "0755"
+  when: "'hypr-pano' in cli_tools_legacy_app_names"
 
 # The wallpaper selector has the same "bundles TS at startup" lifecycle; its
 # keybind entrypoint must restart a quit instance on demand (SUPER+W toggles).
@@ -96,6 +118,7 @@
     src: wallpaper-selector-ui.j2
     dest: "{{ cli_tools_bin_dir }}/wallpaper-selector-ui"
     mode: "0755"
+  when: "'wallpaper-selector' in cli_tools_legacy_app_names"
 
 # rofi is not an AGS instance, but the same "one keybind entrypoint" contract
 # applies: SUPER+D must toggle it closed as well as open, and the bind must not

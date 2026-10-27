@@ -200,7 +200,7 @@ gui_tools_config_dirs: []
 gui_tools_ags_instances:
   - name: ags
     always_on: true
-    launch: "ags run"
+    launch: "ags-run-locked --expect-instance ags"
   - name: capture
     always_on: false
   - name: icon-color-mapping-editor
@@ -219,7 +219,7 @@ gui_tools_ags_instances:
   # at login (same stagger-free log file).
   - name: notifications
     always_on: true
-    launch: "ags run -d {{ gui_tools_xdg_config_home }}/ags-notifications --log-file {{ gui_tools_xdg_state_home }}/ags/notifications.log"
+    launch: "ags-run-locked --expect-instance notifications -d {{ gui_tools_xdg_config_home }}/ags-notifications --log-file {{ gui_tools_xdg_state_home }}/ags/notifications.log"
   # The btop Theme Studio's per-file placement is RETIRED (slice 8 — the app now
   # deploys WHOLE from the ags-apps unit via the ags_apps role's
   # live-btop-studio link), but this AGS instance entry STAYS: it is the

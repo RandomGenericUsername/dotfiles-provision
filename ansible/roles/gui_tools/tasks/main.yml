@@ -36,6 +36,37 @@
       install_dir seam extra-var (the orchestrator resolves
       $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
+- name: Assert composition manifests seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined
+      - manifests_dir is string
+      - manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — gui_tools reads the composition
+      apps.yaml to manage ONLY owner: legacy instances. The engine CLI resolves
+      it from --manifests-dir; direct runs pass -e manifests_dir=...
+
+- name: Read the composition app list for legacy instance ownership
+  ansible.builtin.set_fact:
+    gui_tools_composition_apps: "{{ lookup('file', manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
+
+- name: Select the legacy AGS instances this role owns
+  ansible.builtin.set_fact:
+    gui_tools_ags_active_instances: >-
+      {{ gui_tools_ags_instances | selectattr(
+           'name', 'in',
+           gui_tools_composition_apps.apps
+             | selectattr('owner', 'equalto', 'legacy')
+             | map(attribute='instance') | list) | list }}
+    gui_tools_ags_always_on_active_instances: >-
+      {{ gui_tools_ags_instances | selectattr(
+           'name', 'in',
+           gui_tools_composition_apps.apps
+             | selectattr('owner', 'equalto', 'legacy')
+             | map(attribute='instance') | list)
+         | selectattr('always_on') | list }}
+
 - name: Ensure GUI tool app dirs exist
   ansible.builtin.file:
     path: "{{ item }}"
@@ -127,10 +158,12 @@
 #   - `changed_when: false`: the task is idempotent by design — the next
 #     SUPER+I / launcher invocation restarts the app transparently; we never
 #     want spurious changed-counts from this step.
-- name: Quit running AGS instances to pick up updated sources on next launch
+- name: Quit running legacy AGS instances to pick up updated sources on next launch
   ansible.builtin.command:
     cmd: "ags quit -i {{ item.name }}"
-  loop: "{{ gui_tools_ags_instances }}"
+  loop: "{{ gui_tools_ags_active_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
   failed_when: false
   changed_when: false
   when: not ansible_check_mode
@@ -193,7 +226,9 @@
           exit 0
       fi
       setsid {{ item.launch }} >/dev/null 2>&1 </dev/null &
-  loop: "{{ gui_tools_ags_always_on_instances }}"
+  loop: "{{ gui_tools_ags_always_on_active_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
   failed_when: false
   changed_when: false
   when: not ansible_check_mode
