@@ -365,7 +365,16 @@ def manifests(ctx: typer.Context) -> None:
     """
     settings = _require_seam(ctx)
     renderer: Renderer = ctx.obj["renderer"]
-    manifest_paths = sorted(settings.seam.manifests_dir.glob("*.yaml"))
+    # The manifests dir also holds composition DATA records that are not
+    # provision manifests: the AGS app list and the program tuple (AD-31/34).
+    # They are consumed by roles and their own schema gates; the manifests
+    # self-check must not try to read them as `kind:` manifests.
+    composition_data = {"apps.yaml", "program-tuple.yaml"}
+    manifest_paths = sorted(
+        path
+        for path in settings.seam.manifests_dir.glob("*.yaml")
+        if path.name not in composition_data
+    )
     if not manifest_paths:
         renderer.error(
             ErrorView(

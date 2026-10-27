@@ -34,8 +34,36 @@
       install_dir seam extra-var (the orchestrator resolves
       $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
-- name: Link each managed config dir into the XDG config home
+- name: Assert composition manifests seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined
+      - manifests_dir is string
+      - manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — config_links reads the composition
+      apps.yaml to expose ONLY owner: legacy app dirs; standalone apps own
+      their XDG links in ags_apps_units. The engine CLI resolves it from
+      --manifests-dir; direct runs pass -e manifests_dir=...
+
+- name: Read the composition app list for standalone XDG ownership
+  ansible.builtin.set_fact:
+    config_links_composition_apps: "{{ lookup('file', manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
+
+- name: Drop standalone app dirs from the legacy config-links set
+  ansible.builtin.set_fact:
+    config_links_standalone_xdg_links: >-
+      {{ config_links_composition_apps.apps
+         | selectattr('owner', 'equalto', 'standalone')
+         | map(attribute='xdgLink') | list }}
+    config_links_active_managed_dirs: >-
+      {{ config_links_managed_dirs
+         | reject('in', config_links_composition_apps.apps
+                       | selectattr('owner', 'equalto', 'standalone')
+                       | map(attribute='xdgLink') | list) | list }}
+
+- name: Link each legacy-managed config dir into the XDG config home
   ansible.builtin.include_tasks: _link_one.yml
-  loop: "{{ config_links_managed_dirs }}"
+  loop: "{{ config_links_active_managed_dirs }}"
   loop_control:
     loop_var: config_link_name

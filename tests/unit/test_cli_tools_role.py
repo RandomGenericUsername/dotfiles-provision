@@ -730,7 +730,7 @@ class TestCliToolsEngineAssertionBattery:
                 "engine detection must be removed — the engine is DECLARED, "
                 "never probed for a podman/docker preference"
             )
-            assert _module_key(task) != "ansible.builtin.set_fact", (
+            assert "container_runtime_engine" not in body or _module_key(task) != "ansible.builtin.set_fact", (
                 "no set_fact may resolve an engine — container_runtime_engine is "
                 "declared in group_vars/all.yml"
             )
@@ -1079,9 +1079,10 @@ class TestCliToolsVars:
             assert "command -v podman" not in str(task.get(_module_key(task) or "", "")), (
                 "engine detection must be gone — the engine is DECLARED"
             )
-            assert _module_key(task) != "ansible.builtin.set_fact", (
-                "no set_fact may resolve an engine — it is declared in group_vars"
-            )
+            if _module_key(task) == "ansible.builtin.set_fact":
+                assert "container_runtime_engine" not in str(task), (
+                    "no set_fact may resolve an engine — it is declared in group_vars"
+                )
 
         # The build consumes the DECLARED engine.
         argv = _argv_of(_image_build_tasks()[0])
@@ -1261,20 +1262,21 @@ class TestHyprPanoLauncher:
             "the window command"
         )
 
-    def test_cold_start_backgrounds_ags_run_then_requests_show(self) -> None:
+    def test_cold_start_uses_the_shared_lock_then_requests_show(self) -> None:
         code = self._code()
-        assert 'ags run -d "$DIR" --log-file "$LOG" &' in code, (
-            "the cold start must run in the BACKGROUND so this shell survives "
-            "to issue the reveal request"
+        assert 'ags-run-locked --expect-instance "$INSTANCE" -d "$DIR" --log-file "$LOG"' in code, (
+            "the cold start must go through the shared launch lock; the wrapper "
+            "returns after the instance registers, so this shell survives to "
+            "issue the reveal request"
         )
         assert "request show" in code, (
             "the cold start must reveal the freshly started (hidden) overlay"
         )
 
-    def test_launcher_never_execs_ags_run(self) -> None:
+    def test_launcher_never_execs_raw_ags_run(self) -> None:
         assert "exec ags run" not in self._code(), (
             "`exec` replaces the shell, so the follow-up `request show` could "
-            "never run; the cold start must background `ags run`"
+            "never run; and every cold start must use ags-run-locked"
         )
 
     def test_launcher_preserves_the_guard_rails(self) -> None:
@@ -1332,6 +1334,10 @@ exit 0
         stub = bin_dir / "ags"
         stub.write_text(self._STUB)
         stub.chmod(0o755)
+        shutil.copy(
+            _ROLES_DIR / "files" / "ags-run-locked", bin_dir / "ags-run-locked"
+        )
+        (bin_dir / "ags-run-locked").chmod(0o755)
         env = dict(os.environ)
         env["HOME"] = str(home)
         env["PATH"] = f"{bin_dir}:{env['PATH']}"

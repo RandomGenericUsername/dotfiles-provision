@@ -1,0 +1,261 @@
+# One standalone app: the AD-32 cutover epoch with rollback.
+#
+# The caller sets `app` (one `owner: standalone` entry from apps.yaml).
+# Everything this file writes is OUTSIDE the immutable tag:
+#   <install>/apps/<installDir>/pinned
+#   <install>/config/<spineLink>
+#   <XDG_CONFIG_HOME>/<xdgLink>
+#   <bin>/<binLink>
+#   <bin>/<launcher>
+# The tag directory itself is only cloned (presence-guarded) and has its .git
+# removed once — never templated/copied into.
+
+- name: "{{ app.app }} : materialize the owner paths"
+  ansible.builtin.set_fact:
+    ags_apps_units_unit_dir: "{{ ags_apps_units_install_root }}/{{ app.installDir }}/{{ app.tag }}"
+    ags_apps_units_pin_file: "{{ ags_apps_units_install_root }}/{{ app.installDir }}/pinned"
+    ags_apps_units_spine_link: "{{ ags_apps_units_spine_config_dir }}/{{ app.spineLink }}"
+    ags_apps_units_xdg_link: "{{ ags_apps_units_xdg_config_home }}/{{ app.xdgLink }}"
+    ags_apps_units_bin_link: >-
+      {{ (ags_apps_units_bin_dir | trim) ~ '/' ~ app.binLink
+         if app.binLink is defined else '' }}
+    ags_apps_units_launcher_path: >-
+      {{ (ags_apps_units_bin_dir | trim) ~ '/' ~ app.launcher
+         if app.launcher is defined else '' }}
+    ags_apps_units_launcher_backup: >-
+      {{ ags_apps_units_install_root ~ '/' ~ app.installDir ~ '/.rollback/' ~ app.launcher
+         if app.launcher is defined else '' }}
+    ags_apps_units_log_file: "{{ ags_apps_units_state_root }}/ags/{{ app.instance }}.log"
+    ags_apps_units_started_this_run: false
+
+- name: "{{ app.app }} : capture the pre-cutover running state"
+  ansible.builtin.command:
+    cmd: ags list
+  register: ags_apps_units_before_list
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: not ansible_check_mode
+
+- name: "{{ app.app }} : record whether the old instance was running"
+  ansible.builtin.set_fact:
+    ags_apps_units_was_running: >-
+      {{ app.instance in (ags_apps_units_before_list.stdout_lines | default([])
+                          | map('trim') | list) }}
+  when: not ansible_check_mode
+
+- name: "{{ app.app }} : capture previous spine/XDG/bin link targets"
+  ansible.builtin.command:
+    cmd: "readlink {{ item }}"
+  loop:
+    - "{{ ags_apps_units_spine_link }}"
+    - "{{ ags_apps_units_xdg_link }}"
+    - "{{ ags_apps_units_bin_link }}"
+  register: ags_apps_units_previous_links
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: not ansible_check_mode
+
+- name: "{{ app.app }} : record the previous link targets for rollback"
+  ansible.builtin.set_fact:
+    ags_apps_units_previous_spine_target: "{{ ags_apps_units_previous_links.results[0].stdout | default('') | trim }}"
+    ags_apps_units_previous_xdg_target: "{{ ags_apps_units_previous_links.results[1].stdout | default('') | trim }}"
+    ags_apps_units_previous_bin_target: "{{ ags_apps_units_previous_links.results[2].stdout | default('') | trim }}"
+  when: not ansible_check_mode
+
+- name: "{{ app.app }} : check for an existing launcher to preserve for rollback"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_launcher_path }}"
+  register: ags_apps_units_previous_launcher
+  when: app.launcher is defined
+
+- name: "{{ app.app }} : ensure the rollback backup dir exists"
+  ansible.builtin.file:
+    path: "{{ ags_apps_units_launcher_backup | dirname }}"
+    state: directory
+    mode: "0755"
+  when:
+    - not ansible_check_mode
+    - app.launcher is defined
+    - ags_apps_units_previous_launcher.stat.exists | default(false)
+
+- name: "{{ app.app }} : back up the previous launcher before replacing it"
+  ansible.builtin.copy:
+    src: "{{ ags_apps_units_launcher_path }}"
+    dest: "{{ ags_apps_units_launcher_backup }}"
+    remote_src: true
+    mode: "0755"
+  when:
+    - not ansible_check_mode
+    - app.launcher is defined
+    - ags_apps_units_previous_launcher.stat.exists | default(false)
+
+- name: "{{ app.app }} : quiesce before any link change (AD-32)"
+  ansible.builtin.include_tasks: _quiesce.yml
+
+- name: "{{ app.app }} : block — install, repoint, start, verify; rollback on failure"
+  block:
+    - name: "{{ app.app }} : ensure install/config/XDG/bin/log parents exist"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ ags_apps_units_install_root }}/{{ app.installDir }}"
+        - "{{ ags_apps_units_spine_config_dir }}"
+        - "{{ ags_apps_units_xdg_config_home }}"
+        - "{{ ags_apps_units_bin_dir | trim }}"
+        - "{{ ags_apps_units_state_root }}/ags"
+
+    - name: "{{ app.app }} : check whether the immutable tag is installed"
+      ansible.builtin.stat:
+        path: "{{ ags_apps_units_unit_dir }}/app.tsx"
+      register: ags_apps_units_unit_check
+
+    - name: "{{ app.app }} : clone the standalone tag (shallow, anonymous HTTPS)"
+      ansible.builtin.git:
+        repo: "{{ app.repo }}"
+        dest: "{{ ags_apps_units_unit_dir }}"
+        version: "{{ app.tag }}"
+        depth: 1
+        single_branch: true
+      register: ags_apps_units_clone
+      retries: 3
+      delay: 5
+      until: ags_apps_units_clone is succeeded
+      when:
+        - not ansible_check_mode
+        - not ags_apps_units_unit_check.stat.exists
+
+    - name: "{{ app.app }} : remove the clone's .git (deploy as a source tree)"
+      ansible.builtin.file:
+        path: "{{ ags_apps_units_unit_dir }}/.git"
+        state: absent
+      when: not ansible_check_mode
+
+    - name: "{{ app.app }} : record the installed tag outside the immutable tree"
+      ansible.builtin.copy:
+        content: "{{ app.tag }}\n"
+        dest: "{{ ags_apps_units_pin_file }}"
+        mode: "0644"
+        force: true
+
+    - name: "{{ app.app }} : verify the tag's manifest identity and handler"
+      ansible.builtin.include_tasks: _verify_unit.yml
+
+    - name: "{{ app.app }} : repoint the spine link at the immutable tag"
+      ansible.builtin.file:
+        src: "{{ ags_apps_units_unit_dir }}"
+        dest: "{{ ags_apps_units_spine_link }}"
+        state: link
+        force: true
+
+    - name: "{{ app.app }} : expose the spine link at its XDG config path"
+      ansible.builtin.file:
+        src: "{{ ags_apps_units_spine_link }}"
+        dest: "{{ ags_apps_units_xdg_link }}"
+        state: link
+        force: true
+
+    - name: "{{ app.app }} : verify the app-owned bin entry point exists"
+      ansible.builtin.stat:
+        path: "{{ ags_apps_units_unit_dir }}/bin/{{ app.binLink }}"
+      register: ags_apps_units_bin_source
+      when: app.binLink is defined
+
+    - name: "{{ app.app }} : assert the app-owned bin entry point exists in the tag"
+      ansible.builtin.assert:
+        that: ags_apps_units_bin_source.stat.exists
+        fail_msg: >-
+          {{ app.app }} declares binLink '{{ app.binLink }}' but
+          {{ ags_apps_units_unit_dir }}/bin/{{ app.binLink }} does not exist in
+          the immutable tag. The app repo must ship the declared command.
+      when: app.binLink is defined
+
+    - name: "{{ app.app }} : install the optional bin link"
+      ansible.builtin.file:
+        src: "{{ ags_apps_units_unit_dir }}/bin/{{ app.binLink }}"
+        dest: "{{ ags_apps_units_bin_link }}"
+        state: link
+        force: true
+      when: app.binLink is defined
+
+    - name: "{{ app.app }} : render the provisioned launcher through the launch lock"
+      ansible.builtin.template:
+        src: ags-app-launcher.j2
+        dest: "{{ ags_apps_units_launcher_path }}"
+        mode: "0755"
+      when: app.launcher is defined
+
+    - name: "{{ app.app }} : verify the declared ownership surfaces"
+      ansible.builtin.include_tasks: _verify_surfaces.yml
+
+    - name: "{{ app.app }} : assert the shared launch-lock wrapper is installed"
+      ansible.builtin.stat:
+        path: "{{ ags_apps_units_run_locked }}"
+      register: ags_apps_units_run_locked_check
+      when: (app.launch == 'always') or (ags_apps_units_cutover | bool)
+
+    - name: "{{ app.app }} : require cli_tools' ags-run-locked wrapper for starts"
+      ansible.builtin.assert:
+        that: ags_apps_units_run_locked_check.stat.exists
+        fail_msg: >-
+          {{ ags_apps_units_run_locked }} is missing — cli_tools installs the
+          shared launch-lock wrapper and runs before this role in bootstrap
+          order. Every `ags run` path must use it (AD-28).
+      when: (app.launch == 'always') or (ags_apps_units_cutover | bool)
+
+    - name: "{{ app.app }} : start the new instance through the shared launch lock"
+      ansible.builtin.command:
+        argv:
+          - "{{ ags_apps_units_run_locked }}"
+          - --expect-instance
+          - "{{ app.instance }}"
+          - --lock-timeout
+          - "{{ ags_apps_units_lock_timeout }}"
+          - --register-timeout
+          - "{{ ags_apps_units_register_timeout }}"
+          - -d
+          - "{{ ags_apps_units_xdg_link }}"
+          - --log-file
+          - "{{ ags_apps_units_log_file }}"
+      environment:
+        PATH: "{{ ags_apps_units_bin_dir | trim }}:{{ ansible_facts.env.PATH }}"
+      register: ags_apps_units_start
+      when:
+        - not ansible_check_mode
+        - (app.launch == 'always') or (ags_apps_units_cutover | bool)
+
+    - name: "{{ app.app }} : record that this run started the instance"
+      ansible.builtin.set_fact:
+        ags_apps_units_started_this_run: true
+      when:
+        - not ansible_check_mode
+        - (app.launch == 'always') or (ags_apps_units_cutover | bool)
+
+    - name: "{{ app.app }} : verify the running identity, handler and ownership surfaces"
+      ansible.builtin.include_tasks: _verify_runtime.yml
+      when:
+        - not ansible_check_mode
+        - ags_apps_units_started_this_run | default(false)
+
+    - name: "{{ app.app }} : stop an on-demand app after cutover verification"
+      ansible.builtin.include_tasks: _quiesce.yml
+      when:
+        - not ansible_check_mode
+        - app.launch == 'on-demand'
+        - ags_apps_units_cutover | bool
+        - not ags_apps_units_was_running | default(false)
+
+  rescue:
+    - name: "{{ app.app }} : ROLLBACK — restore the previous owner surfaces"
+      ansible.builtin.include_tasks: _rollback.yml
+
+    - name: "{{ app.app }} : fail after rollback (the epoch did not verify)"
+      ansible.builtin.fail:
+        msg: >-
+          {{ app.app }} cutover/verification failed; rollback restored the
+          previous links and restarted the old instance when it was running.
+          Failed task: {{ ansible_failed_task.name | default('unknown') }}.
+          Failed result: {{ ansible_failed_result | default('') }}

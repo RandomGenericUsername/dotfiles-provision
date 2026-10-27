@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# ags-run-locked — every provisioned `ags run` goes through the shared per-user
+# AGS launch lock (AD-28).
+#
+# WHY. AGS 3.1.0 has one shared `$XDG_RUNTIME_DIR/ags.js`; two concurrent
+# `ags run` invocations can race while bundling. The runtime holds
+# `flock($XDG_RUNTIME_DIR/ags-launch.lock)` across its restart lane; autostart,
+# on-demand launchers and provisioning must take the SAME lock. `ags request`
+# and `ags toggle` do not bundle, so they deliberately do not use this wrapper.
+#
+# LIFECYCLE. The lock is held from launch until the intended instance publishes
+# its name on the AGS bus, then released — NOT for the app process lifetime
+# (holding it forever would deadlock the login sequence). The app runs in the
+# background with the lock fd closed, so a later wrapper can start the next app.
+#
+# USAGE
+#   ags-run-locked [--expect-instance NAME] [--lock-timeout SEC]
+#                  [--register-timeout SEC] [--] <ags run args...>
+#
+# `--expect-instance` is the app-list/manifest instance name. Without it the
+# wrapper treats any new name on `ags list` as registration. A non-zero exit
+# means the lock timed out, `ags run` failed, or the name never registered.
+set -uo pipefail
+
+expect_instance=""
+lock_timeout="${AGS_LAUNCH_LOCK_TIMEOUT:-10}"
+register_timeout="${AGS_LAUNCH_REGISTER_TIMEOUT:-10}"
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --expect-instance)
+            expect_instance="${2:-}"
+            shift 2 || shift
+            ;;
+        --lock-timeout)
+            lock_timeout="${2:-10}"
+            shift 2 || shift
+            ;;
+        --register-timeout)
+            register_timeout="${2:-10}"
+            shift 2 || shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+runtime_dir="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/ags-$(id -u)}"
+lock_file="$runtime_dir/ags-launch.lock"
+mkdir -p "$runtime_dir" || exit 1
+
+# fd 9 is the lock; commands below close it for the app child (`9>&-`) so the
+# long-lived app process cannot keep the lock after this wrapper exits.
+exec 9>"$lock_file" || exit 1
+if ! flock -w "$lock_timeout" 9; then
+    echo "ags-run-locked: timed out waiting for the shared AGS launch lock $lock_file" >&2
+    exit 1
+fi
+
+list_instances() {
+    ags list 2>/dev/null || true
+}
+
+before="$(list_instances)"
+if [ -n "$expect_instance" ] && printf '%s\n' "$before" | grep -qx "$expect_instance"; then
+    # Already running: `ags run` would delegate (exit 0). Nothing to bundle.
+    exit 0
+fi
+
+setsid ags run "$@" 9>&- </dev/null >/dev/null 2>&1 &
+child=$!
+
+deadline=$((SECONDS + register_timeout))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    current="$(list_instances)"
+    if [ -n "$expect_instance" ]; then
+        if printf '%s\n' "$current" | grep -qx "$expect_instance"; then
+            exit 0
+        fi
+    else
+        new_names="$(
+            comm -13 \
+                <(printf '%s\n' "$before" | sort -u) \
+                <(printf '%s\n' "$current" | sort -u)
+        )"
+        if [ -n "$(printf '%s' "$new_names" | tr -d '[:space:]')" ]; then
+            exit 0
+        fi
+    fi
+
+    if ! kill -0 "$child" 2>/dev/null; then
+        wait "$child"
+        rc=$?
+        # A clean quick exit is AGS delegating to an existing instance (or a
+        # no-op start); a non-zero exit is a real launch failure.
+        exit "$rc"
+    fi
+    sleep 0.2
+done
+
+echo "ags-run-locked: '${expect_instance:-new instance}' did not register on the AGS bus within ${register_timeout}s" >&2
+kill "$child" 2>/dev/null || true
+wait "$child" 2>/dev/null || true
+exit 1

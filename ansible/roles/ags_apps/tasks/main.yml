@@ -100,16 +100,55 @@
       install_dir seam extra-var (the orchestrator resolves
       $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
+- name: Assert composition manifests seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined
+      - manifests_dir is string
+      - manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — the ags_apps role reads the
+      composition's apps.yaml to deploy ONLY owner: legacy entries. The engine
+      CLI resolves it from --manifests-dir; direct runs pass
+      -e manifests_dir=...
+
+- name: Read the composition app list and select the legacy owner
+  ansible.builtin.set_fact:
+    ags_apps_composition_apps: "{{ lookup('file', manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
+
+- name: Partition the app list for the legacy monorepo role
+  ansible.builtin.set_fact:
+    ags_apps_legacy_apps: "{{ ags_apps_composition_apps.apps | selectattr('owner', 'equalto', 'legacy') | list }}"
+    ags_apps_legacy_names: "{{ ags_apps_composition_apps.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
+    ags_apps_standalone_names: "{{ ags_apps_composition_apps.apps | selectattr('owner', 'equalto', 'standalone') | map(attribute='app') | list }}"
+
+- name: Assert every app has exactly one owner before the legacy role acts
+  ansible.builtin.assert:
+    that:
+      - ags_apps_legacy_names | intersect(ags_apps_standalone_names) | length == 0
+      - ags_apps_legacy_apps | length + (ags_apps_composition_apps.apps | selectattr('owner', 'equalto', 'standalone') | list | length) == ags_apps_composition_apps.apps | length
+    fail_msg: >-
+      the composition app list must assign every app exactly one owner; the
+      legacy role refuses to act on an ambiguous partition (AD-31/AD-32).
+
+- name: Report the legacy app set this run deploys
+  ansible.builtin.debug:
+    msg: >-
+      ags_apps (legacy monorepo) owns {{ ags_apps_legacy_names | join(', ') if
+      ags_apps_legacy_names | length > 0 else 'no apps (all standalone)' }}.
+
 - name: Ensure the ags-apps install root exists
   ansible.builtin.file:
     path: "{{ ags_apps_install_root }}"
     state: directory
     mode: "0755"
+  when: ags_apps_legacy_apps | length > 0
 
 - name: Check whether the pinned ags-apps unit is already installed
   ansible.builtin.stat:
     path: "{{ ags_apps_unit_marker }}"
   register: ags_apps_unit_check
+  when: ags_apps_legacy_apps | length > 0
 
 - name: Clone the pinned ags-apps unit (shallow, anonymous HTTPS)
   ansible.builtin.git:
@@ -124,13 +163,16 @@
   until: ags_apps_clone is succeeded
   when:
     - not ansible_check_mode
-    - not ags_apps_unit_check.stat.exists
+    - not (ags_apps_unit_check.stat.exists | default(false))
+    - ags_apps_legacy_apps | length > 0
 
 - name: Remove the clone's .git (deploy the unit as a source tree, not a checkout)
   ansible.builtin.file:
     path: "{{ ags_apps_unit_dir }}/.git"
     state: absent
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - ags_apps_legacy_apps | length > 0
 
 - name: Record the pinned bar version
   ansible.builtin.copy:
@@ -138,18 +180,21 @@
     dest: "{{ ags_apps_pin_file }}"
     mode: "0644"
     force: true
+  when: ags_apps_legacy_apps | length > 0
 
 - name: Ensure the spine config root exists for the live-bar link
   ansible.builtin.file:
     path: "{{ ags_apps_spine_config_dir }}"
     state: directory
     mode: "0755"
+  when: ags_apps_legacy_apps | length > 0
 
 - name: Ensure the per-unit node_modules dir exists
   ansible.builtin.file:
     path: "{{ ags_apps_resolution_dir }}"
     state: directory
     mode: "0755"
+  when: ags_apps_legacy_apps | length > 0
 
 - name: Point the per-unit resolution shortcut at the pinned platform unit
   ansible.builtin.file:
@@ -157,12 +202,14 @@
     dest: "{{ ags_apps_resolution_shortcut }}"
     state: link
     force: true
+  when: ags_apps_legacy_apps | length > 0
 
 - name: Check whether the live-bar path already exists
   ansible.builtin.stat:
     path: "{{ ags_apps_live_bar_link }}"
     follow: false
   register: ags_apps_live_bar_check
+  when: "'bar' in ags_apps_legacy_names"
 
 - name: List the live-bar path's children when it is a real dir
   ansible.builtin.find:
@@ -172,7 +219,8 @@
     hidden: true
   register: ags_apps_live_bar_children
   when:
-    - ags_apps_live_bar_check.stat.exists
+    - "'bar' in ags_apps_legacy_names"
+    - ags_apps_live_bar_check.stat.exists | default(false)
     - not ags_apps_live_bar_check.stat.islnk | default(false)
 
 # Capture the pre-existing pointer target BEFORE the live-bar link is (re)pointed
@@ -193,14 +241,16 @@
   changed_when: false
   failed_when: false
   check_mode: false
+  when: "'bar' in ags_apps_legacy_names"
 
 - name: Remove the live-bar path when it is an empty real dir
   ansible.builtin.file:
     path: "{{ ags_apps_live_bar_link }}"
     state: absent
   when:
+    - "'bar' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_bar_check.stat.exists
+    - ags_apps_live_bar_check.stat.exists | default(false)
     - not ags_apps_live_bar_check.stat.islnk | default(false)
     - ags_apps_live_bar_children.matched | default(0) == 0
 
@@ -208,7 +258,8 @@
   ansible.builtin.set_fact:
     ags_apps_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}"
   when:
-    - ags_apps_live_bar_check.stat.exists
+    - "'bar' in ags_apps_legacy_names"
+    - ags_apps_live_bar_check.stat.exists | default(false)
     - not ags_apps_live_bar_check.stat.islnk | default(false)
     - (ags_apps_live_bar_children.matched | default(0)) != 0
 
@@ -218,7 +269,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_bar_check.stat.exists
+    - "'bar' in ags_apps_legacy_names"
+    - ags_apps_live_bar_check.stat.exists | default(false)
     - not ags_apps_live_bar_check.stat.islnk | default(false)
     - (ags_apps_live_bar_children.matched | default(0)) != 0
 
@@ -230,8 +282,9 @@
       - "{{ ags_apps_backup_path }}"
   changed_when: true
   when:
+    - "'bar' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_bar_check.stat.exists
+    - ags_apps_live_bar_check.stat.exists | default(false)
     - not ags_apps_live_bar_check.stat.islnk | default(false)
     - (ags_apps_live_bar_children.matched | default(0)) != 0
 
@@ -241,6 +294,7 @@
     dest: "{{ ags_apps_live_bar_link }}"
     state: link
     force: true
+  when: "'bar' in ags_apps_legacy_names"
 
 # UNCONDITIONAL + IDEMPOTENT (the regression fix). Runs on EVERY deploy — a
 # version bump repoints the live-bar symlink at a NEW unit dir that never
@@ -265,6 +319,7 @@
           and (ags_apps_pre_colors_readlink.stdout | trim) | length > 0)
          | ternary(ags_apps_pre_colors_readlink.stdout | trim,
                    ags_apps_runtime_colors_pointer) }}
+  when: "'bar' in ags_apps_legacy_names"
 
 # The clipboard overlay deploys the same way as the bar (ags-apps-bar-first
 # slice 3): a symlink into the unit's hypr-pano/ dir, with the SAME
@@ -281,6 +336,7 @@
     path: "{{ ags_apps_live_pano_link }}"
     follow: false
   register: ags_apps_live_pano_check
+  when: "'hypr-pano' in ags_apps_legacy_names"
 
 - name: List the live-pano path's children when it is a real dir
   ansible.builtin.find:
@@ -290,7 +346,8 @@
     hidden: true
   register: ags_apps_live_pano_children
   when:
-    - ags_apps_live_pano_check.stat.exists
+    - "'hypr-pano' in ags_apps_legacy_names"
+    - ags_apps_live_pano_check.stat.exists | default(false)
     - not ags_apps_live_pano_check.stat.islnk | default(false)
 
 - name: Remove the live-pano path when it is an empty real dir
@@ -298,8 +355,9 @@
     path: "{{ ags_apps_live_pano_link }}"
     state: absent
   when:
+    - "'hypr-pano' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_pano_check.stat.exists
+    - ags_apps_live_pano_check.stat.exists | default(false)
     - not ags_apps_live_pano_check.stat.islnk | default(false)
     - ags_apps_live_pano_children.matched | default(0) == 0
 
@@ -307,7 +365,8 @@
   ansible.builtin.set_fact:
     ags_apps_pano_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}-hypr-pano"
   when:
-    - ags_apps_live_pano_check.stat.exists
+    - "'hypr-pano' in ags_apps_legacy_names"
+    - ags_apps_live_pano_check.stat.exists | default(false)
     - not ags_apps_live_pano_check.stat.islnk | default(false)
     - (ags_apps_live_pano_children.matched | default(0)) != 0
 
@@ -317,7 +376,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_pano_check.stat.exists
+    - "'hypr-pano' in ags_apps_legacy_names"
+    - ags_apps_live_pano_check.stat.exists | default(false)
     - not ags_apps_live_pano_check.stat.islnk | default(false)
     - (ags_apps_live_pano_children.matched | default(0)) != 0
 
@@ -329,8 +389,9 @@
       - "{{ ags_apps_pano_backup_path }}"
   changed_when: true
   when:
+    - "'hypr-pano' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_pano_check.stat.exists
+    - ags_apps_live_pano_check.stat.exists | default(false)
     - not ags_apps_live_pano_check.stat.islnk | default(false)
     - (ags_apps_live_pano_children.matched | default(0)) != 0
 
@@ -340,6 +401,7 @@
     dest: "{{ ags_apps_live_pano_link }}"
     state: link
     force: true
+  when: "'hypr-pano' in ags_apps_legacy_names"
 
 # The notification overlay deploys the same way (slice 4): a symlink into the
 # unit's notifications/ dir, with the SAME migrate-then-symlink discipline for a
@@ -354,6 +416,7 @@
     path: "{{ ags_apps_live_notifications_link }}"
     follow: false
   register: ags_apps_live_notifications_check
+  when: "'notifications' in ags_apps_legacy_names"
 
 - name: List the live-notifications path's children when it is a real dir
   ansible.builtin.find:
@@ -363,7 +426,8 @@
     hidden: true
   register: ags_apps_live_notifications_children
   when:
-    - ags_apps_live_notifications_check.stat.exists
+    - "'notifications' in ags_apps_legacy_names"
+    - ags_apps_live_notifications_check.stat.exists | default(false)
     - not ags_apps_live_notifications_check.stat.islnk | default(false)
 
 - name: Remove the live-notifications path when it is an empty real dir
@@ -371,8 +435,9 @@
     path: "{{ ags_apps_live_notifications_link }}"
     state: absent
   when:
+    - "'notifications' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_notifications_check.stat.exists
+    - ags_apps_live_notifications_check.stat.exists | default(false)
     - not ags_apps_live_notifications_check.stat.islnk | default(false)
     - ags_apps_live_notifications_children.matched | default(0) == 0
 
@@ -380,7 +445,8 @@
   ansible.builtin.set_fact:
     ags_apps_notifications_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}-notifications"
   when:
-    - ags_apps_live_notifications_check.stat.exists
+    - "'notifications' in ags_apps_legacy_names"
+    - ags_apps_live_notifications_check.stat.exists | default(false)
     - not ags_apps_live_notifications_check.stat.islnk | default(false)
     - (ags_apps_live_notifications_children.matched | default(0)) != 0
 
@@ -390,7 +456,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_notifications_check.stat.exists
+    - "'notifications' in ags_apps_legacy_names"
+    - ags_apps_live_notifications_check.stat.exists | default(false)
     - not ags_apps_live_notifications_check.stat.islnk | default(false)
     - (ags_apps_live_notifications_children.matched | default(0)) != 0
 
@@ -402,8 +469,9 @@
       - "{{ ags_apps_notifications_backup_path }}"
   changed_when: true
   when:
+    - "'notifications' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_notifications_check.stat.exists
+    - ags_apps_live_notifications_check.stat.exists | default(false)
     - not ags_apps_live_notifications_check.stat.islnk | default(false)
     - (ags_apps_live_notifications_children.matched | default(0)) != 0
 
@@ -413,6 +481,7 @@
     dest: "{{ ags_apps_live_notifications_link }}"
     state: link
     force: true
+  when: "'notifications' in ags_apps_legacy_names"
 
 # The capture-tool GUI deploys the same way (slice 5): a symlink into the unit's
 # capture-tool/ dir, with the SAME migrate-then-symlink discipline for a
@@ -431,6 +500,7 @@
     path: "{{ ags_apps_live_capture_link }}"
     follow: false
   register: ags_apps_live_capture_check
+  when: "'capture' in ags_apps_legacy_names"
 
 - name: List the live-capture path's children when it is a real dir
   ansible.builtin.find:
@@ -440,7 +510,8 @@
     hidden: true
   register: ags_apps_live_capture_children
   when:
-    - ags_apps_live_capture_check.stat.exists
+    - "'capture' in ags_apps_legacy_names"
+    - ags_apps_live_capture_check.stat.exists | default(false)
     - not ags_apps_live_capture_check.stat.islnk | default(false)
 
 - name: Remove the live-capture path when it is an empty real dir
@@ -448,8 +519,9 @@
     path: "{{ ags_apps_live_capture_link }}"
     state: absent
   when:
+    - "'capture' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_capture_check.stat.exists
+    - ags_apps_live_capture_check.stat.exists | default(false)
     - not ags_apps_live_capture_check.stat.islnk | default(false)
     - ags_apps_live_capture_children.matched | default(0) == 0
 
@@ -457,7 +529,8 @@
   ansible.builtin.set_fact:
     ags_apps_capture_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}-capture-tool"
   when:
-    - ags_apps_live_capture_check.stat.exists
+    - "'capture' in ags_apps_legacy_names"
+    - ags_apps_live_capture_check.stat.exists | default(false)
     - not ags_apps_live_capture_check.stat.islnk | default(false)
     - (ags_apps_live_capture_children.matched | default(0)) != 0
 
@@ -467,7 +540,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_capture_check.stat.exists
+    - "'capture' in ags_apps_legacy_names"
+    - ags_apps_live_capture_check.stat.exists | default(false)
     - not ags_apps_live_capture_check.stat.islnk | default(false)
     - (ags_apps_live_capture_children.matched | default(0)) != 0
 
@@ -479,8 +553,9 @@
       - "{{ ags_apps_capture_backup_path }}"
   changed_when: true
   when:
+    - "'capture' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_capture_check.stat.exists
+    - ags_apps_live_capture_check.stat.exists | default(false)
     - not ags_apps_live_capture_check.stat.islnk | default(false)
     - (ags_apps_live_capture_children.matched | default(0)) != 0
 
@@ -490,6 +565,7 @@
     dest: "{{ ags_apps_live_capture_link }}"
     state: link
     force: true
+  when: "'capture' in ags_apps_legacy_names"
 
 # The capture-tool CLI is now part of the SAME unit (ags-apps v0.4.0). It is not
 # copied: the bin entry is a symlink into the pinned unit, so the controller the
@@ -501,6 +577,7 @@
     path: "{{ ags_apps_bin_dir | trim }}"
     state: directory
     mode: "0755"
+  when: "'capture' in ags_apps_legacy_names"
 
 - name: Install the unit's capture-tool backend as the CLI entry point
   ansible.builtin.file:
@@ -508,6 +585,7 @@
     dest: "{{ ags_apps_capture_tool_bin_link }}"
     state: link
     force: true
+  when: "'capture' in ags_apps_legacy_names"
 
 # Relocated from the cli_tools role when the backend moved into the unit: the
 # cli_tools playbook runs BEFORE ags-apps, so the assertion belongs here, after
@@ -519,7 +597,9 @@
   environment:
     PATH: "{{ ags_apps_bin_dir | trim }}:{{ ansible_facts.env.PATH }}"
   changed_when: false
-  when: not ansible_check_mode
+  when:
+    - "'capture' in ags_apps_legacy_names"
+    - not ansible_check_mode
 
 # The wallpaper selector deploys the same way (slice 6): a symlink into the
 # unit's wallpaper-selector/ dir, with the SAME migrate-then-symlink discipline
@@ -537,6 +617,7 @@
     path: "{{ ags_apps_live_wallpaper_selector_link }}"
     follow: false
   register: ags_apps_live_wallpaper_selector_check
+  when: "'wallpaper-selector' in ags_apps_legacy_names"
 
 - name: List the live-wallpaper-selector path's children when it is a real dir
   ansible.builtin.find:
@@ -546,7 +627,8 @@
     hidden: true
   register: ags_apps_live_wallpaper_selector_children
   when:
-    - ags_apps_live_wallpaper_selector_check.stat.exists
+    - "'wallpaper-selector' in ags_apps_legacy_names"
+    - ags_apps_live_wallpaper_selector_check.stat.exists | default(false)
     - not ags_apps_live_wallpaper_selector_check.stat.islnk | default(false)
 
 - name: Remove the live-wallpaper-selector path when it is an empty real dir
@@ -554,8 +636,9 @@
     path: "{{ ags_apps_live_wallpaper_selector_link }}"
     state: absent
   when:
+    - "'wallpaper-selector' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_wallpaper_selector_check.stat.exists
+    - ags_apps_live_wallpaper_selector_check.stat.exists | default(false)
     - not ags_apps_live_wallpaper_selector_check.stat.islnk | default(false)
     - ags_apps_live_wallpaper_selector_children.matched | default(0) == 0
 
@@ -563,7 +646,8 @@
   ansible.builtin.set_fact:
     ags_apps_wallpaper_selector_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}-wallpaper-selector"
   when:
-    - ags_apps_live_wallpaper_selector_check.stat.exists
+    - "'wallpaper-selector' in ags_apps_legacy_names"
+    - ags_apps_live_wallpaper_selector_check.stat.exists | default(false)
     - not ags_apps_live_wallpaper_selector_check.stat.islnk | default(false)
     - (ags_apps_live_wallpaper_selector_children.matched | default(0)) != 0
 
@@ -573,7 +657,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_wallpaper_selector_check.stat.exists
+    - "'wallpaper-selector' in ags_apps_legacy_names"
+    - ags_apps_live_wallpaper_selector_check.stat.exists | default(false)
     - not ags_apps_live_wallpaper_selector_check.stat.islnk | default(false)
     - (ags_apps_live_wallpaper_selector_children.matched | default(0)) != 0
 
@@ -585,8 +670,9 @@
       - "{{ ags_apps_wallpaper_selector_backup_path }}"
   changed_when: true
   when:
+    - "'wallpaper-selector' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_wallpaper_selector_check.stat.exists
+    - ags_apps_live_wallpaper_selector_check.stat.exists | default(false)
     - not ags_apps_live_wallpaper_selector_check.stat.islnk | default(false)
     - (ags_apps_live_wallpaper_selector_children.matched | default(0)) != 0
 
@@ -596,6 +682,7 @@
     dest: "{{ ags_apps_live_wallpaper_selector_link }}"
     state: link
     force: true
+  when: "'wallpaper-selector' in ags_apps_legacy_names"
 
 # The icon color mapping editor deploys the same way (slice 7): a symlink into
 # the unit's icme/ dir, with the SAME migrate-then-symlink discipline for a
@@ -614,6 +701,7 @@
     path: "{{ ags_apps_live_icme_link }}"
     follow: false
   register: ags_apps_live_icme_check
+  when: "'icme' in ags_apps_legacy_names"
 
 - name: List the live-icme path's children when it is a real dir
   ansible.builtin.find:
@@ -623,7 +711,8 @@
     hidden: true
   register: ags_apps_live_icme_children
   when:
-    - ags_apps_live_icme_check.stat.exists
+    - "'icme' in ags_apps_legacy_names"
+    - ags_apps_live_icme_check.stat.exists | default(false)
     - not ags_apps_live_icme_check.stat.islnk | default(false)
 
 - name: Remove the live-icme path when it is an empty real dir
@@ -631,8 +720,9 @@
     path: "{{ ags_apps_live_icme_link }}"
     state: absent
   when:
+    - "'icme' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_icme_check.stat.exists
+    - ags_apps_live_icme_check.stat.exists | default(false)
     - not ags_apps_live_icme_check.stat.islnk | default(false)
     - ags_apps_live_icme_children.matched | default(0) == 0
 
@@ -640,7 +730,8 @@
   ansible.builtin.set_fact:
     ags_apps_icme_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}-icme"
   when:
-    - ags_apps_live_icme_check.stat.exists
+    - "'icme' in ags_apps_legacy_names"
+    - ags_apps_live_icme_check.stat.exists | default(false)
     - not ags_apps_live_icme_check.stat.islnk | default(false)
     - (ags_apps_live_icme_children.matched | default(0)) != 0
 
@@ -650,7 +741,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_icme_check.stat.exists
+    - "'icme' in ags_apps_legacy_names"
+    - ags_apps_live_icme_check.stat.exists | default(false)
     - not ags_apps_live_icme_check.stat.islnk | default(false)
     - (ags_apps_live_icme_children.matched | default(0)) != 0
 
@@ -662,8 +754,9 @@
       - "{{ ags_apps_icme_backup_path }}"
   changed_when: true
   when:
+    - "'icme' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_icme_check.stat.exists
+    - ags_apps_live_icme_check.stat.exists | default(false)
     - not ags_apps_live_icme_check.stat.islnk | default(false)
     - (ags_apps_live_icme_children.matched | default(0)) != 0
 
@@ -673,6 +766,7 @@
     dest: "{{ ags_apps_live_icme_link }}"
     state: link
     force: true
+  when: "'icme' in ags_apps_legacy_names"
 
 # The btop Theme Studio deploys the same way (slice 8): a symlink into the unit's
 # btop-theme-studio/ dir, with the SAME migrate-then-symlink discipline for a
@@ -692,6 +786,7 @@
     path: "{{ ags_apps_live_btop_studio_link }}"
     follow: false
   register: ags_apps_live_btop_studio_check
+  when: "'btop-theme-studio' in ags_apps_legacy_names"
 
 - name: List the live-btop-studio path's children when it is a real dir
   ansible.builtin.find:
@@ -701,7 +796,8 @@
     hidden: true
   register: ags_apps_live_btop_studio_children
   when:
-    - ags_apps_live_btop_studio_check.stat.exists
+    - "'btop-theme-studio' in ags_apps_legacy_names"
+    - ags_apps_live_btop_studio_check.stat.exists | default(false)
     - not ags_apps_live_btop_studio_check.stat.islnk | default(false)
 
 - name: Remove the live-btop-studio path when it is an empty real dir
@@ -709,8 +805,9 @@
     path: "{{ ags_apps_live_btop_studio_link }}"
     state: absent
   when:
+    - "'btop-theme-studio' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_btop_studio_check.stat.exists
+    - ags_apps_live_btop_studio_check.stat.exists | default(false)
     - not ags_apps_live_btop_studio_check.stat.islnk | default(false)
     - ags_apps_live_btop_studio_children.matched | default(0) == 0
 
@@ -718,7 +815,8 @@
   ansible.builtin.set_fact:
     ags_apps_btop_studio_backup_path: "{{ ags_apps_backup_root }}/{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}-btop-theme-studio"
   when:
-    - ags_apps_live_btop_studio_check.stat.exists
+    - "'btop-theme-studio' in ags_apps_legacy_names"
+    - ags_apps_live_btop_studio_check.stat.exists | default(false)
     - not ags_apps_live_btop_studio_check.stat.islnk | default(false)
     - (ags_apps_live_btop_studio_children.matched | default(0)) != 0
 
@@ -728,7 +826,8 @@
     state: directory
     mode: "0755"
   when:
-    - ags_apps_live_btop_studio_check.stat.exists
+    - "'btop-theme-studio' in ags_apps_legacy_names"
+    - ags_apps_live_btop_studio_check.stat.exists | default(false)
     - not ags_apps_live_btop_studio_check.stat.islnk | default(false)
     - (ags_apps_live_btop_studio_children.matched | default(0)) != 0
 
@@ -740,8 +839,9 @@
       - "{{ ags_apps_btop_studio_backup_path }}"
   changed_when: true
   when:
+    - "'btop-theme-studio' in ags_apps_legacy_names"
     - not ansible_check_mode
-    - ags_apps_live_btop_studio_check.stat.exists
+    - ags_apps_live_btop_studio_check.stat.exists | default(false)
     - not ags_apps_live_btop_studio_check.stat.islnk | default(false)
     - (ags_apps_live_btop_studio_children.matched | default(0)) != 0
 
@@ -751,3 +851,4 @@
     dest: "{{ ags_apps_live_btop_studio_link }}"
     state: link
     force: true
+  when: "'btop-theme-studio' in ags_apps_legacy_names"

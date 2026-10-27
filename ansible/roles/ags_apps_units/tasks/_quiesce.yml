@@ -1,0 +1,33 @@
+# Quiesce one AGS instance: confirmed quit, bounded wait for the D-Bus name to
+# release. Holds the same shared launch lock every `ags run` path uses so a
+# concurrent launcher cannot start the instance under the link swap.
+#
+# The caller sets `app` (the app-list entry). `changed_when: false`: this is a
+# lifecycle step, not a machine configuration change.
+
+- name: "Quiesce {{ app.app }} (confirmed quit + bounded name release)"
+  ansible.builtin.shell:
+    cmd: |
+      set -u
+      runtime_dir="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}/ags-$(id -u)}"
+      lock="$runtime_dir/ags-launch.lock"
+      mkdir -p "$runtime_dir"
+      exec 9>"$lock"
+      if ! flock -w {{ ags_apps_units_lock_timeout }} 9; then
+          echo "timeout waiting for the shared AGS launch lock $lock" >&2
+          exit 1
+      fi
+      ags quit -i "$AGS_INSTANCE" >/dev/null 2>&1 || true
+      for _ in $(seq 1 20); do
+          if ! ags list 2>/dev/null | grep -qx "$AGS_INSTANCE"; then
+              exit 0
+          fi
+          sleep 0.25
+      done
+      echo "AGS instance '$AGS_INSTANCE' did not leave the bus after quit" >&2
+      exit 1
+    executable: /bin/bash
+  environment:
+    AGS_INSTANCE: "{{ app.instance }}"
+  changed_when: false
+  when: not ansible_check_mode

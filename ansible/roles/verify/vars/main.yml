@@ -72,6 +72,10 @@ verify_state_current_dir: "{{ verify_xdg_state_home | trim }}/dotfiles/current"
 #   installs 0755.
 verify_bin_scripts:
   - "{{ verify_cli_bin_dir | trim }}/toggle-touchpad"
+  # The shared AGS launch-lock wrapper (AD-28): every provisioned launcher and
+  # gui_tools start path routes cold `ags run` through it, so a missing wrapper
+  # would break every launcher at once.
+  - "{{ verify_cli_bin_dir | trim }}/ags-run-locked"
   # The capture UI launcher: `capture-ui` (SUPER+PRINT). Installed by the
   # cli_tools role; without it the keybind is a silent no-op, so its presence is
   # asserted here too. The `capture-tool` CLI itself is installed from the
@@ -1106,3 +1110,21 @@ verify_managed_link_spine_prefix: "{{ install_dir | trim }}/config"
 #   listable); the deployed icon-mappings/ dir contains icons.yaml (verified).
 #   Trim lock.
 verify_itr_list_target: "{{ install_dir | trim }}/icon-mappings/icons.yaml"
+
+# ── Generic per-app AGS topology (REQ-008 / AD-31/32/37) ─────────────────────
+# verify mirrors the standalone installer: read the ONE composition app list
+# and program tuple, then assert only the surfaces each owner declares. The
+# legacy sections above remain the host-side mirror for owner: legacy; the
+# generic section below covers owner: standalone. With today's all-legacy list
+# every standalone task skips (dormant), exactly like the installer role.
+verify_ags_apps_units_apps_file: "{{ manifests_dir | trim }}/apps.yaml"
+verify_ags_apps_units_tuple_file: "{{ manifests_dir | trim }}/program-tuple.yaml"
+verify_ags_apps_units_install_root: "{{ install_dir | trim }}/apps"
+verify_ags_apps_units_platform_shortcut: "{{ verify_ags_apps_units_install_root }}/node_modules/ags-platform"
+verify_ags_apps_units_spine_config_dir: "{{ install_dir | trim }}/config"
+verify_ags_apps_units_run_locked: "{{ verify_cli_bin_dir | trim }}/ags-run-locked"
+verify_ags_apps_units_autostart_file: "{{ install_dir | trim }}/config/hypr/autostart.lua"
+verify_ags_apps_units_state_root: >-
+  {{ ansible_facts.env.XDG_STATE_HOME
+     | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}
+verify_ags_apps_units_colors_pointer: "{{ verify_ags_apps_units_state_root }}/dotfiles/current/colors.gtk.css"

@@ -27,9 +27,9 @@ INSTANCE="hypr-pano"
 DIR="${HOME}/.config/ags-hypr-pano"
 LOG="${HOME}/.local/state/ags/hypr-pano.log"
 
-# Bounded waits (0.2s ticks): ~10s for the instance to appear on the bus after
-# `ags run`, then ~2s of retries for its request handler to accept the reveal.
-START_TICKS=50
+# Bounded waits (0.2s ticks): ~2s of retries for the request handler to accept
+# the reveal after ags-run-locked returns (the instance is on the bus slightly
+# before its requestHandler is ready).
 REQUEST_RETRIES=10
 
 request() { timeout 8 ags request "$1" -i "$INSTANCE" >/dev/null 2>&1; }
@@ -45,19 +45,14 @@ if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
     sleep 1
 fi
 
-# Cold start: launch in the BACKGROUND (never `exec`) so this shell survives to
-# issue the reveal request below, then poll the bus until it registers.
+# Cold start: `ags-run-locked` launches in the background and holds the shared
+# launch lock until the instance registers on the bus. It returns only after
+# the name is live, so the reveal request below has an owner to answer it.
 mkdir -p "$(dirname "$LOG")"
-ags run -d "$DIR" --log-file "$LOG" &
-
-ticks=0
-while [ "$ticks" -lt "$START_TICKS" ]; do
-    if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
-        break
-    fi
-    sleep 0.2
-    ticks=$((ticks + 1))
-done
+if ! ags-run-locked --expect-instance "$INSTANCE" -d "$DIR" --log-file "$LOG"; then
+    echo "hypr-pano-ui: failed to start instance '$INSTANCE'" >&2
+    exit 1
+fi
 
 # Reveal the freshly started overlay. Retry briefly: the instance is on the bus
 # slightly before its requestHandler is ready to accept requests.

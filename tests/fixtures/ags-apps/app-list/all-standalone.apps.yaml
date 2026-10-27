@@ -1,0 +1,33 @@
+# All-standalone fixture: both apps are owned by the generic role; the legacy
+# role must be a complete no-op. fake-bar owns the stable palette pointer.
+apps:
+  - app: bar
+    installDir: bar
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: ags
+    configDir: ags
+    configLink: ags
+    spineLink: ags
+    xdgLink: ags
+    autostart: ags
+    launch: always
+    barPalettePointer: true
+    cutoverId: REQ-999
+
+  - app: fake-app
+    installDir: fake-app
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: fake-app
+    configDir: ags-fake-app
+    configLink: ags-fake-app
+    spineLink: ags-fake-app
+    xdgLink: ags-fake-app
+    binLink: fake-app-tool
+    launcher: fake-app-ui
+    autostart: fake-app
+    launch: on-demand
+    cutoverId: REQ-999

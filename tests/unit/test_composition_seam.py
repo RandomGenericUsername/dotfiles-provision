@@ -84,6 +84,10 @@ class TestExternalManifestsDir:
         assert payload["composition_root"] == str(external.parent.parent)
         assert payload["count"] == len(_EXPECTED_MANIFEST_KINDS)
         assert payload["manifests"] == _EXPECTED_MANIFEST_KINDS
+        # Composition DATA records (AD-31/34) live beside the manifests but are
+        # not `kind:` manifests; the seam check must skip them deliberately.
+        assert "apps.yaml" not in payload["manifests"]
+        assert "program-tuple.yaml" not in payload["manifests"]
 
     def test_external_dir_wins_over_the_cwd_default(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

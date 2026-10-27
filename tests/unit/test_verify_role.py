@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.support import composition_root
+from tests.support import composition_root, manifests_dir
 
 
 def _find_ansible_dir() -> Path:
@@ -750,6 +750,9 @@ class TestVerifyTasks:
             "Assert install_dir seam is provided",
             "Assert verify list vars are not empty",
             "Assert binary and tool names are safe identifiers",
+            "Assert composition manifests seam is provided",
+            "Assert every AGS app has exactly one owner and unique surfaces",
+            "Assert the program tuple names exactly the three program tags",
         }
         for task in _load_tasks():
             if task.get("name") in ungated_seam_asserts:
@@ -2386,6 +2389,7 @@ class TestVerifyVars:
             "icon-color-mapping-editor",
             "btop-theme-studio",
             "toggle-touchpad",
+            "ags-run-locked",
         }, names
 
     def test_palette_files_match_cache_artifacts(self) -> None:
@@ -3007,6 +3011,38 @@ class TestVerifyVars:
             "the retired per-file platform tree must not be mirrored in verify"
         )
 
+    def test_standalone_generated_icon_skeletons_are_filtered_by_owner(self) -> None:
+        """AD-37: a standalone app verifies the platform's single-produced
+        icons.json. The compositor-generated `config/<spine>/icons.json`
+        skeleton must drop out for that owner instead of asserting a file
+        compositor_configs deliberately no longer writes."""
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        assert "Derive standalone apps' generated icon skeletons" in names
+        assert "Select the compositor skeletons still generated for legacy owners" in names
+        source = (_ROLES_DIR / "tasks" / "main.yml").read_text()
+        assert "verify_ags_standalone_icon_skeletons" in source
+        check = next(
+            task for task in tasks if task.get("name") == "Check compositor configs and skeletons"
+        )
+        assert "verify_compositor_skeleton_active_files" in str(check.get("loop"))
+        assertion = next(
+            task
+            for task in tasks
+            if task.get("name")
+            == "Assert compositor configs and skeletons are present with correct types"
+        )
+        assert "verify_compositor_skeleton_active_files" in str(_module(assertion).get("that"))
+
+    def test_verify_standalone_autostart_requires_one_locked_entry(self) -> None:
+        text = (_ROLES_DIR / "tasks" / "_verify_standalone.yml").read_text()
+        assert "app.autostart" in text
+        assert "--expect-instance " in text
+        assert "ags-run-locked" in text
+        assert "| length - 1) == 1" in text, (
+            "the autostart identity must appear exactly once (no duplicate process)"
+        )
+
     def test_vars_use_non_deprecated_env_fact(self) -> None:
         """F4 lock: vars read ansible_facts.env, never the deprecated top-level
         ansible_env fact (INJECT_FACTS_AS_VARS injection that hard-breaks on
@@ -3073,6 +3109,15 @@ class TestVerifyVars:
             "verify_ags_apps_btop_studio_dir",
             "verify_ags_apps_live_btop_studio_link",
             "verify_ags_apps_btop_studio_files",
+            "verify_ags_apps_units_apps_file",
+            "verify_ags_apps_units_tuple_file",
+            "verify_ags_apps_units_install_root",
+            "verify_ags_apps_units_platform_shortcut",
+            "verify_ags_apps_units_spine_config_dir",
+            "verify_ags_apps_units_run_locked",
+            "verify_ags_apps_units_autostart_file",
+            "verify_ags_apps_units_colors_pointer",
+            "verify_ags_apps_units_state_root",
             "verify_xdg_data_home",
             "verify_desktop_entry_files",
             "verify_assets_desktop_paths",
@@ -3602,6 +3647,8 @@ class TestVerifyRuntime:
                         str(self._PATH),
                         "-e",
                         f"install_dir={install}",
+                        "-e",
+                        f"manifests_dir={manifests_dir()}",
                         *_display_manager_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
@@ -3709,6 +3756,8 @@ class TestVerifyRuntime:
                         str(self._PATH),
                         "-e",
                         f"install_dir={install}",
+                        "-e",
+                        f"manifests_dir={manifests_dir()}",
                         "--start-at-task",
                         "Check deployed desktop entries exist",
                     ],
@@ -3758,6 +3807,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     "--start-at-task",
                     "Check deployed desktop entries exist",
                 ],
@@ -3827,6 +3878,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3906,6 +3959,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3974,6 +4029,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -4037,6 +4094,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -4098,6 +4157,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -4153,6 +4214,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -4204,6 +4267,8 @@ class TestVerifyRuntime:
                         str(self._PATH),
                         "-e",
                         f"install_dir={install}",
+                        "-e",
+                        f"manifests_dir={manifests_dir()}",
                         *_display_manager_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
@@ -4253,6 +4318,8 @@ class TestVerifyRuntime:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -4389,6 +4456,11 @@ def _write_stub_binaries(home: Path) -> Path:
         "exit 0\n"
     )
     ags.chmod(0o755)
+    # The shared AGS launch-lock wrapper (AD-28) is installed by cli_tools and
+    # asserted as one of the keybind-invoked executables.
+    wrapper = bin_dir / "ags-run-locked"
+    wrapper.write_text("#!/bin/sh\nexit 0\n")
+    wrapper.chmod(0o755)
     # csg/weg/itr: the pinned-CLI handshake asserts `contract <x>` in
     # `--version` stdout. The generic exit-0 stub above cannot satisfy that.
     verify_vars = _vars()

@@ -69,6 +69,33 @@
       the install_dir seam extra-var (the orchestrator resolves
       $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
+- name: Assert composition manifests seam is provided
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined
+      - manifests_dir is string
+      - manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — compositor_configs reads the
+      composition apps.yaml to decide whether a generated icons.json would be
+      written through a LEGACY live link. The engine CLI resolves it from
+      --manifests-dir; direct runs pass -e manifests_dir=...
+
+- name: Read the composition app list for the AGS icon-manifest owner
+  ansible.builtin.set_fact:
+    compositor_configs_composition_apps: "{{ lookup('file', manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
+
+- name: Resolve the bar/capture owners before generating icons.json
+  ansible.builtin.set_fact:
+    compositor_configs_bar_owner: >-
+      {{ compositor_configs_composition_apps.apps
+         | selectattr('app', 'equalto', 'bar')
+         | map(attribute='owner') | first | default('legacy') }}
+    compositor_configs_capture_owner: >-
+      {{ compositor_configs_composition_apps.apps
+         | selectattr('app', 'equalto', 'capture')
+         | map(attribute='owner') | first | default('legacy') }}
+
 - name: Ensure compositor config dirs exist
   ansible.builtin.file:
     path: "{{ item }}"
@@ -104,7 +131,9 @@
     dest: "{{ compositor_configs_icon_manifest_dest }}"
     force: true
     mode: "0644"
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - compositor_configs_bar_owner == 'legacy'
 
 - name: Generate capture AGS JSON manifest from icon mappings
   ansible.builtin.copy:
@@ -112,7 +141,9 @@
     dest: "{{ compositor_configs_capture_icon_manifest_dest }}"
     force: true
     mode: "0644"
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - compositor_configs_capture_owner == 'legacy'
 
 - name: Check the pinned assets configs class exists
   ansible.builtin.stat:
@@ -353,7 +384,9 @@
       - "{{ compositor_configs_spine_config_dir }}/ags/bar/validate-cli.ts"
   register: compositor_configs_bar_validate_cli
   changed_when: false
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - compositor_configs_bar_owner == 'legacy'
 
 - name: Validate the deployed bar artifacts (strict install gate)
   ansible.builtin.command:
@@ -365,4 +398,6 @@
       - --expect-schema-version
       - "{{ compositor_configs_icon_manifest_schema_version }}"
   changed_when: false
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - compositor_configs_bar_owner == 'legacy'
