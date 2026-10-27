@@ -6,6 +6,34 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-10-27
+
+### Changed
+
+- **Adoption program tuple activated (`ags-apps` `v0.5.0` + `ags-platform`
+  `v0.3.0`):** the legacy monorepo deployment now installs `ags-apps v0.5.0`,
+  the adoption release that adds every app's `app.manifest.json` and the live
+  `palette-refresh` handlers while keeping the existing app directories and the
+  `hypr-pano` name. The `ags_platform` role installs `v0.3.0`, and the legacy
+  per-unit resolution shortcut plus the shared
+  `<install>/config/node_modules/ags-platform` shortcut resolve that same
+  tuple. All seven composition entries remain `owner: legacy`, so `ags_apps`
+  is still the only active owner and the new `ags_apps_units` role stays a
+  no-op.
+- **Verify/pin mirrors (REQ-008):** `verify_ags_apps_version` moves to
+  `v0.5.0`; `verify_ags_platform_version` and
+  `verify_ags_apps_platform_version` move to `v0.3.0`. The pin-mirror tests
+  now assert the platform role, legacy shortcut and both verify mirrors agree,
+  and the verify fixture seeds the `v0.3.0` platform unit/pin.
+
+### Notes
+
+- No app cutover, no `dotfiles-v3` change, no hypr-pano rename and no runtime
+  pin move (`dotfiles-runtime` stays `v0.2.3`).
+- `ags-apps v0.5.0` and `ags-platform v0.3.0` are local-only tags. The engine
+  gates exercise them through pre-seeded fixtures/checkouts only (the role
+  clones are presence-guarded); they never fetch the tags.
+
 ## [0.1.18] - 2026-10-27
 
 ### Added

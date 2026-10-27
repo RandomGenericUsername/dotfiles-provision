@@ -3159,23 +3159,53 @@ class TestVerifyAgsAppsPinMirror:
             == apps_vars["ags_apps_platform_version"]
         )
 
-    def test_engine_consumes_ags_apps_v0_4_3(self) -> None:
-        """REQ-005: both legs name the selector-collapse release.
+    def test_engine_consumes_the_adoption_tuple(self) -> None:
+        """REQ-008 adoption: ags-apps v0.5.0 + ags-platform v0.3.0.
 
-        ags-apps v0.4.3 (BUG-002) collapses the wallpaper-selector drawer on
-        Apply. The engine installs one monorepo unit, so the installer pin and
-        its hand-maintained verify mirror must both move. This is the red/green
-        guard for the bump: it fails while either leg still says v0.4.2.
+        ags-apps v0.5.0 adds the per-app manifests and palette-refresh handlers
+        for the standalone contract; it builds against ags-platform v0.3.0. The
+        engine installs one monorepo unit, so the installer, platform role and
+        verify mirrors must all move together. This is the red/green guard for
+        the tuple: it fails while any leg still names v0.4.3/v0.2.0.
         """
         verify_vars = _vars()
         apps_vars = _sibling_vars("ags_apps")
-        assert apps_vars["ags_apps_version"] == "v0.4.3", (
-            "the ags_apps role must install ags-apps v0.4.3 (selector collapses "
-            f"on Apply); got {apps_vars['ags_apps_version']!r}"
+        platform_vars = _sibling_vars("ags_platform")
+        assert apps_vars["ags_apps_version"] == "v0.5.0", (
+            "the ags_apps role must install the adoption release v0.5.0; got "
+            f"{apps_vars['ags_apps_version']!r}"
         )
-        assert verify_vars["verify_ags_apps_version"] == "v0.4.3", (
-            "verify_ags_apps_version must mirror ags_apps_version v0.4.3; got "
+        assert verify_vars["verify_ags_apps_version"] == "v0.5.0", (
+            "verify_ags_apps_version must mirror ags_apps_version v0.5.0; got "
             f"{verify_vars['verify_ags_apps_version']!r}"
+        )
+        assert platform_vars["ags_platform_version"] == "v0.3.0", (
+            "the ags_platform role must install the adoption tuple v0.3.0; got "
+            f"{platform_vars['ags_platform_version']!r}"
+        )
+        assert verify_vars["verify_ags_platform_version"] == "v0.3.0", (
+            "verify_ags_platform_version must mirror ags_platform_version v0.3.0; "
+            f"got {verify_vars['verify_ags_platform_version']!r}"
+        )
+        assert apps_vars["ags_apps_platform_version"] == "v0.3.0", (
+            "the legacy per-unit shortcut must resolve the same v0.3.0 tuple; got "
+            f"{apps_vars['ags_apps_platform_version']!r}"
+        )
+
+    def test_platform_pin_matches_every_consumer(self) -> None:
+        """The platform tag is one tuple: platform role, legacy per-unit
+        shortcut and both verify mirrors must agree."""
+        verify_vars = _vars()
+        apps_vars = _sibling_vars("ags_apps")
+        platform_vars = _sibling_vars("ags_platform")
+        assert (
+            verify_vars["verify_ags_platform_version"]
+            == apps_vars["ags_apps_platform_version"]
+            == platform_vars["ags_platform_version"]
+        )
+        assert (
+            verify_vars["verify_ags_apps_platform_version"]
+            == apps_vars["ags_apps_platform_version"]
         )
 
     def test_the_live_links_are_asserted_against_the_mirror(self) -> None:
@@ -4880,7 +4910,7 @@ def _build_provisioned_layout(
     # installed by the ags_platform role as ONE versioned unit, NOT mirrored
     # per file under config/ags. The fixture mirrors verify_ags_platform_unit_dir
     # / _pin_file / _shortcut so the criterion asserts have something to pass on.
-    unit = install / "ags-platform" / "v0.2.0"
+    unit = install / "ags-platform" / "v0.3.0"
     (unit / "ports").mkdir(parents=True, exist_ok=True)
     (unit / "adapters").mkdir(parents=True, exist_ok=True)
     (unit / "package.json").write_text("{}")
@@ -4892,7 +4922,7 @@ def _build_provisioned_layout(
     (unit / "adapters" / "event-bus.ts").write_text("")
     (unit / "adapters" / "icon-registry.ts").write_text("")
     (unit / "adapters" / "astal.ts").write_text("")
-    (install / "ags-platform" / "pinned").write_text("v0.2.0\n")
+    (install / "ags-platform" / "pinned").write_text("v0.3.0\n")
     (install / "config" / "node_modules").mkdir(parents=True, exist_ok=True)
     (install / "config" / "node_modules" / "ags-platform").symlink_to(unit)
     # The ags-apps unit + live-bar link + per-unit resolution shortcut (spine
