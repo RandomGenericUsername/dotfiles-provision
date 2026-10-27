@@ -141,7 +141,7 @@ class TestOwnerFilters:
 
     def test_old_role_filters_legacy_owner_and_keeps_its_pin(self) -> None:
         old_vars = yaml.safe_load((_ROLES_DIR / "ags_apps" / "vars" / "main.yml").read_text())
-        assert old_vars["ags_apps_version"] == "v0.4.3"
+        assert old_vars["ags_apps_version"] == "v0.5.0"
         old_tasks = (_ROLES_DIR / "ags_apps" / "tasks" / "main.yml").read_text()
         assert "apps.yaml" in old_tasks
         assert "selectattr('owner', 'equalto', 'legacy')" in old_tasks
@@ -255,7 +255,7 @@ class TestRoleStructure:
         vars_text = (_ROLE / "vars" / "main.yml").read_text()
         assert "program-tuple.yaml" in vars_text
         assert "ags_apps_units_tuple['ags-platform']" in vars_text
-        assert "v0.4.3" not in vars_text
+        assert "v0.5.0" not in vars_text
         assert "v0.3.0" not in vars_text
 
 

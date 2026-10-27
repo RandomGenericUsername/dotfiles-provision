@@ -91,15 +91,17 @@ ags_apps_repo_url: https://github.com/RandomGenericUsername/ags-apps.git
 
 # ags_apps_version: THE PIN. The git tag to install, and the name of the
 #   version directory under the install root. The tag names a MONOREPO release
-#   (`v0.4.0` carries bar/ + hypr-pano/ + notifications/ + capture-tool/ +
-#   wallpaper-selector/ + icme/ + btop-theme-studio/, the notifications app
-#   owning org.freedesktop.Notifications, and the capture-tool Python backend at
+#   (`v0.5.0` is the adoption release carrying every app directory, each app's
+#   `app.manifest.json` and the live `palette-refresh` handlers; it still ships
+#   bar/ + hypr-pano/ + notifications/ + capture-tool/ + wallpaper-selector/ +
+#   icme/ + btop-theme-studio/, the notifications app owning
+#   org.freedesktop.Notifications, and the capture-tool Python backend at
 #   capture-tool/bin/capture-tool): the unit is deployed whole, so one tag
 #   moves every app it ships. Bump this to move the live apps forward, point a
 #   live link at an older sibling tag dir to roll back. Recorded on the host at
 #   ags_apps_pin_file so the installed version is observable without reading
 #   this file.
-ags_apps_version: v0.4.3
+ags_apps_version: v0.5.0
 
 # ags_apps_install_root: the monorepo home (<install>/ags-apps/). Trim lock:
 #   consumes the same validated {{ install_dir | trim }} value the sibling
@@ -317,7 +319,7 @@ ags_apps_backup_root: "{{ ags_apps_install_root }}/bridge-backups"
 #   together). Lives here (not read from the ags_platform role) because roles
 #   in different plays share no vars; the structural test is the single
 #   source of truth for their equality.
-ags_apps_platform_version: v0.2.0
+ags_apps_platform_version: v0.3.0
 
 # ags_apps_platform_unit_dir: the pinned platform unit the resolution
 #   shortcut resolves the bar's bare `ags-platform` specifier to.

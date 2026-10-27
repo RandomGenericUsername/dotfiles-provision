@@ -955,7 +955,7 @@ class TestAgsAppsExecution:
 
     @staticmethod
     def _seed_units(install: Path) -> tuple[Path, Path]:
-        platform = install / "ags-platform" / "v0.2.0"
+        platform = install / "ags-platform" / "v0.3.0"
         (platform / "ports").mkdir(parents=True)
         (platform / "index.ts").write_text("export {}\n")
         # Derive the unit dir from the pin so a tag bump does not leave a
