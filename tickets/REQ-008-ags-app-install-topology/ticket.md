@@ -79,9 +79,9 @@ Deliver:
       moved.
 - [ ] The old monorepo role/pin and old launcher/config entries are removed at
       program completion. Deferred by design: no app has cut over, so
-      `ags_apps` remains the owner of all seven legacy entries and keeps its
-      `v0.4.3` pin (`ags-platform v0.2.0`). The verification gate proves zero
-      duplicate surfaces for a mixed list.
+      `ags_apps` remains the owner of all seven legacy entries on the adoption
+      tuple (`ags-apps v0.5.0`, `ags-platform v0.3.0`; engine v0.1.19). The
+      verification gate proves zero duplicate surfaces for a mixed list.
 - [x] `make gates` is green; fake-app fixtures are GUI-free. Evidence below.
 
 ## Dependencies
@@ -138,12 +138,12 @@ Local-only release; nothing pushed or published.
 
 - **No cutover and no composition pin move.** All seven `dotfiles-v3` entries
   remain `owner: legacy`; `dotfiles-v3` `installer.pin` stays `v0.1.17` until
-  its own pin task consumes engine `v0.1.18`.
-- **Adoption tuple mismatch is guarded.** The composition tuple names
-  `ags-platform v0.3.0`, while the engine still pins `v0.2.0` for the legacy
-  unit. `ags_apps_units` refuses to link a missing tuple platform unit, so a
-  standalone flip before the adoption re-pin fails loud rather than shipping a
-  dangling resolver.
+  its own pin task consumes engine `v0.1.19`.
+- **Adoption tuple is active (resolved in v0.1.19).** The legacy unit now
+  installs `ags-apps v0.5.0`; `ags_platform` installs `v0.3.0`; and the shared
+  shortcut plus the legacy per-unit shortcut both resolve that same tuple.
+  Verify mirrors assert the same three values. `ags_apps_units` remains a no-op
+  while every entry is legacy.
 - **Autostart lock content is assets-owned.** `dotfiles-assets v0.6.1` still
   starts the legacy instances with raw `ags run`. The installer and verify now
   require each standalone entry to appear exactly once as
@@ -151,3 +151,36 @@ Local-only release; nothing pushed or published.
   autostart update must land in the same epoch as the first real cutover
   (dotfiles-assets REQ-007 / later assets release). This role intentionally
   never writes assets-owned content.
+
+## Follow-up closeout — adoption tuple (v0.1.19)
+
+Local-only release; nothing pushed or published.
+
+| Item | Value |
+| --- | --- |
+| Pin/test commit | `4a9ec99` — `feat(pins): activate the ags-apps v0.5.0 + ags-platform v0.3.0 adoption tuple` |
+| Release commit | `6b8e605` — `chore(release): activate the adoption tuple; v0.1.19` |
+| Merge/tag commit | `0805db0` — merge `ticket/REQ-008-ags-app-install-topology`; tagged |
+| Annotated tag | local `v0.1.19`, tag object `2d81165`, peeled commit `0805db0` |
+| Engine version | `0.1.19` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.19]` |
+| Pins activated | `ags-apps v0.5.0`; `ags-platform`, `ags_apps_platform` and both verify platform mirrors `v0.3.0` |
+
+### Gates
+
+- Role/verify/bootstrap targeted suite → **240 passed** (includes real
+  `ansible-playbook` role executions and the verify green/negative paths).
+- `make gates` → exit 0. Fast suite: **1033 passed, 3 skipped, 54 deselected**
+  (19m49s); hermetic: **1000 passed, 36 skipped, 54 deselected** (16m08s);
+  `ruff check`, `uv lock --check`, `docs-check` all pass.
+- `make ci-gates-parity` → PASS.
+- `make build` → sdist + wheel `0.1.19`; wheel-contents check PASS.
+- `ansible-playbook --syntax-check` for `ags-apps.yaml` and
+  `ags-platform.yaml` → pass.
+
+### Scope / safety
+
+- `ags-apps v0.5.0` and `ags-platform v0.3.0` are local-only dependency tags.
+  The role tests pre-seed the unit trees; the presence-guarded clone paths mean
+  no gate fetches either tag.
+- No app cutover, no `dotfiles-v3` change, no `hypr-pano` rename and no runtime
+  pin move; `dotfiles-runtime` stays `v0.2.3`.
