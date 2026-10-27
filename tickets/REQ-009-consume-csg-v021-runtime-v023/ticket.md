@@ -2,7 +2,7 @@
 id: REQ-009
 title: "Consume csg v0.2.1 + runtime v0.2.3 in one pin release (engine v0.1.17)"
 kind: requirement
-status: in-progress
+status: done
 lane: 1
 links:
   openspec: none
@@ -237,9 +237,9 @@ Verify: `rg -n '^kind: requirement|^lane: 1' tickets/REQ-009-consume-csg-v021-ru
 - [x] `make gates`, `make test-integration`, `make assets-parity` (at
       `v0.6.1`), `make build`, `uv run dotfiles-provision version`, and the
       wheel-contents check are green.
-- [ ] Merged to `main`; annotated tag `v0.1.17`; tag CI all green; GitHub
+- [x] Merged to `main`; annotated tag `v0.1.17`; tag CI all green; GitHub
       Release carries the wheel and sdist; branch/tag pushed.
-- [ ] Post-tag engine checkout inspection confirms exactly the csg/runtime
+- [x] Post-tag engine checkout inspection confirms exactly the csg/runtime
       legs changed.
 
 ## Out of scope
@@ -279,10 +279,11 @@ uv run pytest -q $FOCUSED
 | Rendered settings | `ansible-playbook ansible/playbooks/settings.yaml -e install_dir=<tmp>` with the committed roles | **exit 0** — `PLAY RECAP failed=0`; rendered csg `image_tag = "v0.2.1"`, weg `image_tag = "v0.2.0"`. The runtime therefore resolves the new csg image, not the previous one. |
 | Pin scope | `git diff --stat v0.1.16..75b4a5c -- ansible tests/fixtures` | **6 files, 10 insertions / 10 deletions** — only `cli_tools` (csg + runtime), `assets` csg mirror, `settings` csg image, `verify` (csg + runtime), and the two fixture files. weg/itr/ags-apps/ags-platform/assets-corpus/contract pins untouched. |
 | CI gate parity | `make ci-gates-parity` at `75b4a5c` | **exit 0** — `GATES` and workflow jobs match; exemptions `assets-parity`, `ci-gates-parity`, `release`. |
-| Merge | pending | pending |
-| Tag / CI | pending | pending |
-| Release assets | pending | pending |
-| Post-tag checkout | pending | pending |
+| Merge | `git merge --no-ff ticket/REQ-009-consume-csg-v021-runtime-v023` on `main`; `git push origin main` | **`7482177`** — merge of `552e306` (main) + `9851905` (branch); pushed `31a59bb..7482177`. The branch was pushed too. Note: `552e306` is the pre-existing local AGS-topology planning commit that was already on `main`; it is not part of this release's content. |
+| Tag | `git tag -a v0.1.17 -m "consume csg v0.2.1 + runtime v0.2.3; release v0.1.17" 7482177`; `git push origin v0.1.17`; `git ls-remote --tags origin 'refs/tags/v0.1.17*'` | Annotated tag object **`77849fdf3f9a5786c1faf0a8a13a97bbeb89b2b1`**; peeled commit **`74821775c0242ca36d9f54b75ded20d5c98eee95`**; remote shows the same pair. |
+| Tag CI | `gh run view 40435278944 --json conclusion,jobs,url` | **completed/success** — jobs `test`, `lint`, `hermetic`, `lock-check`, `docs-check`, `ci-gates-parity`, `assets-parity`, `release` all `success`; https://github.com/RandomGenericUsername/dotfiles-provision/actions/runs/40435278944 |
+| Release assets | `gh release view v0.1.17 --json tagName,url,assets` | `dotfiles_provision-0.1.17-py3-none-any.whl` (244,904 B) and `dotfiles_provision-0.1.17.tar.gz` (445,790 B), both `state: uploaded`; tag `v0.1.17`; https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.17 |
+| Post-tag checkout | `git clone --branch v0.1.17 https://github.com/RandomGenericUsername/dotfiles-provision /tmp/opencode/req009-v0117`; `git diff --stat v0.1.16..v0.1.17 -- ansible tests/fixtures` | HEAD = tag target `7482177`. Clone shows csg `v0.2.1`, runtime `v0.2.3`, weg/itr `v0.2.0`; `assets_csg_pinned_tag: v0.2.1`; `settings_csg_image_tag: v0.2.1`; `verify_csg_version: v0.2.1`; `verify_runtime_version: v0.2.3` / tool `0.2.3`; fixture csg/runtime and csg source `v0.2.1`; `assets.tag: v0.6.1`. The diff is exactly 6 files / 10 lines — the ten csg+runtime legs, no other pin. |
 
 Red excerpt (`a634cd5`):
 
@@ -308,10 +309,16 @@ Green excerpt (`75b4a5c`):
 ```
 
 Evidence: the commands and observed results above, run in
-`.worktrees/REQ-009/` on the listed commits (`a634cd5` red, `75b4a5c` fix).
+`.worktrees/REQ-009/` on the listed commits (`a634cd5` red, `75b4a5c` fix,
+`9851905` pre-release closeout) and on `main` for the merge/tag/release rows.
 Verify: re-run `$FOCUSED`, `make gates`, `make test-integration`,
 `make assets-parity`, and `make build` from the worktree; inspect the tag and
 release with `gh release view v0.1.17`.
+
+Post-tag note: `v0.1.17` is immutable and points at `7482177` (plan, red test,
+implementation, and pre-release closeout). This final closeout commit is
+docs-only, lands after the tag, and changes no packaged file (`pyproject.toml`
+packages only `src/provisioning`).
 
 ### User host steps (sudo; user-run — the agent must not provision/reboot)
 
