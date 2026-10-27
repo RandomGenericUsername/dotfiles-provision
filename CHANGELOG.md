@@ -6,6 +6,44 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-10-26
+
+### Changed
+
+- **`color-scheme-generator` pin `v0.2.1` (csg BUG-001):** container-mode
+  `generate`/`show` now label their wrappers as csg-owned (`csg.managed`,
+  `csg.session`, `csg.created_at`, `csg.timeout_seconds`, plus `csg.boot_id`
+  when exposed) and run a best-effort sweep before image preflight. wrappers
+  from a previous boot are removed immediately; same-boot wrappers only after
+  their own timeout plus a 60 s grace. Young same-boot wrappers from a
+  concurrent run, unlabelled/foreign containers, and wrappers with no parseable
+  age are left untouched; list/inspect/remove failures are logged and never
+  fail the requested palette run. The engine pins the tag in `cli_tools`, the
+  assets csg-template mirror (`assets_csg_pinned_tag`), the settings rendered
+  image tag (`settings_csg_image_tag`), `verify_csg_version`, and the fixture
+  `cli-tools.yaml` + `assets.yaml` source. `verify_csg_contract_version` stays
+  `0.2.0` (`csg --version` prints `0.2.1 contract 0.2.0`); the assets corpus
+  pin stays `v0.6.1`.
+- **`dotfiles-runtime` pin `v0.2.3` (runtime BUG-005):** an absent optional
+  intent root is informational instead of degraded watch health. The optional
+  `$XDG_CONFIG_HOME/dotfiles/desired.json` root reports `optional_absent` at
+  INFO, only a required-root failure sets `failed_roots`/`degraded`,
+  `watch-health.json` gains the additive `optional_absent` key under the
+  unchanged `version: 1`, `inspect daemon`/`doctor` stay exit 0 while printing
+  `OPTIONAL (absent, not watched)`, and `WatchCoordinator` retries once per
+  burst when an optional root is absent. The engine's `cli_tools` mirror, the
+  hand-maintained verify mirror (`verify_runtime_version` /
+  `verify_runtime_tool_version`) and the fixture `cli-tools.yaml` move from
+  `v0.2.2` to `v0.2.3`.
+
+### Notes
+
+- No assets-corpus, ags-apps, weg, itr or ags-platform pin moves; the assets
+  tag stays `v0.6.1` and every `verify_*_contract_version` stays `0.2.0`.
+- This release adds no engine-side runtime install pin. The host deploy and
+  live verification are user-run after the `dotfiles-v3` `PIN-0116`
+  re-provision.
+
 ## [0.1.16] - 2026-10-26
 
 ### Changed

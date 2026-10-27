@@ -11,6 +11,7 @@
 ## Requirements
 
 - [REQ-008-ags-app-install-topology/ticket.md](./REQ-008-ags-app-install-topology/ticket.md) — Generic per-app AGS install topology and one-owner cutover | `proposed` | links: none
+- [REQ-009-consume-csg-v021-runtime-v023/ticket.md](./REQ-009-consume-csg-v021-runtime-v023/ticket.md) — Consume csg v0.2.1 + runtime v0.2.3 in one pin release (engine v0.1.17) | `in-progress` | links: none
 
 ## Bugs
 
