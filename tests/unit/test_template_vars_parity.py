@@ -409,8 +409,8 @@ class TestCsgAndRuntimePinMirrors:
             "the assets corpus tag must stay v0.6.2 in the fixture manifest"
         )
 
-    def test_runtime_mirrors_are_v0_2_3(self) -> None:
-        expected = "v0.2.3"
+    def test_runtime_mirrors_are_v0_3_0(self) -> None:
+        expected = "v0.3.0"
         fixture_runtime = self._cli_entry("dotfiles-runtime")
         role_runtime = next(
             entry
@@ -428,7 +428,7 @@ class TestCsgAndRuntimePinMirrors:
         assert verify_vars["verify_runtime_version"] == expected, (
             f"verify_runtime_version must be {expected}; got {verify_vars['verify_runtime_version']!r}"
         )
-        assert str(verify_vars["verify_runtime_tool_version"]) == "0.2.3", (
+        assert str(verify_vars["verify_runtime_tool_version"]) == "0.3.0", (
             "verify_runtime_tool_version must be the tag without its leading 'v'; got "
             f"{verify_vars['verify_runtime_tool_version']!r}"
         )
