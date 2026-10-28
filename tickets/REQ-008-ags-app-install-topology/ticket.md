@@ -345,3 +345,67 @@ installer no longer exists.
 > fresh-host `--check` fix and then re-pointed to `d652fc9` (the final v0.1.21
 > tree with that fix) before any push/publish. It is local-only. A concurrent
 > REQ-010 ticket took main to v0.1.22; this tag remains the REQ-008 release.
+
+## Follow-up closeout — consume dotfiles-runtime v0.3.0 (v0.1.23)
+
+Local-only release; nothing pushed, published or provisioned. Pin-only engine
+release on top of the final all-standalone topology.
+
+| Item | Value |
+| --- | --- |
+| Pin/release commit | `2c2cf46` — `chore(release): consume dotfiles-runtime v0.3.0; v0.1.23` |
+| Merge/tag commit | recorded after the local merge/tag |
+| Engine version | `0.1.23` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.23]` |
+| Runtime tag | local `dotfiles-runtime v0.3.0` (tag object `7c0f43b872a615ad47ff1a536dd89fa6569064ec`, peeled `dd615432bb5598432afeb8dd4425fdec8ecdd06b`) |
+
+### Pin table (all legs agree)
+
+| Consumer | Value |
+| --- | --- |
+| `roles/cli_tools/vars/main.yml` → `dotfiles-runtime` | `v0.3.0` |
+| `roles/verify/vars/main.yml` → `verify_runtime_version` | `v0.3.0` |
+| `roles/verify/vars/main.yml` → `verify_runtime_tool_version` | `0.3.0` |
+| `tests/fixtures/composition/dotfiles/provisioning/cli-tools.yaml` | `v0.3.0` |
+| Runtime/verify execution fixture | derives from the verify vars (prints `0.3.0`) |
+
+Unchanged pins: `ags-platform v0.3.0`, `contracts v0.3.0`,
+`dotfiles-assets v0.6.2`, `csg v0.2.1`, `weg v0.2.0`, `itr v0.2.0`,
+`tpr v0.1.0`.
+
+### Why v0.3.0
+
+Runtime v0.3.0 brings the manifest-driven AGS palette refresh, the
+applied-appearance ledger, the BUG-006 shared serialized restart/confirm lane
+and the clipboard namespace migration — the runtime half of the standalone
+app topology. The engine's existing shared `ags-launch.lock` and
+`$XDG_STATE_HOME/dotfiles/` contracts match it; no provision-role code changes.
+
+### Gates
+
+- `make gates` → exit 0. Fast suite: **910 passed, 31 skipped, 54 deselected**
+  (22m58s); hermetic: **907 passed, 34 skipped, 54 deselected** (20m44s);
+  `ruff check`, `uv lock --check`, `docs-check` all pass.
+- `make ci-gates-parity` → PASS.
+- `make build` → sdist + wheel `0.1.23`; wheel-contents check PASS.
+- Runtime-pin/verify tests: `TestVerifyRuntimePinMirror`,
+  `test_runtime_mirrors_are_v0_3_0`, and the cli_tools pinned-entry tests pass.
+
+### Exact v3 follow-up (not edited here)
+
+1. In `dotfiles-v3/dotfiles/provisioning/cli-tools.yaml`, set the
+   `dotfiles-runtime` entry to `repo:
+   https://github.com/RandomGenericUsername/dotfiles-runtime` and
+   `tag: v0.3.0`.
+2. Bump `installer.pin` / the expected engine tag to `v0.1.23`.
+3. Keep `dotfiles-assets v0.6.2`, `ags-platform v0.3.0` and
+   `contracts v0.3.0` unchanged; no app-list change is needed (v0.1.22 already
+   carries the all-standalone topology).
+4. Apply and verify: `dotfiles-runtime version` reports `0.3.0`, the
+   `~/.local/share/dotfiles/cli-tools/dotfiles-runtime/v0.3.0/` checkout and
+   `pinned` agree, and the clipboard namespace migration completes under the
+   runtime's own state migration (provisioning does not author runtime state).
+
+### Deliberate limits
+
+- `dotfiles-runtime v0.3.0` is a local-only tag; no push/publish.
+- No host provision in this release.
