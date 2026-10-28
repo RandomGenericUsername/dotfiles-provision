@@ -66,7 +66,7 @@
 - import_playbook: runtime-clipboard.yaml
 - import_playbook: filesystem.yaml
 - import_playbook: assets.yaml
-# AGS units, then the configs that consume them. The ags_platform role installs
+# AGS units and the configs that feed them. The ags_platform role installs
 # the platform unit and the shared-ancestor shortcut under
 # <install>/config/node_modules; ags_apps_units is the ONLY AGS app installer:
 # it installs every app at <install>/apps/<installDir>/<tag>/, creates the one
@@ -78,13 +78,14 @@
 # always-on `notifications` instance can own org.freedesktop.Notifications when
 # the installer starts it. It owns no AGS app surfaces.
 #
-# compositor_configs runs after the installer because it consumes the deployed
-# spine (hypr/hyprpaper) — not the AGS bar: every app tag carries its own
-# sources and the platform-produced icons.json (AD-37).
+# compositor-configs runs BEFORE ags-apps-units: it deploys the assets-owned
+# compositor spine (including hypr/autostart.lua) that the app role reads when
+# it reconciles each app's autostart entry. Running the installer first would
+# verify/link against a stale autostart from the previous assets pin.
 - import_playbook: ags-platform.yaml
 - import_playbook: gui-tools.yaml
-- import_playbook: ags-apps-units.yaml
 - import_playbook: compositor-configs.yaml
+- import_playbook: ags-apps-units.yaml
 - import_playbook: config-copies.yaml
 - import_playbook: settings.yaml
 - import_playbook: zsh-tools.yaml

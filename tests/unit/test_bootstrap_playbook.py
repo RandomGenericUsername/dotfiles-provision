@@ -36,7 +36,9 @@ _PLAYBOOKS_DIR = _ANSIBLE_DIR / "playbooks"
 # display-manager, before verify: it owns the GloView build/load lifecycle
 # behind the provision-owned touchpad gestures. gui-tools.yaml runs before
 # ags-apps-units: it stops/masks dunst so the always-on notifications instance
-# can own the notification bus when the installer starts it. P5-1-1: runtime-daemon.yaml runs right after cli-tools (the
+# can own the notification bus when the installer starts it. compositor-configs
+# runs before ags-apps-units so the app role reads the current assets-owned
+# hypr/autostart.lua. P5-1-1: runtime-daemon.yaml runs right after cli-tools (the
 # unit's ExecStart needs the dotfiles-runtime binary; the daemon tolerates
 # an unseeded machine so it does not wait for runtime-seed). Each imported
 # playbook
@@ -52,8 +54,8 @@ _EXPECTED_ORDER = [
     "assets.yaml",
     "ags-platform.yaml",
     "gui-tools.yaml",
-    "ags-apps-units.yaml",
     "compositor-configs.yaml",
+    "ags-apps-units.yaml",
     "config-copies.yaml",
     "settings.yaml",
     "zsh-tools.yaml",
@@ -98,14 +100,16 @@ class TestBootstrapPlaybook:
     def test_imports_in_exact_dependency_order(self) -> None:
         """AC 4: the twenty-three imports appear in the EXACT dependency order —
         packages → power-options → cli-tools → runtime-daemon → runtime-clipboard → filesystem →
-        assets → ags-platform → gui-tools → ags-apps-units → compositor-configs →
+        assets → ags-platform → gui-tools → compositor-configs → ags-apps-units →
         config-copies → settings → zsh-tools → zsh-config → wlogout-config →
         kitty-config → btop-config → config-links → runtime-seed →
         display-manager → gloview-plugin → verify (Epic 4: no default-palette/icons).
         btop-config MUST precede config-links: the role writes
         <install>/config/btop/, the links role exposes it at ~/.config/btop.
         gui-tools MUST precede ags-apps-units so dunst is masked before the
-        notifications overlay starts. ags-platform MUST precede the installer
+        notifications overlay starts. compositor-configs MUST precede
+        ags-apps-units so the app role sees the current assets-owned
+        hypr/autostart.lua. ags-platform MUST precede the installer
         (the shared shortcut resolves the tuple platform unit)."""
         order = [str(entry["import_playbook"]) for entry in _load_imports()]
         assert order == _EXPECTED_ORDER, (

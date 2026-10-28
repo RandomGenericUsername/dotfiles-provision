@@ -22,9 +22,13 @@
 
 - [REQ-010-tpr-producer-support](./REQ-010-tpr-producer-support/ticket.md) — Support tpr as a palette producer (pin + roles + verify) | `in-progress` | worktree: .worktrees/REQ-010/ | branch: ticket/REQ-010-tpr-producer-support
 
+## Requirements
+
+- [REQ-011-tpr-v020-pin](./REQ-011-tpr-v020-pin/ticket.md) — Pin theme-producer v0.2.0 | `in-progress` | worktree: .worktrees/REQ-011/ | branch: ticket/REQ-011-tpr-v020-pin
+
 ## Ops tasks
 
-(none)
+- [OPS-001-bootstrap-order-tpr-path](./OPS-001-bootstrap-order-tpr-path/ticket.md) — Fix bootstrap order and the tpr checkout path | `done` | worktree none, branch main | tag: v0.1.24
 
 ## Spikes
 

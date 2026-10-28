@@ -327,7 +327,7 @@ class TestTprPinMirrors:
         )
         assert verify_vars["verify_tpr_version"] == expected
         assert str(verify_vars["verify_tpr_contract_version"]) == "0.4.0"
-        assert f"/cli-tools/theme-producer/{expected}/src/" in str(tpr_source), (
+        assert f"/cli-tools/tpr/{expected}/src/" in str(tpr_source), (
             f"fixture tpr-templates source must read the {expected} checkout; "
             f"got {tpr_source!r}"
         )

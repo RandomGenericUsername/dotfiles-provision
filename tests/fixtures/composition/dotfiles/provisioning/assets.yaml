@@ -51,6 +51,6 @@ entries:
     # the pinned tpr checkout into the XDG-discovered spine config
     # (config/theme-producer/templates — the exact path runtime TprAdapter
     # reads). cli-tools.yaml runs BEFORE assets.yaml, so the checkout exists.
-    source: "{{ install_dir | trim }}/cli-tools/theme-producer/v0.1.0/src/theme_producer/defaults/templates"
+    source: "{{ install_dir | trim }}/cli-tools/tpr/v0.1.0/src/theme_producer/defaults/templates"
   - name: weg-effects
     kind: weg-effects

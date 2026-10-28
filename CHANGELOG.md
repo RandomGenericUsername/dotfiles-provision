@@ -6,6 +6,19 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-10-28
+
+### Fixed
+
+- **Bootstrap order:** `compositor-configs.yaml` now runs before
+  `ags-apps-units.yaml`, so the app role reconciles each app's autostart entry
+  against the current assets-owned `hypr/autostart.lua` instead of the previous
+  pin's copy. `gui-tools` still precedes the installer (dunst must be masked).
+- **tpr checkout path:** `assets` and `verify` now read the tpr checkout at
+  `<install>/cli-tools/tpr/<tag>`, the path `cli_tools` actually installs
+  (`<install>/cli-tools/<name>/<tag>`). The deployed config dir stays
+  `config/theme-producer`; tpr remains installed as the opt-in producer.
+
 ## [0.1.23] - 2026-10-28
 
 ### Changed

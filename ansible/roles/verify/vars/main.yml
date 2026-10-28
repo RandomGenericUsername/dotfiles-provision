@@ -395,10 +395,12 @@ verify_csg_image_references:
 #   dynamic to grep. `verify_tpr_contract_version` records the invocation
 #   contract generation this consumer expects (contracts v0.4.0) and is locked
 #   by `TestVerifyTprPinAndImages`; the executable assertions below are the
-#   version + images.
+#   version + images. The checkout dir is the cli_tools entry `name` (`tpr`),
+#   i.e. <install>/cli-tools/tpr/<tag>; the `theme-producer` name is the
+#   deployed config dir, not this source checkout.
 verify_tpr_version: v0.1.0
-verify_tpr_checkout: "{{ verify_cli_tools_checkout_root }}/theme-producer/{{ verify_tpr_version }}"
-verify_tpr_pin_file: "{{ verify_cli_tools_checkout_root }}/theme-producer/pinned"
+verify_tpr_checkout: "{{ verify_cli_tools_checkout_root }}/tpr/{{ verify_tpr_version }}"
+verify_tpr_pin_file: "{{ verify_cli_tools_checkout_root }}/tpr/pinned"
 verify_tpr_contract_version: 0.4.0
 verify_tpr_image_prefix: tpr
 verify_tpr_image_references:

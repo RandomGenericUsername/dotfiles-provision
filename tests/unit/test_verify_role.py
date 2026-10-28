@@ -2217,11 +2217,11 @@ class TestVerifyVars:
         data = _vars()
         assert str(data["verify_tpr_version"]) == "v0.1.0"
         assert str(data["verify_tpr_checkout"]) == (
-            "{{ verify_cli_tools_checkout_root }}/theme-producer/"
+            "{{ verify_cli_tools_checkout_root }}/tpr/"
             "{{ verify_tpr_version }}"
         )
         assert str(data["verify_tpr_pin_file"]) == (
-            "{{ verify_cli_tools_checkout_root }}/theme-producer/pinned"
+            "{{ verify_cli_tools_checkout_root }}/tpr/pinned"
         )
         assert str(data["verify_tpr_contract_version"]) == "0.4.0", (
             "tpr is validated against the v0.4.0 invocation contract"

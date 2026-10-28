@@ -738,7 +738,7 @@ class TestAssetsVars:
         csg_manifest_source = str(manifest["csg-templates"]["source"])
         csg_pin = csg_manifest_source.split("/cli-tools/csg/")[1].split("/", 1)[0]
         tpr_manifest_source = str(manifest["tpr-templates"]["source"])
-        tpr_pin = tpr_manifest_source.split("/cli-tools/theme-producer/")[1].split("/", 1)[0]
+        tpr_pin = tpr_manifest_source.split("/cli-tools/tpr/")[1].split("/", 1)[0]
         for entry in copies:
             manifest_entry = manifest[entry["name"]]
             assert entry["kind"] == manifest_entry["kind"], (
@@ -866,7 +866,7 @@ class TestAssetsVars:
         existence contract as csg.
 
         The catalog lives at
-        `<install>/cli-tools/theme-producer/<tag>/src/theme_producer/defaults/templates/`
+        `<install>/cli-tools/tpr/<tag>/src/theme_producer/defaults/templates/`
         and the runtime's TprAdapter reads the DEPLOYED copy at
         `config/theme-producer/templates`.
         """
@@ -888,7 +888,7 @@ class TestAssetsVars:
         source = source.replace("{{ install_dir | trim }}", install)
         source = source.replace("{{ assets_tpr_pinned_tag }}", str(data["assets_tpr_pinned_tag"]))
         assert source == (
-            f"{install}/cli-tools/theme-producer/{pin}/src/theme_producer/defaults/templates"
+            f"{install}/cli-tools/tpr/{pin}/src/theme_producer/defaults/templates"
         ), f"resolved tpr-templates source is wrong: {source!r}"
         assert "src/cli-tools" not in source, (
             "the tpr-templates source must not name the retired in-tree tree"

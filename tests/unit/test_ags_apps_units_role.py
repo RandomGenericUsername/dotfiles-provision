@@ -203,7 +203,7 @@ class TestRoleStructure:
         ]
         assert imports.index("ags-platform.yaml") < imports.index("gui-tools.yaml")
         assert imports.index("gui-tools.yaml") < imports.index("ags-apps-units.yaml")
-        assert imports.index("ags-apps-units.yaml") < imports.index("compositor-configs.yaml")
+        assert imports.index("compositor-configs.yaml") < imports.index("ags-apps-units.yaml")
 
     def test_install_path_and_shared_shortcut_match_ad31(self) -> None:
         vars_text = (_ROLE / "vars" / "main.yml").read_text()
