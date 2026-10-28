@@ -354,7 +354,7 @@ release on top of the final all-standalone topology.
 | Item | Value |
 | --- | --- |
 | Pin/release commit | `2c2cf46` — `chore(release): consume dotfiles-runtime v0.3.0; v0.1.23` |
-| Merge/tag commit | recorded after the local merge/tag |
+| Merge/tag commit | `706bfce` — merge `ticket/REQ-008-ags-app-install-topology`; local annotated `v0.1.23` (tag object `78373608071dfcab42a38e5a28981bf2f7880ef9`, peeled `706bfce`) |
 | Engine version | `0.1.23` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.23]` |
 | Runtime tag | local `dotfiles-runtime v0.3.0` (tag object `7c0f43b872a615ad47ff1a536dd89fa6569064ec`, peeled `dd615432bb5598432afeb8dd4425fdec8ecdd06b`) |
 
