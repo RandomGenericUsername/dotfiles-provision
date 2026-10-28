@@ -68,6 +68,8 @@ filesystem_spine_dirs:
   - config/kitty
   - config/weg
   - config/itr
+  - config/theme-producer
+  - config/theme-producer/templates
   - config/gtk-3.0
   - config/gtk-4.0
 

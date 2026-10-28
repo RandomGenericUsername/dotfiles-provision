@@ -910,6 +910,79 @@
       cli-tools playbook
   when: not ansible_check_mode
 
+# REQ-010: `tpr` follows the same execution-asserted pin as csg, with THREE
+# images (base + the matugen/native engines). tpr v0.1.0 has no `contract <x>`
+# token in `--version`, so the assertion is the exact package version (the tag
+# without its leading `v`) plus the tag-qualified image set. The rendered
+# settings carry `image_prefix = "tpr"` and the same pin, so a missing image or
+# one left at `latest`/the previous pin fails here.
+- name: Check the pinned tpr checkout and its pin record
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ verify_tpr_checkout }}"
+    - "{{ verify_tpr_pin_file }}"
+  register: verify_tpr_checkout_checks
+
+- name: Read the tpr pin record
+  ansible.builtin.slurp:
+    src: "{{ verify_tpr_pin_file }}"
+  register: verify_tpr_pin
+  when: not ansible_check_mode
+
+- name: Read the installed tpr version
+  ansible.builtin.command:
+    argv:
+      - "{{ verify_cli_bin_dir | trim }}/tpr"
+      - --version
+  register: verify_tpr_version_check
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Check every pinned tpr image exists at its tag-qualified reference
+  ansible.builtin.command:
+    argv:
+      - "{{ container_runtime_engine }}"
+      - image
+      - inspect
+      - "{{ item }}"
+  loop: "{{ verify_tpr_image_references }}"
+  register: verify_tpr_image_checks
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert the tpr checkout, pin, version and all three images are the pinned tag
+  ansible.builtin.assert:
+    that:
+      - verify_tpr_checkout_checks.results[0].stat.isdir
+      - verify_tpr_checkout_checks.results[1].stat.isreg
+      - verify_tpr_checkout is search(verify_tpr_version)
+      - verify_tpr_pin.content | b64decode | trim == verify_tpr_version
+      - verify_tpr_version_check.rc == 0
+      - verify_tpr_version_check.stdout | trim == (verify_tpr_version | regex_replace('^v', ''))
+      - verify_tpr_image_checks.results | selectattr('rc', 'equalto', 0) | list | length == verify_tpr_image_references | length
+    fail_msg: >-
+      the pinned tpr install is not the tag `verify` mirrors (spine
+      AD-10/AD-11). Expected the checkout at {{ verify_tpr_checkout }}/ (path
+      naming {{ verify_tpr_version }}), the pin record
+      {{ verify_tpr_pin_file }} containing exactly {{ verify_tpr_version }},
+      `tpr --version` reporting {{ verify_tpr_version | regex_replace('^v', '') }},
+      and ALL THREE images ({{ verify_tpr_image_references | join(', ') }})
+      present — base plus matugen/native at the pin (AD-7: the image tag IS the
+      pin, never `latest`). The invocation-contract generation this consumer
+      expects is {{ verify_tpr_contract_version }} (tpr v0.1.0 prints no
+      contract token). Observed:
+      rc={{ verify_tpr_version_check.rc | default('n/a', true) }},
+      stdout={{ verify_tpr_version_check.stdout | default('', true) | trim }},
+      pin={{ verify_tpr_pin.content | default('', true) | b64decode | trim }},
+      missing_images={{ verify_tpr_image_checks.results | rejectattr('rc', 'equalto', 0) | map(attribute='item') | list }}.
+      A stale local-path install, a pin-file/checkout mismatch, or an image
+      left at another tag means provisioning never re-pinned tpr; re-run the
+      cli-tools playbook
+  when: not ansible_check_mode
+
 # The notifications overlay imports AstalNotifd at startup — a provisioned
 # machine with the app dir deployed but the binding missing would ship a
 # daemon that crashes on launch. Gate on the AUR package the packages role

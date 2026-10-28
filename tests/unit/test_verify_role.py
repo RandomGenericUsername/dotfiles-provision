@@ -1757,7 +1757,7 @@ class TestVerifyVars:
         the TOML section + key name (e.g. [output] directory → output.directory)."""
         data = _vars()
         keys = data["verify_settings_spine_keys"]
-        assert set(keys) == {"csg", "weg", "itr"}
+        assert set(keys) == {"csg", "weg", "itr", "tpr"}
         for name, dotted_keys in keys.items():
             template = (
                 _ANSIBLE_DIR / "roles" / "settings" / "templates" / f"{name}-settings.toml.j2"
@@ -1933,12 +1933,13 @@ class TestVerifyVars:
         )
         assert "ansible_facts.env.XDG_STATE_HOME" not in value
 
-    def test_cli_tools_are_csg_weg_itr_runtime(self) -> None:
+    def test_cli_tools_are_csg_weg_itr_tpr_runtime(self) -> None:
         data = _vars()
         assert [str(c) for c in data["verify_cli_tools"]] == [
             "csg",
             "weg",
             "itr",
+            "tpr",
             "dotfiles-runtime",
         ]
 
@@ -1974,6 +1975,7 @@ class TestVerifyVars:
             ("csg", str(data["verify_csg_version"])),
             ("weg", str(data["verify_weg_version"])),
             ("itr", str(data["verify_itr_version"])),
+            ("tpr", str(data["verify_tpr_version"])),
             ("dotfiles-runtime", str(data["verify_runtime_version"])),
         ], "verify_*_version must equal the role's pins"
         assert str(role_vars["cli_tools_checkout_root"]) == str(
@@ -2205,6 +2207,132 @@ class TestVerifyVars:
         assert str(_vars()["verify_csg_version"]) == str(csg["tag"])
         assert str(settings_vars["settings_csg_image_tag"]) == str(csg["tag"])
         assert str(role_csg["tag"]) == str(csg["tag"])
+
+    def test_tpr_pin_and_all_three_images_are_asserted_by_execution(self) -> None:
+        """REQ-010: tpr's checkout, pin record, package version and all three
+        tag-qualified images (base + matugen/native) must be asserted by
+        execution. tpr v0.1.0 prints no contract token, so the executable
+        handshake is the exact package version; the recorded
+        `verify_tpr_contract_version` is 0.4.0."""
+        data = _vars()
+        assert str(data["verify_tpr_version"]) == "v0.1.0"
+        assert str(data["verify_tpr_checkout"]) == (
+            "{{ verify_cli_tools_checkout_root }}/theme-producer/"
+            "{{ verify_tpr_version }}"
+        )
+        assert str(data["verify_tpr_pin_file"]) == (
+            "{{ verify_cli_tools_checkout_root }}/theme-producer/pinned"
+        )
+        assert str(data["verify_tpr_contract_version"]) == "0.4.0", (
+            "tpr is validated against the v0.4.0 invocation contract"
+        )
+        assert str(data["verify_tpr_image_prefix"]) == "tpr"
+        references = [str(r) for r in data["verify_tpr_image_references"]]
+        assert len(references) == 3, (
+            "tpr builds base + one image per shipped engine (matugen, native)"
+        )
+        for suffix in ("base", "matugen", "native"):
+            assert any(
+                f"verify_tpr_image_prefix }}}}-{suffix}-" in ref for ref in references
+            ), f"missing the {suffix} image reference"
+        for ref in references:
+            assert "container_runtime_engine" in ref, (
+                "every reference must use the DECLARED engine the build used"
+            )
+            assert "verify_tpr_version" in ref and "latest" not in ref, (
+                "every reference must be the pin, never `latest` (AD-7)"
+            )
+
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+
+        stat_name = "Check the pinned tpr checkout and its pin record"
+        assert stat_name in names, f"missing task {stat_name!r}"
+        stat_task = tasks[names.index(stat_name)]
+        assert _module_key(stat_task) == "ansible.builtin.stat"
+        loop = str(stat_task.get("loop"))
+        assert "verify_tpr_checkout" in loop and "verify_tpr_pin_file" in loop
+
+        version_name = "Read the installed tpr version"
+        assert version_name in names, f"missing task {version_name!r}"
+        version_task = tasks[names.index(version_name)]
+        argv = _module(version_task).get("argv")
+        assert isinstance(argv, list)
+        assert argv[0].endswith("/tpr") and argv[1] == "--version"
+
+        image_name = "Check every pinned tpr image exists at its tag-qualified reference"
+        assert image_name in names, f"missing task {image_name!r}"
+        image_task = tasks[names.index(image_name)]
+        assert _module_key(image_task) == "ansible.builtin.command"
+        image_argv = _module(image_task).get("argv")
+        assert isinstance(image_argv, list)
+        assert image_argv[0] == "{{ container_runtime_engine }}"
+        assert image_argv[1:3] == ["image", "inspect"]
+        assert image_argv[3] == "{{ item }}"
+        assert str(image_task.get("loop")) == "{{ verify_tpr_image_references }}"
+        assert image_task.get("changed_when") is False
+        assert image_task.get("failed_when") is False
+        assert image_task.get("when") == "not ansible_check_mode"
+
+        assert_name = (
+            "Assert the tpr checkout, pin, version and all three images are the pinned tag"
+        )
+        assert assert_name in names, f"missing task {assert_name!r}"
+        assert_task = tasks[names.index(assert_name)]
+        assert _module_key(assert_task) == "ansible.builtin.assert"
+        that = str(_module(assert_task).get("that"))
+        assert "verify_tpr_checkout_checks.results[0].stat.isdir" in that
+        assert "verify_tpr_checkout_checks.results[1].stat.isreg" in that
+        assert "verify_tpr_checkout is search(verify_tpr_version)" in that
+        assert "b64decode | trim == verify_tpr_version" in that
+        assert "verify_tpr_version_check.stdout | trim ==" in that
+        assert "verify_tpr_image_checks.results" in that
+        assert assert_task.get("when") == "not ansible_check_mode"
+        assert names.index(stat_name) < names.index(assert_name)
+        assert names.index(image_name) < names.index(assert_name)
+
+    def test_tpr_settings_and_templates_are_verified(self) -> None:
+        """REQ-010: the rendered tpr settings file and the deployed template
+        catalog are named by verify (settings parse + non-empty derivation
+        input), so a missing render/deploy cannot pass the gate."""
+        data = _vars()
+        assert {str(f["name"]) for f in data["verify_settings_files"]} == {
+            "csg",
+            "weg",
+            "itr",
+            "tpr",
+        }
+        tpr_file = next(
+            f for f in data["verify_settings_files"] if str(f["name"]) == "tpr"
+        )
+        assert str(tpr_file["dest"]) == (
+            "{{ install_dir | trim }}/config/theme-producer/settings.toml"
+        )
+        assert "config/theme-producer/templates" in [
+            str(d) for d in data["verify_derivation_template_dirs"]
+        ], "the tpr catalog must be asserted NON-EMPTY (a derivation input)"
+        assert "config/theme-producer/templates" in [
+            str(d) for d in data["verify_asset_dirs"]
+        ]
+        assert "theme-producer" in [str(d) for d in data["verify_managed_link_dirs"]]
+
+    def test_tpr_image_tag_mirrors_the_manifest_and_settings_render(self) -> None:
+        """One pin source (the manifest) and the settings/cli_tools/verify
+        mirrors must agree, or a bump could build one tag and render another."""
+        manifest = yaml.safe_load(
+            (_REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
+        )
+        tpr = next(e for e in manifest["entries"] if e.get("name") == "tpr")
+        settings_vars = yaml.safe_load(
+            (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
+        )
+        role_vars = yaml.safe_load(
+            (_ROLES_DIR.parent / "cli_tools" / "vars" / "main.yml").read_text()
+        )
+        role_tpr = next(e for e in role_vars["cli_tools"] if e.get("name") == "tpr")
+        assert str(_vars()["verify_tpr_version"]) == str(tpr["tag"])
+        assert str(settings_vars["settings_tpr_image_tag"]) == str(tpr["tag"])
+        assert str(role_tpr["tag"]) == str(tpr["tag"])
 
     def test_notifd_binding_packages_pin_libastal_notifd(self) -> None:
         """Implementation gate (capture-notifications): verify pins the
@@ -2438,6 +2566,9 @@ class TestVerifyVars:
             "verify_btop_theme_paths",
             "verify_cli_bin_dir",
             "verify_cli_tools_checkout_root",
+            "verify_tpr_version",
+            "verify_tpr_checkout",
+            "verify_tpr_image_references",
             "verify_itr_checkout",
             "verify_itr_pin_file",
             "verify_bin_scripts",
@@ -3777,7 +3908,7 @@ def _write_stub_binaries(home: Path) -> Path:
     machine: report `NetworkManager` as active."""
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston"):
+    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston"):
         stub = bin_dir / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
@@ -3808,6 +3939,15 @@ def _write_stub_binaries(home: Path) -> Path:
             "exit 0\n"
         )
         stub.chmod(0o755)
+    # tpr v0.1.0's `--version` prints ONLY the package version (no contract
+    # token); verify asserts it equals the tag minus `v`.
+    tpr_stub = bin_dir / "tpr"
+    tpr_stub.write_text(
+        "#!/bin/sh\n"
+        f'if [ "$1" = "--version" ]; then echo "{verify_vars["verify_tpr_version"][1:]}"; exit 0; fi\n'
+        "exit 0\n"
+    )
+    tpr_stub.chmod(0o755)
     # The runtime has no `--version` flag and no contract token: `version`
     # prints the package version, and verify asserts it equals the tag minus `v`.
     runtime_stub = bin_dir / "dotfiles-runtime"
@@ -3993,6 +4133,8 @@ def _build_provisioned_layout(
         "config/kitty",
         "config/weg",
         "config/itr",
+        "config/theme-producer",
+        "config/theme-producer/templates",
         "config/gtk-3.0",
         "config/gtk-4.0",
         "config/rofi",
@@ -4010,6 +4152,7 @@ def _build_provisioned_layout(
     (cache_home / "dotfiles" / "weg-tmp").mkdir(parents=True, exist_ok=True)
     (cache_home / "dotfiles" / "csg-output").mkdir(parents=True, exist_ok=True)
     (cache_home / "dotfiles" / "itr-output").mkdir(parents=True, exist_ok=True)
+    (cache_home / "dotfiles" / "tpr-output").mkdir(parents=True, exist_ok=True)
 
     (install / "wallpapers" / "default.png").write_bytes(b"\x89PNG")
     (install / "icon-mappings" / "icons.yaml").write_text("variants: []\n")
@@ -4053,6 +4196,7 @@ def _build_provisioned_layout(
         ("csg", "verify_csg_version"),
         ("weg", "verify_weg_version"),
         ("itr", "verify_itr_version"),
+        ("theme-producer", "verify_tpr_version"),
         ("dotfiles-runtime", "verify_runtime_version"),
     ):
         cli_version = str(verify_vars[version_key])
@@ -4110,6 +4254,7 @@ def _build_provisioned_layout(
         "colors.kitty.j2",
     ):
         (install / "config" / "color-scheme-generator" / "templates" / _tpl).write_text("x\n")
+    (install / "config" / "theme-producer" / "templates" / "colors.yaml.j2").write_text("x\n")
 
     (install / "config" / "color-scheme-generator" / "settings.toml").write_text(
         f'[output]\ndirectory = "{cache_home}/dotfiles/csg-output"\n'
@@ -4124,6 +4269,9 @@ def _build_provisioned_layout(
         f'[output]\noutput_dir = "{cache_home}/dotfiles/itr-output"\n'
         f'[templates]\ndir = "{install}/icon-templates"\n'
         f'[color_scheme]\npath = "{state_home}/dotfiles/current/colors.yaml"\n'
+    )
+    (install / "config" / "theme-producer" / "settings.toml").write_text(
+        f'[output]\ndirectory = "{cache_home}/dotfiles/tpr-output"\n'
     )
 
     # Runtime-seeded palette + icons (what `wallpaper set` produces): the
@@ -4336,6 +4484,7 @@ def _build_provisioned_layout(
         "color-scheme-generator",
         "weg",
         "itr",
+        "theme-producer",
         "gtk-3.0",
         "gtk-4.0",
         "rofi",

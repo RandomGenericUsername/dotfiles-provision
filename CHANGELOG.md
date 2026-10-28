@@ -10,6 +10,7 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ### Added
 
+<<<<<<< HEAD
 - **Seven-app all-standalone fixture and execution proof (REQ-008):**
   `tests/fixtures/ags-apps/app-list/all-standalone.apps.yaml` models the final
   composition exactly — `bar`, `notifications`, `capture`, `clipboard`,
@@ -68,6 +69,41 @@ Notable changes to the `dotfiles-provision` repo. Format follows
   cutover.
 - `make gates`, `make ci-gates-parity` and `make build` are green; the release
   tag is local-only.
+=======
+- **`tpr` (theme-producer v0.1.0) as the opt-in palette producer (REQ-010):**
+  the `cli_tools` role pins `theme-producer` (`v0.1.0`) alongside csg/weg/itr,
+  installs the `tpr` console script, and builds its three images
+  (`tpr-base`, `tpr-matugen`, `tpr-native`) at the pin. The env-tag build loop
+  is now per-tool (`cli_tools_image_tag_env_keys`): csg keeps
+  `COLORSCHEME__CONTAINER__IMAGE_TAG`, tpr gets
+  `THEME__CONTAINER__IMAGE_TAG`, and the value is always `{{ item.tag }}`.
+- **`tpr-settings.toml.j2`:** renders the native engine, container runtime,
+  `tpr` image prefix, the pin (default `v0.1.0`), a 300 s timeout and a 512 MiB
+  limit, with output under the XDG cache and `apply_to_terminal = false` (the
+  runtime applies sequences). `theme-producer` joins the settings config dirs
+  and the managed XDG config links, so `~/.config/theme-producer` points at the
+  spine the runtime discovers.
+- **Pinned tpr template catalog:** the `assets` role copies
+  `<install>/cli-tools/theme-producer/<tag>/src/theme_producer/defaults/templates`
+  to `config/theme-producer/templates` (the path `TprAdapter` reads) and fails
+  loud when the pinned checkout is missing.
+- **Verify coverage for tpr:** version `v0.1.0`, checkout + pin, the three
+  engine-qualified images, the console script, the rendered settings file, the
+  non-empty template catalog, and the recorded invocation contract `0.4.0`
+  (tpr v0.1.0's `--version` prints only the package version).
+- **Runtime palette-producer switch:** `runtime_palette_producer` (default
+  `csg`) is written to `~/.config/environment.d/10-dotfiles-runtime.conf` and
+  the daemon unit's `Environment=` line, so the AGS wallpaper selector and the
+  daemon see the same value. Activating tpr is one var change
+  (`-e runtime_palette_producer=tpr` or `RUNTIME_PALETTE_PRODUCER=tpr`); the
+  default stays csg.
+
+### Changed
+
+- **Fixture composition mirrors the tpr pin:** `cli-tools.yaml`, `assets.yaml`
+  (new `tpr-template` `AssetKind`) and `filesystem.yaml` carry the new entry
+  and spine dirs; the csg/weg/itr settings remain byte-identical.
+>>>>>>> ticket/REQ-010-tpr-producer-support
 
 ## [0.1.20] - 2026-10-27
 

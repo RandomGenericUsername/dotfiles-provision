@@ -53,6 +53,24 @@ dotfiles-provision \
 `plan` is Ansible `--check` (no machine changes). `verify` is a real, non-mutating assertion run
 against the deployed spine. `apply`/`bootstrap` change the machine.
 
+## Palette producer switch (REQ-010)
+
+The runtime composes either the existing `csg` producer (default) or the opt-in
+`theme-producer` (`tpr`) producer. `tpr` is pinned and verified either way; activation is
+**one variable change**, never a separate provisioning path:
+
+```bash
+# csg is the shipped default; choose tpr for both the session CLI and the daemon:
+dotfiles-provision apply -e runtime_palette_producer=tpr
+# or export RUNTIME_PALETTE_PRODUCER=tpr for the run
+```
+
+The `runtime_daemon` role writes the value to
+`~/.config/environment.d/10-dotfiles-runtime.conf` (the systemd user session environment the
+AGS wallpaper selector inherits) and to the daemon unit's
+`Environment="RUNTIME__PALETTE__PRODUCER=…"` line. The two cannot diverge because both render
+from `runtime_palette_producer` (shipped default `csg`; `csg|tpr` is asserted).
+
 ## Install from a checkout (development)
 
 ```bash

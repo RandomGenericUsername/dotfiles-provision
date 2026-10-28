@@ -286,13 +286,14 @@
   loop: "{{ assets_copies }}"
   when: not ansible_check_mode
 
-# csg-templates reads the PINNED csg checkout (spine AD-10), which the
-# cli_tools role materializes at <install>/cli-tools/csg/<tag>/ (bootstrap
-# order: cli-tools.yaml before assets.yaml). The source is already absolute, so
-# this loop is the same mirror WITHOUT the repo-root prefix. The stat/assert
-# pair above makes a missing or mis-pinned checkout a named failure here rather
-# than a silently empty deploy (synchronize against a missing src copies
-# nothing and would leave the previous catalog in place).
+# csg-templates and tpr-templates read PINNED CLI checkouts (spine AD-10),
+# which the cli_tools role materializes at
+# <install>/cli-tools/<name>/<tag>/ (bootstrap order: cli-tools.yaml before
+# assets.yaml). Their sources are already absolute, so this loop is the same
+# mirror WITHOUT the repo-root prefix. The stat/assert pairs above make a
+# missing or mis-pinned checkout a named failure here rather than a silently
+# empty deploy (synchronize against a missing src copies nothing and would
+# leave the previous catalog in place).
 - name: Check the pinned csg checkout template catalog exists
   ansible.builtin.stat:
     path: "{{ assets_csg_templates_source }}"
@@ -309,6 +310,28 @@
       cloned csg at {{ assets_csg_pinned_tag }} first (bootstrap order:
       cli-tools.yaml before assets.yaml). A missing checkout means the csg pin
       was never fetched; re-run the cli-tools playbook
+  when: not ansible_check_mode
+
+# REQ-010: the tpr catalog has the identical pinned-checkout contract. The
+# runtime's TprAdapter reads `config/theme-producer/templates` from the spine,
+# so a missing catalog would make the tpr producer fail on the first wallpaper
+# set — assert it before the mirror so the error names the checkout.
+- name: Check the pinned tpr checkout template catalog exists
+  ansible.builtin.stat:
+    path: "{{ assets_tpr_templates_source }}"
+  register: assets_tpr_templates_dir
+  when: not ansible_check_mode
+
+- name: Assert the pinned tpr checkout template catalog is deployed
+  ansible.builtin.assert:
+    that: assets_tpr_templates_dir.stat.isdir | default(false)
+    fail_msg: >-
+      the pinned tpr template catalog is missing at
+      {{ assets_tpr_templates_source }} — the assets role copies it FROM the
+      cli_tools checkout (spine AD-10), so the cli-tools playbook must have
+      cloned theme-producer at {{ assets_tpr_pinned_tag }} first (bootstrap
+      order: cli-tools.yaml before assets.yaml). A missing checkout means the
+      tpr pin was never fetched; re-run the cli-tools playbook
   when: not ansible_check_mode
 
 - name: Deploy directory asset kinds that live in a pinned checkout (mirror, prune)

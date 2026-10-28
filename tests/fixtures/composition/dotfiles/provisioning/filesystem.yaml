@@ -38,6 +38,8 @@ entries:
   - name: config/kitty
   - name: config/weg
   - name: config/itr
+  - name: config/theme-producer
+  - name: config/theme-producer/templates
   # GTK consumer dirs (gt-3-1): spine parents for the gtk-3.0/gtk-4.0
   # config-links targets. At first runtime seed they host the runtime's
   # colors.css pointers (runtime seeder creates the pointers, never us).

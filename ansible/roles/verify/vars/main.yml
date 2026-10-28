@@ -148,6 +148,8 @@ verify_install_spine_dirs:
   - config/kitty
   - config/weg
   - config/itr
+  - config/theme-producer
+  - config/theme-producer/templates
   - config/gtk-3.0
   - config/gtk-4.0
   # btop is deliberately NOT listed here: this list is parity-EXACT with
@@ -234,6 +236,7 @@ verify_install_spine_files:
 verify_derivation_template_dirs:
   - icon-templates
   - config/color-scheme-generator/templates
+  - config/theme-producer/templates
 
 # verify_csg_template_files: the CSG color-format templates the runtime's
 #   csg_adapter requests by name (adapters/csg_adapter.py `--format` args).
@@ -313,6 +316,7 @@ verify_cli_tools:
   - csg
   - weg
   - itr
+  - tpr
   - dotfiles-runtime
 
 # verify_cli_tools_checkout_root / verify_itr_*: the pinned external CLI
@@ -376,6 +380,31 @@ verify_csg_image_references:
   - "{{ verify_csg_image_prefix }}-custom-{{ container_runtime_engine }}:{{ verify_csg_version }}"
   - "{{ verify_csg_image_prefix }}-pywal-{{ container_runtime_engine }}:{{ verify_csg_version }}"
   - "{{ verify_csg_image_prefix }}-wallust-{{ container_runtime_engine }}:{{ verify_csg_version }}"
+
+# verify_tpr_*: REQ-010, the opt-in palette producer. Same legs as csg —
+#   checkout, pin record, console handshake and THREE images (base + one per
+#   shipped engine: matugen, native), each engine-qualified at the pin via
+#   oci_runtime.naming.engine_qualified_image:
+#   `<prefix>-<suffix>-<engine>:<tag>`.
+#   The build takes the tag from THEME__CONTAINER__IMAGE_TAG (tpr's verb has no
+#   --image-tag), and the rendered settings carry image_prefix "tpr" + the same
+#   pin, so a `latest`-only or previous-pin image fails here.
+#
+#   CONTRACT TOKEN: tpr v0.1.0's `--version` prints only the package version;
+#   unlike csg/weg/itr it has no `contract <x>` token, so there is nothing
+#   dynamic to grep. `verify_tpr_contract_version` records the invocation
+#   contract generation this consumer expects (contracts v0.4.0) and is locked
+#   by `TestVerifyTprPinAndImages`; the executable assertions below are the
+#   version + images.
+verify_tpr_version: v0.1.0
+verify_tpr_checkout: "{{ verify_cli_tools_checkout_root }}/theme-producer/{{ verify_tpr_version }}"
+verify_tpr_pin_file: "{{ verify_cli_tools_checkout_root }}/theme-producer/pinned"
+verify_tpr_contract_version: 0.4.0
+verify_tpr_image_prefix: tpr
+verify_tpr_image_references:
+  - "{{ verify_tpr_image_prefix }}-base-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
+  - "{{ verify_tpr_image_prefix }}-matugen-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
+  - "{{ verify_tpr_image_prefix }}-native-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
 
 # verify_notifd_binding_packages: the AUR packages backing the AstalNotifd
 #   binding the notifications overlay imports (capture-notifications
@@ -525,7 +554,7 @@ verify_cli_bin_dir: >-
 #   not pass verify while claiming composition pin B.
 verify_expected_engine_tag: "{{ expected_engine_tag | default('', true) }}"
 
-# verify_settings_files: the three rendered settings DEST paths (criterion 5
+# verify_settings_files: the rendered settings DEST paths (criterion 5
 #   part 1). config-in-spine (2026-08-16): the files are rendered into the
 #   spine at <install>/config/<tool>/settings.toml; verify checks the SPINE
 #   paths (authoritative), and the parse gates (below) read them THROUGH the
@@ -535,6 +564,7 @@ verify_settings_files:
   - { name: csg, dest: "{{ install_dir | trim }}/config/color-scheme-generator/settings.toml" }
   - { name: weg, dest: "{{ install_dir | trim }}/config/weg/settings.toml" }
   - { name: itr, dest: "{{ install_dir | trim }}/config/itr/settings.toml" }
+  - { name: tpr, dest: "{{ install_dir | trim }}/config/theme-producer/settings.toml" }
 
 # verify_settings_spine_keys: the TOML keys inside each rendered settings file
 #   whose values ARE the spine paths the tool writes through (criterion 5 part
@@ -554,6 +584,8 @@ verify_settings_spine_keys:
     - output.output_dir
     - templates.dir
     - color_scheme.path
+  tpr:
+    - output.directory
 
 # verify_asset_dirs / verify_asset_files: the five deployed asset outcomes
 #   (criterion 4), split by inode type so the assert can check isdir/isreg
@@ -575,6 +607,7 @@ verify_asset_dirs:
   - icon-templates/media-transport-panel
   - icon-mappings
   - config/color-scheme-generator/templates
+  - config/theme-producer/templates
 verify_asset_files:
   - wallpapers/default.png
   - config/weg/effects.yaml
@@ -764,6 +797,7 @@ verify_managed_link_dirs:
   - color-scheme-generator
   - weg
   - itr
+  - theme-producer
   - gtk-3.0
   - gtk-4.0
   - rofi

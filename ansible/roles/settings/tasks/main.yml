@@ -1,5 +1,5 @@
 # Settings role tasks (Story 2.11, config-in-spine 2026-08-16) — renders the
-# three per-tool settings.toml files (CSG/WEG/ITR) from role-authored Jinja
+# per-tool settings.toml files (CSG/WEG/ITR/TPR) from role-authored Jinja
 # templates into the config-in-spine home <install>/config/ (FR-21,
 # chaining-spine.md), baking the absolute install-spine paths from the
 # install_dir seam extra-var (AC 5, NFR-6). The config-links role symlinks each
@@ -21,9 +21,9 @@
 #   and non-absolute values (regex ^/). The sibling roles keep the verbatim
 #   form; align them if a chain-wide hardening pass is ever run.
 # - The template module does NOT create dest parents (2.6/2.9 verified fact), so
-#   the per-tool config subdirs (color-scheme-generator/weg/itr) are ensured
-#   first under <install>/config/. Ungated — `file state: directory` is
-#   natively check-safe.
+#   the per-tool config subdirs (color-scheme-generator/weg/itr/theme-producer)
+#   are ensured first under <install>/config/. Ungated — `file state:
+#   directory` is natively check-safe.
 # - The render loop uses ansible.builtin.template with `src: "{{ item.template }}"`
 #   (resolved relative to roles/settings/templates/) and `dest: "{{ item.dest }}"`
 #   (from settings_files). Default `force: true` = content-compare idempotent

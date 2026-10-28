@@ -74,6 +74,7 @@ _EXPECTED_TEMPLATES = {
     "csg": "csg-settings.toml.j2",
     "weg": "weg-settings.toml.j2",
     "itr": "itr-settings.toml.j2",
+    "tpr": "tpr-settings.toml.j2",
 }
 
 # Trim lock (review finding 2026-08-12): detect hardcoded absolute paths even
@@ -188,6 +189,7 @@ class TestSettingsRoleTree:
         "templates/csg-settings.toml.j2",
         "templates/weg-settings.toml.j2",
         "templates/itr-settings.toml.j2",
+        "templates/tpr-settings.toml.j2",
     )
 
     def test_role_tree_exists(self) -> None:
@@ -221,7 +223,7 @@ class TestSettingsTasks:
 
     def test_config_dirs_ensured_via_file_directory_ungated(self) -> None:
         """Direct-run self-containment: a `file` `state: directory` task
-        re-ensures the three per-tool config dirs (template does NOT create
+        re-ensures the per-tool config dirs (template does NOT create
         dest parents; the filesystem role did not create the tool subdirs).
         Natively check-safe — must NOT be --check-gated."""
         task = _dir_ensure_task()
@@ -352,6 +354,7 @@ class TestSettingsVars:
         "settings_spine_config_dir",
         "settings_config_dirs",
         "settings_cache_dirs",
+        "settings_tpr_image_tag",
         "settings_files",
     }
 
@@ -380,17 +383,17 @@ class TestSettingsVars:
             "role-internal content (no repo-file sources)"
         )
 
-    def test_settings_files_are_exactly_three(self) -> None:
-        """AC 1: settings_files has exactly the three {name, template, dest}
-        entries (csg/weg/itr) with matching template filenames."""
+    def test_settings_files_are_exactly_four(self) -> None:
+        """AC 1: settings_files has exactly the four {name, template, dest}
+        entries (csg/weg/itr/tpr) with matching template filenames."""
         data = _vars()
         files = list(data["settings_files"])
-        assert len(files) == 3, (
-            f"settings_files must have exactly 3 entries (csg/weg/itr); found {len(files)}"
+        assert len(files) == 4, (
+            f"settings_files must have exactly 4 entries (csg/weg/itr/tpr); found {len(files)}"
         )
         names = {str(f["name"]) for f in files}
-        assert names == {"csg", "weg", "itr"}, (
-            f"settings_files names must be {{csg, weg, itr}}; found {names}"
+        assert names == {"csg", "weg", "itr", "tpr"}, (
+            f"settings_files names must be {{csg, weg, itr, tpr}}; found {names}"
         )
         for file_ in files:
             template = str(file_["template"])
@@ -470,7 +473,7 @@ class TestSettingsTemplates:
         cli_tools build) — neither container-mode template may hardcode
         `engine = "podman"`, and neither may carry a default() fallback (an
         undefined value must fail loud)."""
-        for name in ("csg", "weg"):
+        for name in ("csg", "weg", "tpr"):
             text = (_TEMPLATES_DIR / _EXPECTED_TEMPLATES[name]).read_text()
             assert 'engine = "podman"' not in text, (
                 f"{name} template must not hardcode the podman engine — that "
@@ -526,6 +529,25 @@ class TestSettingsTemplates:
             "WEG template must not reference a generated/ spine path "
             "(Epic 4 removed the tree)"
         )
+
+    def test_tpr_renders_native_container_contract(self) -> None:
+        """REQ-010: the opt-in producer renders the native engine, container
+        runtime, XDG-cache output, the tpr image prefix and the pin. The
+        terminal apply stays false (the runtime applies sequences itself)."""
+        text = (_TEMPLATES_DIR / "tpr-settings.toml.j2").read_text()
+        assert 'directory = "{{ settings_xdg_cache_home | trim }}/dotfiles/tpr-output"' in text
+        assert "default_formats = []" in text
+        assert "overwrite = false" in text
+        assert "apply_to_terminal = false" in text, (
+            "tpr must not also write to the live terminal: the runtime applies "
+            "the generated sequences"
+        )
+        assert "[generation]" in text and 'engine = "native"' in text
+        assert "[runtime]" in text and 'mode = "container"' in text
+        assert 'image_prefix = "tpr"' in text
+        assert 'image_tag = "{{ settings_tpr_image_tag }}"' in text
+        assert "timeout_seconds = 300" in text
+        assert 'memory_limit = "512m"' in text
 
     def test_itr_renders_spine_contract_uncommented(self) -> None:
         """Epic 4: ITR [output] output_dir → XDG cache default (manual runs
@@ -595,7 +617,7 @@ class TestSettingsPlaybook:
 
     def test_playbook_executes_and_renders_settings(self) -> None:
         """Regression guard (review finding 2026-08-12 discipline): the role
-        must ACTUALLY render the three settings files — structural tests alone
+        must ACTUALLY render every settings file — structural tests alone
         could not catch a silent no-op. Run the real playbook against a temp
         HOME + XDG_CONFIG_HOME + install_dir, assert each settings.toml exists
         under the config-in-spine home <install>/config/, parses as valid TOML,
@@ -687,6 +709,19 @@ class TestSettingsPlaybook:
             assert str(itr["color_scheme"]["path"]) == str(
                 state_home / "dotfiles" / "current" / "colors.yaml"
             )
+            tpr = tomllib.loads(_expected_files(install)["tpr"].read_text())
+            assert str(tpr["output"]["directory"]) == str(
+                cache_home / "dotfiles" / "tpr-output"
+            )
+            assert tpr["output"]["default_formats"] == []
+            assert tpr["output"]["overwrite"] is False
+            assert tpr["output"]["apply_to_terminal"] is False
+            assert tpr["generation"]["engine"] == "native"
+            assert tpr["runtime"]["mode"] == "container"
+            assert tpr["container"]["image_prefix"] == "tpr"
+            assert tpr["container"]["image_tag"] == _vars()["settings_tpr_image_tag"]
+            assert tpr["container"]["timeout_seconds"] == 300
+            assert tpr["container"]["memory_limit"] == "512m"
 
             for name, path in _expected_files(install).items():
                 text = path.read_text()
@@ -756,18 +791,18 @@ class TestSettingsPlaybook:
         with tempfile.TemporaryDirectory() as tmp:
             default, default_install = run("default")
             assert default.returncode == 0, default.stdout + default.stderr
-            assert engine_of(default_install, "csg") == "podman"
-            assert engine_of(default_install, "weg") == "podman"
+            for tool in ("csg", "weg", "tpr"):
+                assert engine_of(default_install, tool) == "podman"
 
             extra, extra_install = run("extra", extra=("-e", "container_runtime_engine=docker"))
             assert extra.returncode == 0, extra.stdout + extra.stderr
-            assert engine_of(extra_install, "csg") == "docker"
-            assert engine_of(extra_install, "weg") == "docker"
+            for tool in ("csg", "weg", "tpr"):
+                assert engine_of(extra_install, tool) == "docker"
 
             env_run, env_install = run("env", env_engine="docker")
             assert env_run.returncode == 0, env_run.stdout + env_run.stderr
-            assert engine_of(env_install, "csg") == "docker"
-            assert engine_of(env_install, "weg") == "docker"
+            for tool in ("csg", "weg", "tpr"):
+                assert engine_of(env_install, tool) == "docker"
 
             bogus, _ = run("bogus", extra=("-e", "container_runtime_engine=bogus"))
             assert bogus.returncode != 0, (
@@ -903,6 +938,7 @@ def _expected_files(install: Path) -> dict[str, Path]:
         "csg": install / "config" / "color-scheme-generator" / "settings.toml",
         "weg": install / "config" / "weg" / "settings.toml",
         "itr": install / "config" / "itr" / "settings.toml",
+        "tpr": install / "config" / "theme-producer" / "settings.toml",
     }
 
 
@@ -1101,6 +1137,95 @@ class TestSettingsCsgImageTag:
                 rendered = tomllib.loads(_expected_files(install)["csg"].read_text())
                 assert rendered["container"]["image_tag"] == tag, (
                     "the rendered CSG image_tag must equal the pin passed to the "
+                    f"settings role; expected {tag!r}"
+                )
+                assert rendered["container"]["image_tag"] != "latest"
+
+
+class TestSettingsTprImageTag:
+    """REQ-010: the rendered TPR `[container] image_tag` is the PIN, never
+    `latest`. Same single-source discipline as CSG/WEG — the manifest `tpr.tag`
+    is authoritative, and `settings_tpr_image_tag` / `verify_tpr_version` are
+    the AD-11 mirrors. The cli_tools role builds tpr's images at this tag by
+    passing `THEME__CONTAINER__IMAGE_TAG`.
+    """
+
+    _PLAYBOOK = _ANSIBLE_DIR / "playbooks" / "settings.yaml"
+    _MANIFEST = manifests_dir() / "cli-tools.yaml"
+
+    @staticmethod
+    def _manifest_tpr_tag() -> str:
+        manifest = yaml.safe_load(TestSettingsTprImageTag._MANIFEST.read_text())
+        entry = next(e for e in manifest["entries"] if e.get("name") == "tpr")
+        return str(entry["tag"])
+
+    def test_image_tag_mirrors_the_manifest_pin(self) -> None:
+        data = _vars()
+        assert data["settings_tpr_image_tag"] == self._manifest_tpr_tag(), (
+            "settings_tpr_image_tag must mirror the `tpr` tag in "
+            "dotfiles/provisioning/cli-tools.yaml (AD-7/AD-10/AD-11)"
+        )
+        template = (_TEMPLATES_DIR / "tpr-settings.toml.j2").read_text()
+        assert 'image_tag = "{{ settings_tpr_image_tag }}"' in template, (
+            "the TPR template must render the pin, not a literal"
+        )
+        assert 'image_tag = "latest"' not in template, (
+            "the TPR template must never hardcode `latest` (AD-7)"
+        )
+
+    def test_image_tag_verify_literal_mirrors_the_pin(self) -> None:
+        verify_vars = yaml.safe_load(
+            (_ANSIBLE_DIR / "roles" / "verify" / "vars" / "main.yml").read_text()
+        )
+        assert verify_vars["verify_tpr_version"] == _vars()["settings_tpr_image_tag"], (
+            "verify_tpr_version must mirror the rendered image tag — verify "
+            "asserts tpr's base + engine images exist at exactly that tag (AD-11)"
+        )
+        references = " ".join(str(r) for r in verify_vars["verify_tpr_image_references"])
+        assert "verify_tpr_version" in references, (
+            "every tpr image reference verify probes must be derived from the pin"
+        )
+        assert "latest" not in references, "no tpr image reference may be `latest`"
+
+    def test_image_tag_renders_the_pin_and_follows_a_bump(self) -> None:
+        """Two renders with different pins: the rendered value equals the pin
+        each time, so a pin bump changes the tag end-to-end."""
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping render test")
+        for tag in ("v0.1.0", "v0.2.0"):
+            with tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp) / "home"
+                xdg = Path(tmp) / "xdg"
+                install = Path(tmp) / "install"
+                home.mkdir()
+                xdg.mkdir()
+                install.mkdir()
+                env = _test_env(
+                    HOME=str(home),
+                    XDG_CONFIG_HOME=str(xdg),
+                    XDG_STATE_HOME=str(Path(tmp) / "state-home"),
+                    XDG_CACHE_HOME=str(Path(tmp) / "cache-home"),
+                    ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
+                )
+                result = subprocess.run(
+                    [
+                        ansible_playbook,
+                        str(self._PLAYBOOK),
+                        "-e",
+                        f"install_dir={install}",
+                        "-e",
+                        f"settings_tpr_image_tag={tag}",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    timeout=120,
+                )
+                assert result.returncode == 0, result.stdout + result.stderr
+                rendered = tomllib.loads(_expected_files(install)["tpr"].read_text())
+                assert rendered["container"]["image_tag"] == tag, (
+                    "the rendered TPR image_tag must equal the pin passed to the "
                     f"settings role; expected {tag!r}"
                 )
                 assert rendered["container"]["image_tag"] != "latest"

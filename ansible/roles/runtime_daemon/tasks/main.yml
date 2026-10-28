@@ -12,11 +12,37 @@
 # graphical-session.target.wants/ directly (what `enable` would create), so
 # the next graphical login starts the daemon. Both paths are check-safe.
 
+# REQ-010: the palette-producer switch is pure variable state; a typo must
+# fail before either consumer is written. UNGATED so --check also validates.
+- name: Assert the palette producer is csg or tpr
+  ansible.builtin.assert:
+    that:
+      - runtime_palette_producer in ["csg", "tpr"]
+    fail_msg: >-
+      runtime_palette_producer is '{{ runtime_palette_producer }}' — the
+      runtime accepts only 'csg' (default) or 'tpr'. Override it with
+      -e runtime_palette_producer=tpr or export RUNTIME_PALETTE_PRODUCER=tpr.
+
 - name: Ensure the user systemd unit directory exists
   ansible.builtin.file:
     path: "{{ ansible_facts.env.HOME }}/.config/systemd/user"
     state: directory
     mode: "0755"
+
+# The session-wide half of the switch: systemd --user imports environment.d at
+# login, so this is what the AGS wallpaper selector (and every other session
+# child) sees. The daemon unit repeats the same value as Environment= below.
+- name: Ensure the user environment.d directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_facts.env.HOME }}/.config/environment.d"
+    state: directory
+    mode: "0755"
+
+- name: Write the palette-producer switch into the session environment
+  ansible.builtin.copy:
+    content: "RUNTIME__PALETTE__PRODUCER={{ runtime_palette_producer }}\n"
+    dest: "{{ runtime_daemon_environment_d_file }}"
+    mode: "0644"
 
 - name: Install the daemon unit file
   ansible.builtin.template:

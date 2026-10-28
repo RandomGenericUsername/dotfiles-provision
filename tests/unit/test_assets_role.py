@@ -123,6 +123,7 @@ def _manifest_entries() -> list[dict[str, str]]:
 # these relocations on top of the domain mapping.
 _CONFIG_IN_SPINE_RELOCATIONS = {
     AssetKind.CSG_TEMPLATE.spine_segment(): "config/color-scheme-generator/templates",
+    AssetKind.TPR_TEMPLATE.spine_segment(): "config/theme-producer/templates",
     AssetKind.WEG_EFFECTS.spine_segment(): "config/weg",
 }
 
@@ -588,7 +589,11 @@ class TestAssetsVars:
         "assets_deploy_dirs",
         "assets_wallpapers_tarball",
         "assets_wallpapers_dest",
+        "assets_csg_templates_source",
+        "assets_tpr_pinned_tag",
+        "assets_tpr_templates_source",
         "assets_copies",
+        "assets_checkout_copies",
         "assets_weg_effects_target",
     }
 
@@ -709,10 +714,15 @@ class TestAssetsVars:
                 str(data["assets_csg_templates_source"]).rstrip("/"),
             )
             text = text.replace(
+                "{{ assets_tpr_templates_source }}",
+                str(data["assets_tpr_templates_source"]).rstrip("/"),
+            )
+            text = text.replace(
                 "{{ assets_checkout_root }}",
                 "{{ install_dir | trim }}/assets/{{ assets_pinned_tag }}",
             )
             text = text.replace("{{ assets_csg_pinned_tag }}", "<tag>")
+            text = text.replace("{{ assets_tpr_pinned_tag }}", "<tag>")
             text = text.replace("{{ assets_pinned_tag }}", "<tag>")
             text = text.replace("{{ install_dir | trim }}", "<install>")
             text = text.replace(str(data["assets_pinned_tag"]), "<tag>")
@@ -727,12 +737,16 @@ class TestAssetsVars:
         }
         csg_manifest_source = str(manifest["csg-templates"]["source"])
         csg_pin = csg_manifest_source.split("/cli-tools/csg/")[1].split("/", 1)[0]
+        tpr_manifest_source = str(manifest["tpr-templates"]["source"])
+        tpr_pin = tpr_manifest_source.split("/cli-tools/theme-producer/")[1].split("/", 1)[0]
         for entry in copies:
             manifest_entry = manifest[entry["name"]]
             assert entry["kind"] == manifest_entry["kind"], (
                 f"copy {entry['name']!r} kind diverges from the manifest"
             )
-            pin = csg_pin if entry["name"] == "csg-templates" else ""
+            pin = {"csg-templates": csg_pin, "tpr-templates": tpr_pin}.get(
+                entry["name"], ""
+            )
             assert _normalize(entry["source"], pin) == _normalize(
                 manifest_entry["source"], pin
             ), (
@@ -748,6 +762,10 @@ class TestAssetsVars:
         assert str(data["assets_csg_pinned_tag"]) == csg_pin, (
             "assets_csg_pinned_tag must mirror the manifest csg pin — the "
             "csg-templates source is derived from it (spine AD-10/AD-11)"
+        )
+        assert str(data["assets_tpr_pinned_tag"]) == tpr_pin, (
+            "assets_tpr_pinned_tag must mirror the manifest tpr pin — the "
+            "tpr-templates source is derived from it (spine AD-10/AD-11)"
         )
 
         assert _normalize(
@@ -836,6 +854,70 @@ class TestAssetsVars:
             task
             for task in _tasks_with_module("ansible.builtin.stat")
             if str(_module(task).get("path", "")) == "{{ assets_csg_templates_source }}"
+        ]
+        assert stats, "the existence probe must stat the resolved checkout source"
+        for task in asserts:
+            assert task.get("when") == "not ansible_check_mode"
+
+
+    def test_tpr_templates_source_resolves_to_pinned_checkout(self) -> None:
+        """REQ-010: the tpr projection catalog is copied FROM the pinned tpr
+        checkout into the runtime's spine path, with the same fail-loud
+        existence contract as csg.
+
+        The catalog lives at
+        `<install>/cli-tools/theme-producer/<tag>/src/theme_producer/defaults/templates/`
+        and the runtime's TprAdapter reads the DEPLOYED copy at
+        `config/theme-producer/templates`.
+        """
+        data = _vars()
+        manifest_entries = _manifest_entries()
+        tpr_entry = next(e for e in manifest_entries if e["name"] == "tpr-templates")
+        cli_manifest = yaml.safe_load(
+            (composition_root() / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
+        )
+        tpr_cli = next(e for e in cli_manifest["entries"] if e.get("name") == "tpr")
+        pin = str(tpr_cli["tag"])
+
+        assert str(data["assets_tpr_pinned_tag"]) == pin, (
+            "the assets role must mirror the tpr pin from the CLI manifest"
+        )
+
+        install = "/tmp/opencode/assets-tpr-pin-check"
+        source = str(data["assets_tpr_templates_source"])
+        source = source.replace("{{ install_dir | trim }}", install)
+        source = source.replace("{{ assets_tpr_pinned_tag }}", str(data["assets_tpr_pinned_tag"]))
+        assert source == (
+            f"{install}/cli-tools/theme-producer/{pin}/src/theme_producer/defaults/templates"
+        ), f"resolved tpr-templates source is wrong: {source!r}"
+        assert "src/cli-tools" not in source, (
+            "the tpr-templates source must not name the retired in-tree tree"
+        )
+        assert "src/cli-tools" not in str(tpr_entry["source"])
+
+        checkout_copy = next(
+            e for e in data["assets_checkout_copies"] if e["name"] == "tpr-templates"
+        )
+        assert str(checkout_copy["source"]).startswith("{{ assets_tpr_templates_source }}"), (
+            "the copy must read the resolved checkout var (single source for the path)"
+        )
+        assert str(checkout_copy["target"]) == "config/theme-producer/templates", (
+            "the target is the exact path runtime TprAdapter reads"
+        )
+
+        asserts = [
+            task
+            for task in _tasks_with_module("ansible.builtin.assert")
+            if "assets_tpr_templates_dir.stat.isdir" in str(_module(task).get("that", ""))
+        ]
+        assert asserts, (
+            "the assets role must assert the pinned tpr template catalog exists "
+            "before copying from it (spine AD-10)"
+        )
+        stats = [
+            task
+            for task in _tasks_with_module("ansible.builtin.stat")
+            if str(_module(task).get("path", "")) == "{{ assets_tpr_templates_source }}"
         ]
         assert stats, "the existence probe must stat the resolved checkout source"
         for task in asserts:
