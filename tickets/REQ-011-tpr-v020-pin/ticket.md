@@ -2,16 +2,22 @@
 id: REQ-011
 title: "Pin theme-producer v0.2.0 (prefer/fallback, lightness, light mode)"
 kind: requirement
-status: in-progress
+status: proposed
 lane: 1
 links:
   openspec: none
   bmad: none
-worktree: .worktrees/REQ-011/
-branch: ticket/REQ-011-tpr-v020-pin
+worktree: none
+branch: none
 ---
 
 # Pin theme-producer v0.2.0
+
+> **HOLD (2026-10-28).** Do NOT touch the provisioning engine for tpr until the AGS app work is
+> finished and the user gives an explicit green. The theme producer is being tested standalone.
+> The engine v0.1.24 already contains tpr support from an earlier slice; leave it unpinned in
+> `dotfiles-v3`. Re-open this ticket only when the user asks.
+
 
 ## Requirement
 

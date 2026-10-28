@@ -24,7 +24,7 @@
 
 ## Requirements
 
-- [REQ-011-tpr-v020-pin](./REQ-011-tpr-v020-pin/ticket.md) — Pin theme-producer v0.2.0 | `in-progress` | worktree: .worktrees/REQ-011/ | branch: ticket/REQ-011-tpr-v020-pin
+- [REQ-011-tpr-v020-pin](./REQ-011-tpr-v020-pin/ticket.md) — Pin theme-producer v0.2.0 | `proposed` | HOLD: standalone testing only; AGS work in flight; do not pin
 
 ## Ops tasks
 
