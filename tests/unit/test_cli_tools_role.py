@@ -1224,7 +1224,7 @@ class TestCliToolsPlaybook:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-class TestHyprPanoLauncher:
+class TestClipboardLauncher:
     """The clipboard overlay launcher must reveal the overlay on ONE press.
 
     The overlay starts hidden (``visible={false}``, keymode ON_DEMAND), so
@@ -1235,7 +1235,7 @@ class TestHyprPanoLauncher:
     the window hidden and force the user to press twice.
     """
 
-    _TEMPLATE = _ROLES_DIR / "templates" / "hypr-pano-ui.j2"
+    _TEMPLATE = _ROLES_DIR / "templates" / "clipboard-ui.j2"
 
     @classmethod
     def _code(cls) -> str:
@@ -1253,11 +1253,12 @@ class TestHyprPanoLauncher:
 
     def test_warm_press_toggles_through_the_request_handler(self) -> None:
         code = self._code()
-        assert 'INSTANCE="hypr-pano"' in code
-        assert 'DIR="${HOME}/.config/ags-hypr-pano"' in code
-        assert 'LOG="${HOME}/.local/state/ags/hypr-pano.log"' in code
+        assert 'INSTANCE="clipboard"' in code
+        assert 'WINDOW="clipboard-window"' in code
+        assert 'DIR="${HOME}/.config/ags-clipboard"' in code
+        assert 'LOG="${HOME}/.local/state/ags/clipboard.log"' in code
         assert 'ags request "$1" -i "$INSTANCE"' in code, (
-            "the launcher must issue `ags request` against the hypr-pano instance"
+            "the launcher must issue `ags request` against the clipboard instance"
         )
         assert "request toggle" in code, (
             "a warm press must toggle through the app's requestHandler, not "
@@ -1302,7 +1303,7 @@ class TestHyprPanoLauncher:
 printf '%s\\n' "$*" >> "$AGS_STUB_LOG"
 case "$1" in
   list)
-    [ -f "$AGS_STUB_STATE/started" ] && echo "hypr-pano"
+    [ -f "$AGS_STUB_STATE/started" ] && echo "clipboard"
     ;;
   run)
     : > "$AGS_STUB_STATE/started"
@@ -1361,9 +1362,9 @@ exit 0
         calls = self._run_launcher(tmp_path, warm=False)
         joined = "\n".join(calls)
         assert any(c.startswith("run -d") for c in calls), joined
-        assert "request show -i hypr-pano" in calls, joined
+        assert "request show -i clipboard" in calls, joined
         run_at = next(i for i, c in enumerate(calls) if c.startswith("run -d"))
-        show_at = calls.index("request show -i hypr-pano")
+        show_at = calls.index("request show -i clipboard")
         assert run_at < show_at, (
             "the reveal request must come AFTER the instance is started:\n" + joined
         )
@@ -1372,13 +1373,13 @@ exit 0
     def test_warm_press_requests_toggle_without_starting(self, tmp_path: Path) -> None:
         calls = self._run_launcher(tmp_path, warm=True)
         joined = "\n".join(calls)
-        assert "request toggle -i hypr-pano" in calls, joined
+        assert "request toggle -i clipboard" in calls, joined
         assert not any(c.startswith("run ") for c in calls), joined
 
     def test_failed_warm_request_falls_back_to_cold_start(self, tmp_path: Path) -> None:
         calls = self._run_launcher(tmp_path, warm=True, fail_request="toggle")
         joined = "\n".join(calls)
-        assert "request toggle -i hypr-pano" in calls, joined
-        assert "quit -i hypr-pano" in calls, joined
+        assert "request toggle -i clipboard" in calls, joined
+        assert "quit -i clipboard" in calls, joined
         assert any(c.startswith("run -d") for c in calls), joined
-        assert "request show -i hypr-pano" in calls, joined
+        assert "request show -i clipboard" in calls, joined

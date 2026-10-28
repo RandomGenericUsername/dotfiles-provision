@@ -63,7 +63,7 @@ config_links_backup_policy: auto
 #   - compositor_configs → hypr, hyprpaper, ags
 #   - gui_tools    → (none since slice 8: gui_tools no longer places app
 #                    sources per file, so it contributes no managed dir)
-#   - ags_apps     → ags, ags-hypr-pano, ags-notifications, ags-capture,
+#   - ags_apps     → ags, ags-clipboard, ags-notifications, ags-capture,
 #                    ags-wallpaper-selector, ags-icme, ags-btop-studio (the live
 #                    links the config-links role exposes at ~/.config/<name>;
 #                    slice 5: ags-capture's TARGET is the ags_apps role's
@@ -71,8 +71,10 @@ config_links_backup_policy: auto
 #                    ags-wallpaper-selector and ags-icme likewise resolve to the
 #                    ags_apps live links -> the unit's wallpaper-selector/ and
 #                    icme/; slice 8: ags-btop-studio -> the unit's
-#                    btop-theme-studio/. The ~/.config links themselves are
-#                    unchanged)
+#                    btop-theme-studio/. The clipboard pilot's ags-clipboard
+#                    link is rendered by ags_apps_units once the composition
+#                    marks it standalone; the legacy-owner filter below drops
+#                    the basename from this role's active set in that epoch.)
 #   - config_copies → nvim, starship, wlogout, zsh
 #   - settings     → color-scheme-generator, weg, itr
 #   - gt-3-1       → gtk-3.0, gtk-4.0 (the GTK consumer dirs)
@@ -89,7 +91,7 @@ config_links_managed_dirs:
   - ags
   - ags-capture
   - ags-icme
-  - ags-hypr-pano
+  - ags-clipboard
   - ags-wallpaper-selector
   - ags-notifications
   - ags-btop-studio

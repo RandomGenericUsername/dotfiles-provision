@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# hypr-pano clipboard overlay launcher — provisioned by the cli_tools role.
+# clipboard-ui clipboard-history launcher — provisioned by the cli_tools role.
 #
-# The overlay is a standalone AGS instance (`hypr-pano`) whose process bundles
+# The overlay is a standalone AGS instance (`clipboard`) whose process bundles
 # TypeScript at startup and holds the compiled bundle in memory. Provisioning
-# quits the instance after placing updated sources (ags_apps role); this
+# quits the instance after placing updated sources (ags_apps_units role); this
 # launcher is the single keybinding entrypoint so the next press re-bundles
 # from disk instead of no-oping, and so a quit instance is started on demand.
 #
 # The overlay starts HIDDEN (`visible={false}`) and runs with keymode
-# ON_DEMAND, so merely starting the instance does NOT reveal it. Since ags-apps
-# v0.3.0 the app registers a `requestHandler` (toggle/show/hide/popup-close),
-# and this launcher drives it:
+# ON_DEMAND, so merely starting the instance does NOT reveal it. The app
+# registers a `requestHandler` (toggle/show/hide/popup-close), and this
+# launcher drives it:
 #   - warm instance -> `ags request toggle` flips visibility instantly;
 #   - cold instance -> start it in the BACKGROUND, wait for it to register on
 #     the bus, then `ags request show` reveals the freshly started window.
@@ -23,9 +23,10 @@
 #   2. instance running                 -> `ags request toggle` (hide/show)
 #   3. request to a live instance fails -> quit the zombie, cold start (1)
 set -uo pipefail
-INSTANCE="hypr-pano"
-DIR="${HOME}/.config/ags-hypr-pano"
-LOG="${HOME}/.local/state/ags/hypr-pano.log"
+INSTANCE="clipboard"
+WINDOW="clipboard-window"
+DIR="${HOME}/.config/ags-clipboard"
+LOG="${HOME}/.local/state/ags/clipboard.log"
 
 # Bounded waits (0.2s ticks): ~2s of retries for the request handler to accept
 # the reveal after ags-run-locked returns (the instance is on the bus slightly
@@ -50,7 +51,7 @@ fi
 # the name is live, so the reveal request below has an owner to answer it.
 mkdir -p "$(dirname "$LOG")"
 if ! ags-run-locked --expect-instance "$INSTANCE" -d "$DIR" --log-file "$LOG"; then
-    echo "hypr-pano-ui: failed to start instance '$INSTANCE'" >&2
+    echo "clipboard-ui: failed to start instance '$INSTANCE' (window '$WINDOW')" >&2
     exit 1
 fi
 
@@ -67,5 +68,5 @@ done
 
 # Registered but never answered: leave the instance running (the next press
 # takes the warm path) and fail loudly rather than hanging silently.
-echo "hypr-pano-ui: instance '$INSTANCE' did not answer 'show' after start" >&2
+echo "clipboard-ui: instance '$INSTANCE' (window '$WINDOW') did not answer 'show' after start" >&2
 exit 1

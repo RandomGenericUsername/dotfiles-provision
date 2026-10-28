@@ -102,14 +102,17 @@
     mode: "0755"
   when: "'capture' in cli_tools_legacy_app_names"
 
-# The clipboard overlay has the same "bundles TS at startup" lifecycle; its
-# keybind entrypoint must restart a quit instance on demand (super+w toggles).
-- name: Install the hypr-pano clipboard overlay launcher (toggle/start-if-down template)
+# The clipboard-history overlay has the same "bundles TS at startup" lifecycle;
+# its keybind entrypoint must restart a quit instance on demand (SUPER+V). The
+# app-list entry is `clipboard` (instance/configDir/launcher/autostart all use
+# that name), so a future `owner: standalone` flip removes it from the legacy
+# set and this task skips — `ags_apps_units` renders the launcher then.
+- name: Install the clipboard-history overlay launcher (toggle/start-if-down template)
   ansible.builtin.template:
-    src: hypr-pano-ui.j2
-    dest: "{{ cli_tools_bin_dir }}/hypr-pano-ui"
+    src: clipboard-ui.j2
+    dest: "{{ cli_tools_bin_dir }}/clipboard-ui"
     mode: "0755"
-  when: "'hypr-pano' in cli_tools_legacy_app_names"
+  when: "'clipboard' in cli_tools_legacy_app_names"
 
 # The wallpaper selector has the same "bundles TS at startup" lifecycle; its
 # keybind entrypoint must restart a quit instance on demand (SUPER+W toggles).
