@@ -143,6 +143,7 @@
 
     - name: "{{ app.app }} : verify the tag's manifest identity and handler"
       ansible.builtin.include_tasks: _verify_unit.yml
+      when: not ansible_check_mode
 
     - name: "{{ app.app }} : repoint the spine link at the immutable tag"
       ansible.builtin.file:
@@ -162,7 +163,9 @@
       ansible.builtin.stat:
         path: "{{ ags_apps_units_unit_dir }}/bin/{{ app.binLink }}"
       register: ags_apps_units_bin_source
-      when: app.binLink is defined
+      when:
+        - not ansible_check_mode
+        - app.binLink is defined
 
     - name: "{{ app.app }} : assert the app-owned bin entry point exists in the tag"
       ansible.builtin.assert:
@@ -171,7 +174,9 @@
           {{ app.app }} declares binLink '{{ app.binLink }}' but
           {{ ags_apps_units_unit_dir }}/bin/{{ app.binLink }} does not exist in
           the immutable tag. The app repo must ship the declared command.
-      when: app.binLink is defined
+      when:
+        - not ansible_check_mode
+        - app.binLink is defined
 
     - name: "{{ app.app }} : install the optional bin link"
       ansible.builtin.file:
@@ -190,12 +195,15 @@
 
     - name: "{{ app.app }} : verify the declared ownership surfaces"
       ansible.builtin.include_tasks: _verify_surfaces.yml
+      when: not ansible_check_mode
 
     - name: "{{ app.app }} : assert the shared launch-lock wrapper is installed"
       ansible.builtin.stat:
         path: "{{ ags_apps_units_run_locked }}"
       register: ags_apps_units_run_locked_check
-      when: (app.launch == 'always') or (ags_apps_units_cutover | bool)
+      when:
+        - not ansible_check_mode
+        - (app.launch == 'always') or (ags_apps_units_cutover | bool)
 
     - name: "{{ app.app }} : require cli_tools' ags-run-locked wrapper for starts"
       ansible.builtin.assert:
@@ -204,7 +212,9 @@
           {{ ags_apps_units_run_locked }} is missing — cli_tools installs the
           shared launch-lock wrapper and runs before this role in bootstrap
           order. Every `ags run` path must use it (AD-28).
-      when: (app.launch == 'always') or (ags_apps_units_cutover | bool)
+      when:
+        - not ansible_check_mode
+        - (app.launch == 'always') or (ags_apps_units_cutover | bool)
 
     - name: "{{ app.app }} : start the new instance through the shared launch lock"
       ansible.builtin.command:

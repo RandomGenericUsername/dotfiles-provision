@@ -709,6 +709,19 @@ def _stop_fake_ags(paths: dict[str, str]) -> None:
 
 
 class TestRoleExecution:
+    def test_check_mode_is_dry_on_a_fresh_host(self, tmp_path: Path) -> None:
+        """A fresh-host --check must not fail on a tag/link it did not create:
+        the verifications that read installed state are check-gated."""
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
+        result, paths = _run_role(tmp_path, provisioning, check=True)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not (install / "apps").exists(), "a dry run must not install an app"
+        assert not (Path(paths["xdg"]) / "ags").exists(), "a dry run must not link"
+
     def test_all_seven_apps_install_the_full_topology(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
         repos, bar_icons = _stage_seven_app_repos(tmp_path)
