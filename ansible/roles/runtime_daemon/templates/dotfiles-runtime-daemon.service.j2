@@ -28,6 +28,12 @@ BusName=org.dotfiles.Events
 # `daemon run# Restart=always...` -> typer `No such command 'run#'` ->
 # systemd start-limit-hit).
 ExecStart="{{ runtime_daemon_bin_dir }}/dotfiles-runtime" daemon run{{ runtime_daemon_run_flags }}
+# REQ-010: the palette-producer switch. The same value is written to
+# ~/.config/environment.d/10-dotfiles-runtime.conf for the session (the AGS
+# wallpaper selector); the daemon repeats it here so a re-provision takes
+# effect without waiting for a new login. Default csg; set
+# runtime_palette_producer=tpr to activate theme-producer.
+Environment="RUNTIME__PALETTE__PRODUCER={{ runtime_palette_producer }}"
 # Restart=always: name loss is a CLEAN stop, so on-failure is insufficient
 # (it would never restart after a bus blip). Backoff + start limits keep a
 # persistent failure from hot-looping (fatal-vs-recoverable, AD-33/B3).

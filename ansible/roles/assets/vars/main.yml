@@ -77,6 +77,7 @@ assets_deploy_dirs:
   - icon-templates
   - icon-mappings
   - config/color-scheme-generator/templates
+  - config/theme-producer/templates
   - config/weg
 
 # assets_wallpapers_tarball: the wallpaper archive INSIDE the pinned checkout.
@@ -104,6 +105,18 @@ assets_wallpapers_dest: "{{ install_dir | trim }}/wallpapers"
 assets_csg_pinned_tag: v0.2.1
 assets_csg_templates_source: >-
   {{ install_dir | trim }}/cli-tools/csg/{{ assets_csg_pinned_tag }}/src/color_scheme_generator/defaults/templates
+
+# assets_tpr_pinned_tag / assets_tpr_templates_source: REQ-010, the same
+#   pinned-checkout shape for the opt-in palette producer. tpr ships its
+#   projection catalog at `src/theme_producer/defaults/templates/`; the
+#   runtime's TprAdapter reads the DEPLOYED copy at
+#   `<install>/config/theme-producer/templates` (never the checkout). The pin
+#   mirrors the manifest `tpr.tag` exactly, and the role asserts the resolved
+#   dir exists before the copy so a missing/mis-pinned checkout fails loud
+#   instead of silently deploying nothing.
+assets_tpr_pinned_tag: v0.1.0
+assets_tpr_templates_source: >-
+  {{ install_dir | trim }}/cli-tools/theme-producer/{{ assets_tpr_pinned_tag }}/src/theme_producer/defaults/templates
 
 # assets_copies: the directory-based asset kinds as (name, kind, source,
 #   target) mirroring the manifest. Since S1 every `source` is an ABSOLUTE path
@@ -138,6 +151,7 @@ assets_copies:
 #   `assets_copies` ∪ `assets_checkout_copies` exactly (parity-locked).
 assets_checkout_copies:
   - { name: csg-templates, kind: csg-template, source: "{{ assets_csg_templates_source }}/", target: config/color-scheme-generator/templates }
+  - { name: tpr-templates, kind: tpr-template, source: "{{ assets_tpr_templates_source }}/", target: config/theme-producer/templates }
 
 # (2026-09-07) icon-mappings is CONVERGE again, like every other copy: the
 # authoring model is repo-authoritative — the editor targets the repo

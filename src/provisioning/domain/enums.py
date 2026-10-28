@@ -82,6 +82,7 @@ class AssetKind(StrEnum):
     ICON_TEMPLATE = "icon-template"
     ICON_MAPPING = "icon-mapping"
     CSG_TEMPLATE = "csg-template"
+    TPR_TEMPLATE = "tpr-template"
     WEG_EFFECTS = "weg-effects"
 
     def spine_segment(self) -> str:
@@ -100,6 +101,7 @@ _SPINE_SEGMENT: dict[AssetKind, str] = {
     AssetKind.ICON_TEMPLATE: "icon-templates",
     AssetKind.ICON_MAPPING: "icon-mappings",
     AssetKind.CSG_TEMPLATE: "csg-templates",
+    AssetKind.TPR_TEMPLATE: "tpr-templates",
     AssetKind.WEG_EFFECTS: "weg-effects.yaml",
 }
 

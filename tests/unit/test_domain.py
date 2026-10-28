@@ -78,6 +78,7 @@ class TestAssetKind:
         assert AssetKind.ICON_TEMPLATE.value == "icon-template"
         assert AssetKind.ICON_MAPPING.value == "icon-mapping"
         assert AssetKind.CSG_TEMPLATE.value == "csg-template"
+        assert AssetKind.TPR_TEMPLATE.value == "tpr-template"
         assert AssetKind.WEG_EFFECTS.value == "weg-effects"
 
     def test_spine_segment_maps_to_install_spine_paths(self) -> None:
@@ -85,6 +86,7 @@ class TestAssetKind:
         assert AssetKind.ICON_TEMPLATE.spine_segment() == "icon-templates"
         assert AssetKind.ICON_MAPPING.spine_segment() == "icon-mappings"
         assert AssetKind.CSG_TEMPLATE.spine_segment() == "csg-templates"
+        assert AssetKind.TPR_TEMPLATE.spine_segment() == "tpr-templates"
         assert AssetKind.WEG_EFFECTS.spine_segment() == "weg-effects.yaml"
 
 

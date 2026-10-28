@@ -282,6 +282,59 @@ class TestPinMirrorsMatchTheManifest:
             )
 
 
+class TestTprPinMirrors:
+    """REQ-010: tpr v0.1.0 has the same multi-leg pin shape as csg — the role
+    mirror, the fixture CLI entry, the assets catalog source, the settings
+    image tag and the verify mirror must all agree."""
+
+    @staticmethod
+    def _role_vars(role: str) -> dict[str, Any]:
+        loaded = yaml.safe_load(
+            (ENGINE_ROOT / "ansible" / "roles" / role / "vars" / "main.yml").read_text()
+        )
+        assert isinstance(loaded, dict)
+        return loaded
+
+    def test_all_tpr_mirrors_are_v0_1_0(self) -> None:
+        expected = "v0.1.0"
+        cli_manifest = yaml.safe_load((manifests_dir() / "cli-tools.yaml").read_text())
+        fixture_tpr = next(
+            entry for entry in cli_manifest["entries"] if entry.get("name") == "tpr"
+        )
+        role_tpr = next(
+            entry
+            for entry in self._role_vars("cli_tools")["cli_tools"]
+            if entry.get("name") == "tpr"
+        )
+        assets_vars = self._role_vars("assets")
+        settings_vars = self._role_vars("settings")
+        verify_vars = self._role_vars("verify")
+        assets_manifest = yaml.safe_load((manifests_dir() / "assets.yaml").read_text())
+        tpr_source = next(
+            entry
+            for entry in assets_manifest["entries"]
+            if entry.get("name") == "tpr-templates"
+        )["source"]
+
+        assert fixture_tpr["tag"] == expected
+        assert role_tpr["tag"] == expected
+        assert assets_vars["assets_tpr_pinned_tag"] == expected, (
+            "assets_tpr_pinned_tag must mirror the tpr pin"
+        )
+        assert settings_vars["settings_tpr_image_tag"] == expected, (
+            "settings_tpr_image_tag must render the same pin"
+        )
+        assert verify_vars["verify_tpr_version"] == expected
+        assert str(verify_vars["verify_tpr_contract_version"]) == "0.4.0"
+        assert f"/cli-tools/theme-producer/{expected}/src/" in str(tpr_source), (
+            f"fixture tpr-templates source must read the {expected} checkout; "
+            f"got {tpr_source!r}"
+        )
+        assert str(assets_manifest["assets"]["tag"]) == "v0.6.1", (
+            "the assets corpus pin must not move with tpr"
+        )
+
+
 class TestCsgAndRuntimePinMirrors:
     """REQ-009: one cross-leg guard for every csg/runtime literal the engine owns.
 

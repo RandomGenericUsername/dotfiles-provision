@@ -76,7 +76,7 @@ config_links_backup_policy: auto
 #                    marks it standalone; the legacy-owner filter below drops
 #                    the basename from this role's active set in that epoch.)
 #   - config_copies → nvim, starship, wlogout, zsh
-#   - settings     → color-scheme-generator, weg, itr
+#   - settings     → color-scheme-generator, weg, itr, theme-producer
 #   - gt-3-1       → gtk-3.0, gtk-4.0 (the GTK consumer dirs)
 #   - add-rofi-app-launcher → rofi
 #   - provision-btop-config → btop (the btop_config role renders btop.conf
@@ -103,6 +103,7 @@ config_links_managed_dirs:
   - color-scheme-generator
   - weg
   - itr
+  - theme-producer
   - gtk-3.0
   - gtk-4.0
   - rofi

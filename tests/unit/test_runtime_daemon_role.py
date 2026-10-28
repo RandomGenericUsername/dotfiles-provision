@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from jinja2 import Environment, StrictUndefined
+from jinja2 import Environment, StrictUndefined, Undefined
 
 
 def _find_ansible_dir() -> Path:
@@ -64,6 +64,7 @@ _RENDER_VARS = {
     "runtime_daemon_activate": True,
     "runtime_daemon_prune_on_reactive": False,
     "runtime_daemon_run_flags": " --activate",
+    "runtime_palette_producer": "csg",
 }
 
 
@@ -179,6 +180,15 @@ class TestUnitContent:
         rendered = _render_unit(runtime_daemon_activate=False, runtime_daemon_run_flags="")
         assert "--activate" not in rendered
 
+    def test_palette_producer_environment_defaults_to_csg_and_follows_the_var(self) -> None:
+        """REQ-010: the daemon unit carries the SAME producer switch the session
+        environment gets. Default csg; a single var change renders tpr."""
+        service = _section(_render_unit(), "Service")
+        assert 'Environment="RUNTIME__PALETTE__PRODUCER=csg"' in service
+        overridden = _section(_render_unit(runtime_palette_producer="tpr"), "Service")
+        assert 'Environment="RUNTIME__PALETTE__PRODUCER=tpr"' in overridden
+        assert "latest" not in overridden
+
     def test_watchdog_sec_and_notify_access_in_service(self) -> None:
         """P5 follow-up: a wedged-but-name-owning daemon is restarted."""
         service = _section(_render_unit(), "Service")
@@ -256,6 +266,77 @@ class TestTasks:
         assert _module_key(probe) == "ansible.builtin.shell"
         assert probe.get("failed_when") is False
         assert probe.get("changed_when") is False
+
+    def test_palette_producer_domain_assert_is_ungated(self) -> None:
+        """REQ-010: a typo'd producer must abort before either consumer is
+        written; pure variable state so it also runs under --check."""
+        matches = [
+            task
+            for task in _load_tasks()
+            if _module_key(task) == "ansible.builtin.assert"
+            and 'runtime_palette_producer in ["csg", "tpr"]'
+            in str(task.get("ansible.builtin.assert", ""))
+        ]
+        assert len(matches) == 1, "expected one palette-producer domain assert"
+        task = matches[0]
+        assert task.get("when") is None
+        msg = str(task["ansible.builtin.assert"].get("fail_msg", ""))
+        assert "-e runtime_palette_producer=tpr" in msg
+        assert "RUNTIME_PALETTE_PRODUCER=tpr" in msg
+
+    def test_session_environment_file_carries_the_switch(self) -> None:
+        """REQ-010: environment.d is what the AGS wallpaper selector inherits;
+        the role writes exactly the resolved producer, check-safe, from the
+        same var as the unit Environment= line."""
+        tasks = _load_tasks()
+        copies = [
+            task
+            for task in tasks
+            if _module_key(task) == "ansible.builtin.copy"
+            and str(task.get("ansible.builtin.copy", {}).get("dest", ""))
+            == "{{ runtime_daemon_environment_d_file }}"
+        ]
+        assert len(copies) == 1, "expected one environment.d write task"
+        body = copies[0]["ansible.builtin.copy"]
+        assert body.get("content") == (
+            "RUNTIME__PALETTE__PRODUCER={{ runtime_palette_producer }}\n"
+        )
+        assert body.get("mode") == "0644"
+
+        env_dirs = [
+            task
+            for task in tasks
+            if _module_key(task) == "ansible.builtin.file"
+            and str(task.get("ansible.builtin.file", {}).get("path", "")).endswith(
+                "/.config/environment.d"
+            )
+        ]
+        assert len(env_dirs) == 1, "environment.d parent must be ensured"
+        assert env_dirs[0]["ansible.builtin.file"].get("state") == "directory"
+
+        data = yaml.safe_load((_ROLE_DIR / "vars" / "main.yml").read_text())
+        assert str(data["runtime_daemon_environment_d_file"]).endswith(
+            "/.config/environment.d/10-dotfiles-runtime.conf"
+        )
+
+    def test_palette_producer_defaults_to_csg_in_group_vars(self) -> None:
+        """REQ-010: the switch ships csg; an env var can select tpr for a run."""
+        group_vars = yaml.safe_load(
+            (_ANSIBLE_DIR / "inventory" / "group_vars" / "all.yml").read_text()
+        )
+        value = str(group_vars["runtime_palette_producer"])
+        assert "RUNTIME_PALETTE_PRODUCER" in value
+        assert "default('csg'" in value
+        env = Environment(undefined=StrictUndefined)
+        env.filters["default"] = lambda raw, fallback, *args: (
+            fallback if isinstance(raw, Undefined) or raw in (None, "") else raw
+        )
+        rendered = env.from_string(value).render(ansible_facts={"env": {}})
+        assert rendered == "csg"
+        rendered_tpr = env.from_string(value).render(
+            ansible_facts={"env": {"RUNTIME_PALETTE_PRODUCER": "tpr"}}
+        )
+        assert rendered_tpr == "tpr"
 
     def test_binary_precondition_fails_loud(self) -> None:
         tasks = _load_tasks()

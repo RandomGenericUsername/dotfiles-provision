@@ -1,0 +1,27 @@
+[output]
+# Default output for MANUAL `tpr generate` runs only: the runtime's TprAdapter
+# always passes THEME__OUTPUT__DIRECTORY/OVERWRITE per render. XDG cache
+# lifetime, mirroring csg/weg/itr.
+directory = "{{ settings_xdg_cache_home | trim }}/dotfiles/tpr-output"
+# Empty default_formats = every projection in the template catalog.
+default_formats = []
+overwrite = false
+# The runtime applies the generated sequences itself; tpr must not also write
+# to the live terminal during a provisioning/render run.
+apply_to_terminal = false
+
+[generation]
+engine = "native"
+
+[runtime]
+mode = "container"
+
+[container]
+engine = "{{ container_runtime_engine }}"
+image_prefix = "tpr"
+# AD-7: the tag is the pinned repo tag (settings_tpr_image_tag, mirror of the
+# cli-tools manifest `tpr.tag`) — never "latest". The cli_tools role builds
+# tpr's base + engine images at exactly this tag (THEME__CONTAINER__IMAGE_TAG).
+image_tag = "{{ settings_tpr_image_tag }}"
+timeout_seconds = 300
+memory_limit = "512m"

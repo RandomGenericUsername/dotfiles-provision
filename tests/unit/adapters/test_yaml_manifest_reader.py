@@ -582,8 +582,8 @@ class TestReadRealManifests:
         assert "ags" not in names
         assert "zsh" not in names
 
-    def test_cli_tools_manifest_has_four_install_targets(self) -> None:
+    def test_cli_tools_manifest_has_five_install_targets(self) -> None:
         manifest = READER.read(_MANIFEST_DIR / "cli-tools.yaml")
         names = [entry.name for entry in manifest.entries]
         assert len(names) == len(set(names)), f"duplicate cli-tool entries: {names}"
-        assert set(names) == {"csg", "weg", "itr", "dotfiles-runtime"}
+        assert set(names) == {"csg", "weg", "itr", "tpr", "dotfiles-runtime"}

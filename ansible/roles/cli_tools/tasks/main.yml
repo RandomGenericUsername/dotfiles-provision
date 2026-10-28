@@ -288,7 +288,7 @@
   changed_when: false
   when: not ansible_check_mode
 
-- name: Verify csg/weg/itr resolve on PATH
+- name: Verify csg/weg/itr/tpr resolve on PATH
   ansible.builtin.shell: "command -v {{ item.name }}"
   loop: "{{ cli_tools }}"
   environment:
@@ -340,10 +340,10 @@
     - cli_tools_codex_standalone.stat.exists
 
 # Container image builds for the container-mode CLIs (product decision
-# 2026-08-12: csg/weg run in container mode; the host never installs backend
-# binaries). `uv tool install` above only installs the host-side launcher —
-# `<cli> install` builds the image that does the actual work. The list of CLIs
-# is `cli_tools_image_builds` (csg + weg).
+# 2026-08-12: csg/weg run in container mode; REQ-010 adds tpr; the host never
+# installs backend binaries). `uv tool install` above only installs the
+# host-side launcher — `<cli> install` builds the image that does the actual
+# work. The list of CLIs is `cli_tools_image_builds` (csg + weg + tpr).
 #
 # Container engine (Option 2b, single DECLARED source of truth):
 # - The engine is DECLARED, not detected: `container_runtime_engine` from
@@ -367,11 +367,12 @@
 # - `--image-tag <pin>` is passed for a PINNED CLI (AD-7): the image tag is the
 #   repo tag from the manifest entry — never `latest` — so a pin bump can never
 #   silently reuse the previous image, and the rendered `image_tag` in
-#   roles/settings resolves the image this task built. Since S6 BOTH
-#   container-mode CLIs are pinned; they differ only in transport (weg takes
-#   `--image-tag` on argv, csg reads COLORSCHEME__CONTAINER__IMAGE_TAG from the
-#   settings env because its `install` verb has no such flag). The tag value in
-#   both cases is `{{ item.tag }}` — the manifest pin, never a literal.
+#   roles/settings resolves the image this task built. Since S6 every
+#   container-mode CLI is pinned; they differ only in transport (weg takes
+#   `--image-tag` on argv; csg and tpr read their settings env because their
+#   `install` verbs have no such flag: COLORSCHEME__CONTAINER__IMAGE_TAG and
+#   THEME__CONTAINER__IMAGE_TAG respectively). The tag value in every case is
+#   `{{ item.tag }}` — the manifest pin, never a literal.
 #   The legacy source-path build task stays for a future in-repo container-mode
 #   entry; today its loop selects nothing (the runtime moved to its own pin and
 #   has no container mode).
@@ -523,14 +524,17 @@
     PATH: "{{ cli_tools_bin_dir }}:{{ ansible_facts.env.PATH }}"
   when: not ansible_check_mode
 
-# csg's `install` verb has no `--image-tag`: it reads
-# `container.image_tag` through its settings resolver, whose env prefix is
-# `COLORSCHEME`. Passing the pin as that env var is the SAME AD-7 contract —
-# the image tag is the manifest pin, never `latest` — just a different
-# transport. `deploy-coverage` asserts this exact key carries `{{ item.tag }}`
-# (and that no literal tag appears in the task code), so a renamed key cannot
-# quietly let the build fall back to the CLI default `latest`.
-- name: Build container images for the pinned CLIs that read the tag from settings env
+# csg and tpr have no `--image-tag` on their `install` verbs: they read
+# `container.image_tag` through their settings resolvers, whose env prefixes are
+# `COLORSCHEME` and `THEME`. Passing the pin as that env var is the SAME AD-7
+# contract — the image tag is the manifest pin, never `latest` — just a
+# different transport. The key is looked up per entry from
+# `cli_tools_image_tag_env_keys`, so each tool carries its own prefix instead
+# of a second hardcoded branch. `deploy-coverage` asserts every env-build entry
+# has a key and that it carries `{{ item.tag }}` (and that no literal tag
+# appears in the task code), so a renamed key cannot quietly let the build fall
+# back to the CLI default `latest`.
+- name: Build container images for the pinned CLIs that read the tag from settings env (context on argv)
   ansible.builtin.command:
     argv:
       - "{{ item.name }}"
@@ -539,12 +543,38 @@
       - "{{ container_runtime_engine }}"
       - --context
       - "{{ cli_tools_checkout_root }}/{{ item.name }}/{{ item.tag }}"
-  loop: "{{ cli_tools_image_tag_env_builds }}"
+  loop: "{{ cli_tools_image_tag_env_flag_context_builds }}"
   loop_control:
     label: "{{ item.name }}"
-  environment:
-    PATH: "{{ cli_tools_bin_dir }}:{{ ansible_facts.env.PATH }}"
-    COLORSCHEME__CONTAINER__IMAGE_TAG: "{{ item.tag }}"
+  # The whole environment is an EXPRESSION so the per-tool key is resolved
+  # before the module runs: Ansible templates environment VALUES but not a
+  # literal mapping KEY, so a quoted `"{{ ... }}"` key would reach the module
+  # as an env var literally named `{{ ... }}` (verified: it surfaces as
+  # `/bin/sh: {{: command not found`). This form renders a real dict.
+  environment: >-
+    {{ {'PATH': cli_tools_bin_dir ~ ':' ~ ansible_facts.env.PATH,
+        cli_tools_image_tag_env_keys[item.name]: item.tag} }}
+  when: not ansible_check_mode
+
+# tpr's install verb has no `--context` either: oci_runtime's explicit source
+# override is THEME_PRODUCER_SOURCE_ROOT, so the pinned checkout travels as an
+# env var while the tag keeps traveling via THEME__CONTAINER__IMAGE_TAG. Same
+# AD-5/AD-7 contract, no implicit PEP 610 discovery.
+- name: Build container images for the pinned CLIs that read the tag and context from settings env
+  ansible.builtin.command:
+    argv:
+      - "{{ item.name }}"
+      - install
+      - --container-engine
+      - "{{ container_runtime_engine }}"
+  loop: "{{ cli_tools_image_tag_env_context_builds }}"
+  loop_control:
+    label: "{{ item.name }}"
+  environment: >-
+    {{ {'PATH': cli_tools_bin_dir ~ ':' ~ ansible_facts.env.PATH,
+        cli_tools_image_tag_env_keys[item.name]: item.tag,
+        cli_tools_image_context_env_keys[item.name]:
+          cli_tools_checkout_root ~ '/' ~ item.name ~ '/' ~ item.tag} }}
   when: not ansible_check_mode
 
 - name: Build container images for the source-path container-mode CLIs

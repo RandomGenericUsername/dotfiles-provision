@@ -17,6 +17,9 @@ entries:
   - name: itr
     repo: https://github.com/RandomGenericUsername/icon-templates-renderer
     tag: v0.2.0
+  - name: tpr
+    repo: https://github.com/RandomGenericUsername/theme-producer
+    tag: v0.1.0
   - name: dotfiles-runtime
     repo: https://github.com/RandomGenericUsername/dotfiles-runtime
     tag: v0.2.3
