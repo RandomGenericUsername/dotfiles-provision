@@ -84,7 +84,7 @@
 # Shallow-clone repo@tag into <install>/assets/<tag>/, drop the clone's .git
 # (it is deployed as data, not a working copy — the ags_apps_units app-tag discipline),
 # and record the tag in <install>/assets/pinned. Check-mode discipline mirrors
-# cli_tools/ags_apps: the stat probe runs under --check, the clone and .git
+# cli_tools/ags_apps_units: the stat probe runs under --check, the clone and .git
 # removal are gated `when: not ansible_check_mode`, and the pin-file copy
 # supports check mode (would-change, never writes).
 - name: Ensure the pinned assets root exists

@@ -129,14 +129,11 @@ compositor_configs_config_dirs:
 #   (`{{ compositor_configs_xdg_config_home }}`); the other 14 files have no
 #   Jinja and pass through byte-identically.
 #
-#   NOTE: the bar is deliberately NOT enumerated here anymore. It used to be
-#   placed per file under ags/ (91 entries); the consumption step
-#   (ags-apps-bar-first slice 2, AD-17/AD-23) installs it as ONE versioned
-#   unit via the `ags_apps` role and deploys the unit's bar/ subdir as the
-#   live <install>/config/ags symlink. A stale per-file bar entry here would
-#   template INTO the unit tree through that link — silently diverging the
-#   live bar from the pinned tag — so deploy-coverage FAILS on any
-#   dotfiles/config/ags/ source in this list.
+#   NOTE: no AGS app is enumerated here anymore. Every app is an immutable
+#   standalone tag installed by `ags_apps_units`, which links it as the live
+#   <install>/config/<spineLink>. A stale per-file AGS entry here would template
+#   INTO a tag through that link — silently diverging the live app from its
+#   pinned version — so deploy-coverage FAILS on any AGS source in this list.
 compositor_configs_skeleton_files:
   - { name: hyprland-lua, source: "{{ compositor_configs_assets_configs_dir }}/hypr/hyprland.lua", dest: "{{ compositor_configs_spine_config_dir }}/hypr/hyprland.lua" }
   - { name: keybindings-lua, source: "{{ compositor_configs_assets_configs_dir }}/hypr/keybindings.lua", dest: "{{ compositor_configs_spine_config_dir }}/hypr/keybindings.lua" }
