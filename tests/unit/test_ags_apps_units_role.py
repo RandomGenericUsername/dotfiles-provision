@@ -117,6 +117,7 @@ class TestOwnerFilters:
             ("legacy.apps.yaml", 2, 0),
             ("mixed.apps.yaml", 1, 1),
             ("all-standalone.apps.yaml", 0, 2),
+            ("clipboard.apps.yaml", 1, 1),
         ],
     )
     def test_every_fixture_has_exactly_one_owner(
@@ -146,6 +147,57 @@ class TestOwnerFilters:
         assert "apps.yaml" in old_tasks
         assert "selectattr('owner', 'equalto', 'legacy')" in old_tasks
         assert "ags_apps_legacy_names" in old_tasks
+
+
+class TestClipboardCutoverContract:
+    """The clipboard pilot is the first real per-app cutover.
+
+    The engine has to be ready for the composition flip without flipping it:
+    the app-list shape is `clipboard`/`ags-clipboard`/`clipboard-ui`, and every
+    legacy role keys off that same name so an `owner: standalone` entry is left
+    entirely to `ags_apps_units`.
+    """
+
+    def test_clipboard_fixture_names_the_exact_standalone_surfaces(self) -> None:
+        apps = {entry["app"]: entry for entry in _app_list("clipboard.apps.yaml")}
+        assert apps["bar"]["owner"] == "legacy"
+        clipboard = apps["clipboard"]
+        assert clipboard["owner"] == "standalone"
+        assert clipboard["installDir"] == "clipboard"
+        assert clipboard["instance"] == "clipboard"
+        assert clipboard["configDir"] == "ags-clipboard"
+        assert clipboard["configLink"] == "ags-clipboard"
+        assert clipboard["spineLink"] == "ags-clipboard"
+        assert clipboard["xdgLink"] == "ags-clipboard"
+        assert clipboard["launcher"] == "clipboard-ui"
+        assert clipboard["autostart"] == "clipboard"
+        assert clipboard["launch"] == "on-demand"
+
+    def test_legacy_roles_key_on_clipboard_so_standalone_skips(self) -> None:
+        cli_tasks = (_ROLES_DIR / "cli_tools" / "tasks" / "main.yml").read_text()
+        assert 'src: clipboard-ui.j2' in cli_tasks
+        assert '"{{ cli_tools_bin_dir }}/clipboard-ui"' in cli_tasks
+        assert "when: \"'clipboard' in cli_tools_legacy_app_names\"" in cli_tasks
+        assert "hypr-pano-ui" not in cli_tasks
+
+        config_vars = (_ROLES_DIR / "config_links" / "vars" / "main.yml").read_text()
+        assert "ags-clipboard" in config_vars
+        assert "ags-hypr-pano" not in config_vars
+        config_tasks = (_ROLES_DIR / "config_links" / "tasks" / "main.yml").read_text()
+        assert "selectattr('owner', 'equalto', 'standalone')" in config_tasks
+        assert "map(attribute='xdgLink')" in config_tasks
+
+        gui_vars = (_ROLES_DIR / "gui_tools" / "vars" / "main.yml").read_text()
+        assert "  - name: clipboard\n    always_on: false" in gui_vars
+        assert "  - name: hypr-pano\n" not in gui_vars
+
+        # The old monorepo role remains the legacy owner of hypr-pano (the
+        # v0.5.0 unit still ships that directory), so its live-pano link stays
+        # gated on the OLD app id. Once the composition list says `clipboard`,
+        # no legacy name matches and the old role creates no pano link.
+        old_tasks = (_ROLES_DIR / "ags_apps" / "tasks" / "main.yml").read_text()
+        assert "when: \"'hypr-pano' in ags_apps_legacy_names\"" in old_tasks
+        assert "'clipboard' in ags_apps_legacy_names" not in old_tasks
 
 
 class TestRoleStructure:
@@ -292,7 +344,7 @@ class TestLaunchLockWiring:
         templates = _ROLES_DIR / "cli_tools" / "templates"
         for name in (
             "capture-ui.j2",
-            "hypr-pano-ui.j2",
+            "clipboard-ui.j2",
             "wallpaper-selector-ui.j2",
             "icon-color-mapping-editor.j2",
             "btop-theme-studio.j2",
@@ -606,6 +658,60 @@ class TestRoleExecution:
             assert (Path(paths["xdg"]) / "ags-fake-app").is_symlink()
             assert (Path(paths["bin"]) / "fake-app-ui").is_file()
             assert Path(paths["registry"]).read_text().splitlines() == ["fake-app"]
+        finally:
+            _stop_fake_ags(paths)
+
+    def test_clipboard_cutover_installs_the_standalone_topology_and_surfaces(
+        self, tmp_path: Path
+    ) -> None:
+        """The clipboard pilot is the first real cutover: one list flip must
+        install `<install>/apps/clipboard/<tag>`, create the
+        config/spine/XDG surfaces `ags-clipboard`, render `clipboard-ui`
+        through the shared launch lock with the clipboard instance/log, and
+        verify the assets-owned `clipboard` autostart identity exactly once.
+        The old monorepo surfaces (`ags-hypr-pano`, `hypr-pano-ui`) must not be
+        created by the standalone role."""
+        install = tmp_path / "install"
+        repo = _make_app_repo(
+            tmp_path,
+            "clipboard",
+            app="clipboard",
+            instance="clipboard",
+            config_dir="ags-clipboard",
+        )
+        provisioning = _write_composition(
+            tmp_path, "clipboard.apps.yaml", {"clipboard": repo}
+        )
+        _stage_fake_platform(install)
+        _stage_autostart(install, _app_list("clipboard.apps.yaml"))
+        result, paths = _run_role(tmp_path, provisioning, cutover=True)
+        try:
+            assert result.returncode == 0, result.stdout + result.stderr
+            unit = install / "apps" / "clipboard" / "v0.1.0"
+            spine_link = install / "config" / "ags-clipboard"
+            xdg_link = Path(paths["xdg"]) / "ags-clipboard"
+            launcher = Path(paths["bin"]) / "clipboard-ui"
+            assert (unit / "app.tsx").is_file()
+            assert (install / "apps" / "clipboard" / "pinned").read_text().strip() == "v0.1.0"
+            assert spine_link.is_symlink() and os.readlink(spine_link) == str(unit)
+            assert xdg_link.is_symlink() and os.readlink(xdg_link) == str(spine_link)
+            assert launcher.is_file()
+            text = launcher.read_text()
+            assert 'INSTANCE="clipboard"' in text
+            assert 'DIR="' + str(Path(paths["xdg"]) / "ags-clipboard") + '"' in text
+            assert 'LOG="' + str(Path(paths["state"]) / "ags" / "clipboard.log") + '"' in text
+            assert "ags-run-locked" in text
+            assert "--expect-instance" in text
+            assert "clipboard" in text
+            assert not (install / "config" / "ags-hypr-pano").exists(), (
+                "the standalone role must not create the retired pano link"
+            )
+            assert not (Path(paths["bin"]) / "hypr-pano-ui").exists(), (
+                "the standalone role must not create the retired pano launcher"
+            )
+            assert Path(paths["registry"]).read_text().splitlines() == [], (
+                "the on-demand clipboard instance is stopped after cutover proof"
+            )
         finally:
             _stop_fake_ags(paths)
 

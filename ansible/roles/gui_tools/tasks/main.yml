@@ -92,10 +92,13 @@
 # in-repo.
 
 # The clipboard overlay's per-file placement is RETIRED (ags-apps-bar-first
-# slice 3): hypr-pano moved into the ags-apps unit and deploys WHOLE via the
-# ags_apps role's live-pano link. No placement task remains here — a stale one
-# would template INTO the unit tree through the live-pano link and diverge the
-# live app from the pinned tag (the deploy-coverage gate asserts its absence).
+# slice 3 + the clipboard pilot): hypr-pano moved into the ags-apps unit and
+# the standalone `clipboard` pilot now deploys WHOLE through `ags_apps_units`
+# (<install>/apps/clipboard/<tag> -> <install>/config/ags-clipboard ->
+# ~/.config/ags-clipboard) when the composition marks it standalone. No
+# placement task remains here — a stale one would template INTO the unit tree
+# through the live link and diverge the live app from the pinned tag (the
+# deploy-coverage gate asserts its absence).
 
 # The wallpaper selector's per-file placement is RETIRED (slice 6): the selector
 # moved into the ags-apps unit and deploys WHOLE via the ags_apps role's

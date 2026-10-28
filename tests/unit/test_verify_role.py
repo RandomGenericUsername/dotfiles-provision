@@ -2384,7 +2384,7 @@ class TestVerifyVars:
         assert names == {
             "rofi-ui",
             "capture-ui",
-            "hypr-pano-ui",
+            "clipboard-ui",
             "wallpaper-selector-ui",
             "icon-color-mapping-editor",
             "btop-theme-studio",
@@ -4612,13 +4612,14 @@ def _write_stub_binaries(home: Path) -> Path:
     # capture-ui: installed by the cli_tools role, asserted by verify (the
     # keybind launcher). rofi-ui: the SUPER+D open/close toggle launcher. The
     # other four are the remaining keybind-invoked launchers (S4 / AD-10 layer 3:
-    # pano, wallpaper picker, icon-mapping editor, btop studio), all rendered by
-    # the cli_tools role. capture-tool itself is a SYMLINK into the ags-apps unit
-    # (v0.4.0) and is created below once the unit fixture exists.
+    # clipboard history, wallpaper picker, icon-mapping editor, btop studio),
+    # all rendered by the cli_tools role while legacy or by ags_apps_units after
+    # the clipboard flip. capture-tool itself is a SYMLINK into the ags-apps
+    # unit (v0.4.0) and is created below once the unit fixture exists.
     for name in (
         "capture-ui",
         "rofi-ui",
-        "hypr-pano-ui",
+        "clipboard-ui",
         "wallpaper-selector-ui",
         "icon-color-mapping-editor",
         "btop-theme-studio",
@@ -4678,6 +4679,11 @@ def _build_provisioned_layout(
         "config/color-scheme-generator/templates",
         "config/hypr",
         "config/hyprpaper",
+        # The clipboard cutover moves the managed basename from ags-hypr-pano to
+        # ags-clipboard. The fixture still models the pre-flip all-legacy list,
+        # so config_links creates this spine dir; after the flip ags_apps_units
+        # repoints it at <install>/apps/clipboard/<tag>`.
+        "config/ags-clipboard",
         # config/ags is the ags_apps live-bar SYMLINK (<install>/config/ags ->
         # the pinned unit's bar/), config/ags-capture is the live-capture SYMLINK
         # (-> the unit's capture-tool/) and config/ags-wallpaper-selector is the
@@ -5178,6 +5184,7 @@ def _build_provisioned_layout(
         "ags",
         "ags-capture",
         "ags-icme",
+        "ags-clipboard",
         "ags-hypr-pano",
         "ags-wallpaper-selector",
         "ags-notifications",

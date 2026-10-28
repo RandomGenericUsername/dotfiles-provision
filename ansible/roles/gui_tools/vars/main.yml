@@ -20,14 +20,17 @@
 #       binaries to the user bin dir; this role starts the AGS UI instances.
 #       The two meet at runtime via $PATH + the instance bus, never on disk.
 #
-# hypr-pano IS RETIRED AS A GUI-TOOLS APP (ags-apps-bar-first slice 3). The
-# clipboard overlay moved into the ags-apps monorepo unit and deploys WHOLE via
-# the ags_apps role's live-pano link (<install>/config/ags-hypr-pano ->
-# <unit>/hypr-pano), so this role no longer enumerates it per file. The AGS
-# instance entry stays in gui_tools_ags_instances below: the app still launches
-# from ~/.config/ags-hypr-pano (the config-links symlink to the live-pano link),
-# and the quit loop must still restart it after placement. The deploy-coverage
-# gate asserts the absence of a stale per-file hypr-pano entry.
+# THE CLIPBOARD OVERLAY IS RETIRED AS A GUI-TOOLS APP (ags-apps-bar-first
+# slice 3 + the clipboard pilot). Its sources moved into the ags-apps monorepo
+# unit (hypr-pano) and now ship as the standalone `ags-clipboard` pilot. The
+# composition app-list entry is `clipboard` (instance `clipboard`, config dir
+# `ags-clipboard`, launcher `clipboard-ui`); once it flips to
+# `owner: standalone`, `ags_apps_units` owns its install, spine/XDG links and
+# launcher, so this role no longer enumerates it per file. The AGS instance
+# entry stays in gui_tools_ags_instances below and is filtered by the legacy
+# owner list: it lets the quit loop restart a legacy deployment after placement
+# without ever acting on a standalone one. The deploy-coverage gate asserts the
+# absence of a stale per-file hypr-pano entry.
 #
 # notifications IS RETIRED AS A GUI-TOOLS APP TOO (slice 4). The notification
 # daemon moved into the same ags-apps monorepo unit and deploys WHOLE via the
@@ -177,7 +180,7 @@ gui_tools_config_dirs: []
 #     always_on — true for the session-critical instances the machine must
 #                 KEEP running (the status bar `ags`, the notification overlay
 #                 `notifications`); false for the keybind-launched tools
-#                 (`capture`, `icon-color-mapping-editor`, `hypr-pano`,
+#                 (`capture`, `clipboard`, `icon-color-mapping-editor`,
 #                 `wallpaper-selector`, `btop-theme-studio`), which provisioning
 #                 deliberately leaves quit (§ per-instance lifecycle below).
 #     launch    — for always_on entries ONLY: the exact `ags run` command this
@@ -194,7 +197,7 @@ gui_tools_config_dirs: []
 #     org.freedesktop.Notifications (dunst is masked on purpose, so the overlay
 #     is the session's only notification daemon).
 #   - on-demand: quit and left down; the provisioned keybind launchers
-#     (capture-ui, icon-color-mapping-editor, hypr-pano-ui,
+#     (capture-ui, clipboard-ui, icon-color-mapping-editor,
 #     wallpaper-selector-ui, btop-theme-studio in cli_tools) start them when the
 #     user asks, so provisioning never opens a window nobody requested.
 gui_tools_ags_instances:
@@ -205,7 +208,10 @@ gui_tools_ags_instances:
     always_on: false
   - name: icon-color-mapping-editor
     always_on: false
-  - name: hypr-pano
+  # The clipboard-history pilot's instance name. The role's legacy-owner
+  # filter drops this entry when the composition marks the app standalone; it
+  # remains here so a legacy deployment still quits/restarts after placement.
+  - name: clipboard
     always_on: false
   - name: wallpaper-selector
     always_on: false

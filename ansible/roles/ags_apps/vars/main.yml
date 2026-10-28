@@ -162,14 +162,15 @@ ags_apps_runtime_colors_pointer: "{{ ags_apps_state_root }}/dotfiles/current/col
 #   repo root is not the package, the app dir is the package.
 ags_apps_hypr_pano_dir: "{{ ags_apps_unit_dir }}/hypr-pano"
 
-# ags_apps_live_pano_link: the live clipboard overlay. A symlink named
+# ags_apps_live_pano_link: the LEGACY clipboard overlay link. A symlink named
 #   `ags-hypr-pano` in the spine config root pointing at the unit's hypr-pano/
-#   dir, so <install>/config/ags-hypr-pano IS the pinned app. The config-links
-#   role exposes it unchanged at ~/.config/ags-hypr-pano; autostart.lua starts
-#   it at login and the provisioned `hypr-pano-ui` launcher drives it (cold
-#   start `ags run -d ~/.config/ags-hypr-pano`, then `ags request show`; warm
-#   `ags request toggle`) through the symlink, never the unit path directly. No
-#   per-file copy can drift.
+#   dir, so <install>/config/ags-hypr-pano IS the pinned legacy app. This link
+#   exists only while the OLD app id (`hypr-pano`) is in the legacy owner set.
+#   The clipboard pilot's composition entry is now `clipboard`; once it flips
+#   to `owner: standalone`, `ags_apps_units` owns
+#   <install>/config/ags-clipboard, ~/.config/ags-clipboard and `clipboard-ui`,
+#   and this legacy link is never created (the gate below keys on `hypr-pano`,
+#   which no longer appears in the list). No per-file copy can drift.
 ags_apps_live_pano_link: "{{ ags_apps_spine_config_dir }}/ags-hypr-pano"
 
 # ags_apps_notifications_dir: the deployed notification daemon package — the

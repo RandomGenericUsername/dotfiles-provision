@@ -6,6 +6,40 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-10-27
+
+### Added
+
+- **Clipboard cutover fixture and role proof (REQ-008):**
+  `tests/fixtures/ags-apps/app-list/clipboard.apps.yaml` models the v3
+  follow-up entry (`app`/`instance` `clipboard`, `ags-clipboard` config/spine/
+  XDG surfaces, `clipboard-ui` launcher, `clipboard` autostart). The
+  `ags_apps_units` execution test installs that standalone unit through a real
+  `ansible-playbook` run, asserts the immutable tag, spine/XDG links, the
+  locked `clipboard-ui` launcher (instance, window, dir, log) and that the
+  legacy `ags-hypr-pano`/`hypr-pano-ui` surfaces are not created.
+
+### Changed
+
+- **Provisioned launcher renamed to `clipboard-ui` (REQ-008):** the
+  `cli_tools` template that shipped as `hypr-pano-ui` now renders the clipboard
+  pilot — instance `clipboard`, window `clipboard-window`, dir
+  `~/.config/ags-clipboard`, log `~/.local/state/ags/clipboard.log`, cold start
+  through `ags-run-locked --expect-instance clipboard`, warm
+  `ags request toggle`. Its install task keys on the `clipboard` app id, so it
+  skips once the composition marks the entry standalone.
+- **Clipboard surfaces renamed in the legacy roles (REQ-008):** `gui_tools`
+  carries the `clipboard` on-demand instance instead of `hypr-pano`;
+  `config_links` exposes `ags-clipboard` instead of `ags-hypr-pano`; and the
+  `verify` mirror asserts `clipboard-ui` plus the `ags-clipboard` managed link.
+  The old `ags_apps` monorepo role still owns only `owner: legacy` entries and
+  its legacy live-pano link is gated on the old `hypr-pano` id, so a
+  `clipboard` standalone entry is left entirely to `ags_apps_units`.
+- **No app-list flip, no host provisioning and no assets pin move:** all seven
+  `dotfiles-v3` entries remain unchanged in this engine release; the clipboard
+  entry flip, `dotfiles-assets v0.6.2` pin and engine `v0.1.20` pin are the
+  composition follow-up.
+
 ## [0.1.19] - 2026-10-27
 
 ### Changed

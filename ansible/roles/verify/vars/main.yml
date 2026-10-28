@@ -64,7 +64,7 @@ verify_state_current_dir: "{{ verify_xdg_state_home | trim }}/dotfiles/current"
 #   is executable").
 #
 #   Scope boundary (AD-10): SIX of these are AGS launcher wrappers rendered by the
-#   cli_tools role (rofi-ui, capture-ui, hypr-pano-ui, wallpaper-selector-ui,
+#   cli_tools role (rofi-ui, capture-ui, clipboard-ui, wallpaper-selector-ui,
 #   icon-color-mapping-editor, btop-theme-studio) because they bake installed
 #   binary paths; they stay in cli_tools and are asserted here. `toggle-touchpad`
 #   is the ONE repo-authored static script: since S4 it is corpus data
@@ -84,10 +84,12 @@ verify_bin_scripts:
   # rofi's toggle launcher: the SUPER+D bind calls `rofi-ui` (open+close), so a
   # missing launcher would leave the key dead.
   - "{{ verify_cli_bin_dir | trim }}/rofi-ui"
-  # The remaining keybind launchers (keybindings.lua: pano, wallpaper picker,
-  # icon-mapping editor, btop studio). All four are cli_tools-rendered wrappers;
-  # a missing one is a dead key, exactly like rofi-ui/capture-ui above.
-  - "{{ verify_cli_bin_dir | trim }}/hypr-pano-ui"
+  # The remaining keybind launchers (keybindings.lua: clipboard history,
+  # wallpaper picker, icon-mapping editor, btop studio). All four are
+  # cli_tools-rendered wrappers; a missing one is a dead key, exactly like
+  # rofi-ui/capture-ui above. Once the clipboard app list entry is standalone,
+  # ags_apps_units renders the same name from the app-list launcher field.
+  - "{{ verify_cli_bin_dir | trim }}/clipboard-ui"
   - "{{ verify_cli_bin_dir | trim }}/wallpaper-selector-ui"
   - "{{ verify_cli_bin_dir | trim }}/icon-color-mapping-editor"
   - "{{ verify_cli_bin_dir | trim }}/btop-theme-studio"
@@ -738,12 +740,13 @@ verify_ags_apps_unit_files:
   - "{{ verify_ags_apps_bar_dir }}/bar/validate-cli.ts"
 
 # verify_ags_apps_hypr_pano_dir / _live_pano_link / _hypr_pano_files: the
-#   clipboard overlay, deployed WHOLE like the bar (ags-apps-bar-first slice 3).
-#   The live-pano link <install>/config/ags-hypr-pano is a symlink into the
-#   unit's hypr-pano/ dir, so the live app is always exactly the pinned tag — no
-#   per-file mirror can drift. Mirror of the ags_apps role vars. The
-#   ~/.config/ags-hypr-pano symlink (config_links) and the autostart/keybind
-#   launchers are unchanged: they resolve through this link.
+#   LEGACY clipboard overlay deployment (ags-apps-bar-first slice 3). The
+#   live-pano link <install>/config/ags-hypr-pano is checked only while the old
+#   `hypr-pano` app id remains in the legacy owner set. After the clipboard
+#   pilot flips to `owner: standalone`, ags_apps_units owns the
+#   <install>/config/ags-clipboard -> <install>/apps/clipboard/<tag> link and
+#   the `_verify_standalone.yml` mirror verifies it; this legacy block is
+#   skipped because `hypr-pano` is no longer in the list.
 verify_ags_apps_hypr_pano_dir: "{{ verify_ags_apps_unit_dir }}/hypr-pano"
 verify_ags_apps_live_pano_link: "{{ install_dir | trim }}/config/ags-hypr-pano"
 
@@ -1026,7 +1029,7 @@ verify_managed_link_dirs:
   - ags
   - ags-capture
   - ags-icme
-  - ags-hypr-pano
+  - ags-clipboard
   - ags-wallpaper-selector
   - ags-notifications
   - ags-btop-studio

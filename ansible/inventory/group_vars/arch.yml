@@ -87,7 +87,7 @@ packages:
   #     resolved inode/directory to kitty-open.desktop, so the capture tool's
   #     "Show in folder" opened a terminal instead of a file manager);
   #   * verify gates `xdg-mime query default inode/directory` against that pin;
-  #   * the capture tool's "Show in folder" and hypr-pano's URL opener shell
+  #   * the capture tool's "Show in folder" and the clipboard overlay's URL opener shell
   #     `xdg-open`.
   # Undeclared, the gui_tools task failed outright (no such binary) and the
   # verify assert failed with it — a fresh machine could not reach the gate.

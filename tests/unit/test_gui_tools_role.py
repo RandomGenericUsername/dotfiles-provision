@@ -332,20 +332,19 @@ class TestGuiToolsVars:
             f"got {instances}"
         )
 
-    def test_hypr_pano_is_retired_as_a_gui_tools_app(self) -> None:
-        """ags-apps-bar-first slice 3: the clipboard overlay moved into the
-        ags-apps unit and deploys WHOLE via the ags_apps role's live-pano link
-        (<install>/config/ags-hypr-pano -> <unit>/hypr-pano). gui_tools must
-        carry NO per-file hypr-pano manifest, NO ags-hypr-pano spine dir, and
-        NO placement task — a stale entry would template INTO the unit tree
-        through the live-pano link and diverge the live app from the pinned
-        tag. The in-repo source is gone (it lives in ags-apps now)."""
+    def test_clipboard_is_retired_as_a_gui_tools_app(self) -> None:
+        """ags-apps-bar-first slice 3 + the clipboard pilot: the overlay moved
+        into the ags-apps unit (hypr-pano) and now ships as the standalone
+        `clipboard` app. gui_tools must carry NO per-file clipboard manifest,
+        NO ags-clipboard spine dir, and NO placement task — a stale entry would
+        template INTO the unit tree through the live link and diverge the live
+        app from the pinned tag. The in-repo source is gone."""
         data = _vars()
-        assert "gui_tools_hypr_pano_app_files" not in data, (
-            "gui_tools_hypr_pano_app_files must be retired — the overlay "
-            "deploys WHOLE via the ags_apps live-pano link"
+        assert "gui_tools_clipboard_app_files" not in data, (
+            "gui_tools_clipboard_app_files must be retired — the overlay "
+            "deploys WHOLE via the ags_apps_units role"
         )
-        # No app-file list may still target the retired ags-hypr-pano/ spine.
+        # No app-file list may still target the old clipboard spine.
         for key, value in data.items():
             if key.endswith("_app_files") and isinstance(value, list):
                 for entry in value:
@@ -354,25 +353,33 @@ class TestGuiToolsVars:
                         f"{key} still deploys into the retired ags-hypr-pano/ "
                         f"spine: {dest}"
                     )
+                    assert "/ags-clipboard/" not in dest, (
+                        f"{key} still deploys into the standalone ags-clipboard/ "
+                        f"spine: {dest}"
+                    )
         assert not any(
-            "ags-hypr-pano" in str(d) for d in data["gui_tools_config_dirs"]
-        ), "the retired ags-hypr-pano/ spine dir must not be ensured as a dir"
+            "ags-clipboard" in str(d) for d in data["gui_tools_config_dirs"]
+        ), "the standalone ags-clipboard/ spine dir must not be ensured as a dir"
         assert not any(
-            "hypr_pano" in str(t.get("loop", "")) for t in _tasks()
-        ), "no gui_tools task may loop a hypr-pano manifest"
+            "clipboard" in str(t.get("loop", "")) for t in _tasks()
+        ), "no gui_tools task may loop a clipboard manifest"
         assert not (_REPO_ROOT / "src" / "gui-tools" / "hypr-pano").exists(), (
-            "the in-repo hypr-pano source must be deleted (it lives in the "
-            "ags-apps unit now)"
+            "the in-repo clipboard source must be deleted (it lives in the "
+            "ags-clipboard repo now)"
         )
 
-    def test_hypr_pano_ags_instance_still_launches_from_the_symlink(self) -> None:
-        """The app still launches: the AGS instance entry stays, so the quit
-        loop restarts it after placement. It runs from ~/.config/ags-hypr-pano
-        (the config-links symlink to the live-pano link), never the unit path."""
+    def test_clipboard_ags_instance_still_launches_from_the_symlink(self) -> None:
+        """The app still launches: the AGS instance entry stays for the legacy
+        owner filter, so the quit loop restarts it after placement. It runs
+        from ~/.config/ags-clipboard (the config-links symlink or the
+        ags_apps_units XDG link), never the unit path."""
         instances = [str(i["name"]) for i in _vars()["gui_tools_ags_instances"]]
-        assert "hypr-pano" in instances, (
-            f"the hypr-pano AGS instance must stay in gui_tools_ags_instances; "
+        assert "clipboard" in instances, (
+            f"the clipboard AGS instance must stay in gui_tools_ags_instances; "
             f"got {instances}"
+        )
+        assert "hypr-pano" not in instances, (
+            "the retired hypr-pano instance entry must not remain"
         )
 
     def test_wallpaper_selector_is_retired_as_a_gui_tools_app(self) -> None:
@@ -507,7 +514,7 @@ class TestGuiToolsVars:
         assert on_demand == [
             "btop-theme-studio",
             "capture",
-            "hypr-pano",
+            "clipboard",
             "icon-color-mapping-editor",
             "wallpaper-selector",
         ], f"the on-demand set drifted: {on_demand}"
