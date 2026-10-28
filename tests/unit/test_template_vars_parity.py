@@ -331,8 +331,8 @@ class TestTprPinMirrors:
             f"fixture tpr-templates source must read the {expected} checkout; "
             f"got {tpr_source!r}"
         )
-        assert str(assets_manifest["assets"]["tag"]) == "v0.6.1", (
-            "the assets corpus pin must not move with tpr"
+        assert str(assets_manifest["assets"]["tag"]) == "v0.6.2", (
+            "tpr does not move the corpus pin; REQ-008's v0.6.2 autostart does"
         )
 
 
