@@ -263,7 +263,8 @@ the final topology in the engine and retires the legacy monorepo owner.
 | Item | Value |
 | --- | --- |
 | Implementation/release commit | `4f2552f` — `feat(REQ-008): activate the final all-standalone AGS topology; v0.1.21` |
-| Merge/tag commit | `170aacf` — merge `ticket/REQ-008-ags-app-install-topology`; local annotated `v0.1.21` (tag object `c0d0265e6842679fbbc0cacac09e176f4b9f2790`, peeled `170aacf`) |
+| Check-mode fix | `31cd0c9` — `fix(REQ-008): keep fresh-host --check dry for standalone verification` |
+| Merge/tag commit | `1a9b769` — merge `ticket/REQ-008-ags-app-install-topology`; local annotated `v0.1.21` on `d652fc9` (tag object `5e6982414565dbd0970d77b6dc2d5669706e9cb7`, peeled `d652fc9`) |
 | Engine version | `0.1.21` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.21]` |
 
 ### Activation landed
@@ -339,3 +340,8 @@ installer no longer exists.
 - All seven app repos are local-only `v0.1.0` tags; no push/publish occurs in
   this ticket.
 - No host provision was run in this ticket.
+
+> Tag note: `v0.1.21` was first created on the mergeless ticket tip before the
+> fresh-host `--check` fix and then re-pointed to `d652fc9` (the final v0.1.21
+> tree with that fix) before any push/publish. It is local-only. A concurrent
+> REQ-010 ticket took main to v0.1.22; this tag remains the REQ-008 release.
