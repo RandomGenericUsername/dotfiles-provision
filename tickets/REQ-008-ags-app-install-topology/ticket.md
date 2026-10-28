@@ -77,11 +77,14 @@ Deliver:
       composition `deploy-coverage` app-list gate already validates the same
       legacy/mixed/all-standalone fixtures and is unchanged; no composition pin
       moved.
-- [ ] The old monorepo role/pin and old launcher/config entries are removed at
-      program completion. Deferred by design: no app has cut over, so
-      `ags_apps` remains the owner of all seven legacy entries on the adoption
-      tuple (`ags-apps v0.5.0`, `ags-platform v0.3.0`; engine v0.1.19). The
-      verification gate proves zero duplicate surfaces for a mixed list.
+- [x] The old monorepo role/pin and old launcher/config entries are removed at
+      program completion. Evidence (v0.1.21): `ansible/roles/ags_apps/` and
+      `ansible/playbooks/ags-apps.yaml` are deleted; `ags_apps_units` rejects a
+      `legacy` entry and owns all seven standalone apps. `cli_tools` no longer
+      renders AGS launchers, `gui_tools` no longer tracks AGS instances,
+      `config_links` no longer exposes AGS basenames, and `compositor_configs`
+      no longer generates/validates AGS icons. The all-standalone fixture and
+      execution tests prove one owner per surface and no legacy role.
 - [x] `make gates` is green; fake-app fixtures are GUI-free. Evidence below.
 
 ## Dependencies
@@ -251,3 +254,88 @@ the host.
    `~/.local/state/ags/clipboard.log` is written, and
    `~/.config/ags-clipboard` resolves through
    `<install>/config/ags-clipboard` to `<install>/apps/clipboard/<tag>`.
+
+## Follow-up closeout — final all-standalone activation (v0.1.21)
+
+Local-only release; nothing pushed, published or provisioned. This activates
+the final topology in the engine and retires the legacy monorepo owner.
+
+| Item | Value |
+| --- | --- |
+| Implementation/release commit | `4f2552f` — `feat(REQ-008): activate the final all-standalone AGS topology; v0.1.21` |
+| Merge/tag commit | pending at time of writing; local annotated `v0.1.21` on the merge commit |
+| Engine version | `0.1.21` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.21]` |
+
+### Activation landed
+
+- `ags_apps_units` is the only AGS installer/owner. Every app-list entry must be
+  `owner: standalone`; the role installs every app at
+  `<install>/apps/<installDir>/<tag>`, creates the ONE
+  `<install>/apps/node_modules/ags-platform` shortcut, and owns each app's
+  config/spine/XDG/bin/launcher surfaces, always-on starts and rollback.
+- The old `ags_apps` role/pin, its playbook and tests are deleted. `cli_tools`,
+  `gui_tools`, `config_links` and `compositor_configs` no longer own any AGS app
+  surface.
+- Launcher behavior is preserved through the app-list `launcher` field and the
+  generic template: request-toggle (clipboard), window-toggle fallbacks
+  (capture/selector/icme/studio), cold start under `ags-run-locked`, reveal via
+  `request show`. The bar and notifications remain installer-started.
+- `gui-tools` now runs before `ags-apps-units` so dunst is masked before the
+  notifications overlay starts.
+- The assets pin moves to `v0.6.2` (launch-lock autostart + clipboard rename);
+  the verbatim v0.6.2 autostart fixture drives the one-locked-entry assertion.
+- The bar tag (v0.1.1 after its state migration) carries `colors.css` as the
+  stable pointer to `$XDG_STATE_HOME/dotfiles/current/colors.gtk.css` and the
+  platform-produced `icons.json`; the role verifies both and writes neither.
+
+### Gates
+
+- `make gates` → exit 0. Fast suite: **896 passed, 31 skipped, 54 deselected**
+  (21m37s); hermetic: **893 passed, 34 skipped, 54 deselected** (20m36s);
+  `ruff check`, `uv lock --check`, `docs-check` all pass.
+- `make ci-gates-parity` → PASS.
+- `make build` → sdist + wheel `0.1.21`; wheel-contents check PASS.
+- Targeted execution proof: seven-app all-standalone install, second-run tag
+  immutability, rollback/restart, tag bump/state preservation, and launcher
+  toggle/request behavior all pass (GUI-free, local fake repos, no network).
+
+### Exact v3 final-cutover follow-up (not edited here)
+
+All seven entries MUST flip in ONE `dotfiles-v3/dotfiles/provisioning/apps.yaml`
+commit — this engine fails loud on any `owner: legacy` entry because the legacy
+installer no longer exists.
+
+1. **Flip all seven entries** to `owner: standalone` with released
+   `repo`/`tag`:
+   - `bar` (`installDir: bar`, `instance: ags`, `configDir/configLink/spineLink/xdgLink: ags`, `launcher: none`, `autostart: ags`, `launch: always`, `barPalettePointer: true`) at `ags-bar` **v0.1.1** (the state-migration tag that carries `colors.css`).
+   - `notifications` (`ags-notifications`, instance `notifications`, `ags-notifications`, `autostart: notifications`, `launch: always`) at `ags-notifications` v0.1.0.
+   - `capture` (`installDir: capture`, `ags-capture-tool` repo, instance `capture`, `ags-capture`, `binLink: capture-tool`, `launcher: capture-ui`, `autostart: capture`, `launch: on-demand`) at `ags-capture-tool` v0.1.0.
+   - `clipboard` (`installDir: clipboard`, `ags-clipboard`, instance `clipboard`, `ags-clipboard`, `launcher: clipboard-ui`, `autostart: clipboard`, `launch: on-demand`) at `ags-clipboard` v0.1.0. Replace the old `hypr-pano` entry; the legacy name must not remain.
+   - `wallpaper-selector` (`ags-wallpaper-selector`, `launcher: wallpaper-selector-ui`, `launch: on-demand`) at v0.1.0.
+   - `icme` (`ags-icme`, instance `icon-color-mapping-editor`, `ags-icme`, `launcher: icon-color-mapping-editor`, `launch: on-demand`) at v0.1.0.
+   - `btop-theme-studio` (`ags-btop-theme-studio`, instance `btop-theme-studio`, `ags-btop-studio`, `launcher: btop-theme-studio`, `launch: on-demand`) at v0.1.0.
+2. **Bump `program-tuple.yaml`**: `dotfiles-assets: v0.6.2`, `ags-platform:
+   v0.3.0`, `contracts: v0.3.0`, `schemaVersion: 1`.
+3. **Bump `dotfiles/provisioning/assets.yaml`**: `tag: v0.6.2` and its three
+   `source:` checkout paths.
+4. **Bump the engine pin** (`installer.pin` / expected engine tag) to
+   `v0.1.21`.
+5. Apply the composition. Expected host proof: `ags list` shows
+   `ags`/`notifications` always-on; `capture`/`clipboard` autostart after their
+   staggered delays; `~/.config/<xdgLink>` resolves through
+   `<install>/config/<spineLink>` into `<install>/apps/<installDir>/<tag>`;
+   `~/.local/bin/{capture-ui,clipboard-ui,wallpaper-selector-ui,icon-color-mapping-editor,btop-theme-studio}`
+   are present and toggle warm instances; `~/.local/state/ags/*.log` is written;
+   the bar's `colors.css` resolves to
+   `$XDG_STATE_HOME/dotfiles/current/colors.gtk.css`; and no
+   `<install>/ags-apps/` tree or `ags-hypr-pano`/`hypr-pano-ui` surface exists.
+
+### Deliberate limits / blockers
+
+- The bar `v0.1.1` state-migration tag does not exist in the local `ags-bar`
+  checkout yet (only `v0.1.0`). The v3 cutover cannot use this engine until
+  that app tag is created; this engine verifies the tag-carried pointer but
+  never authors it.
+- All seven app repos are local-only `v0.1.0` tags; no push/publish occurs in
+  this ticket.
+- No host provision was run in this ticket.
