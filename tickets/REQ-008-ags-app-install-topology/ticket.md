@@ -263,7 +263,7 @@ the final topology in the engine and retires the legacy monorepo owner.
 | Item | Value |
 | --- | --- |
 | Implementation/release commit | `4f2552f` — `feat(REQ-008): activate the final all-standalone AGS topology; v0.1.21` |
-| Merge/tag commit | pending at time of writing; local annotated `v0.1.21` on the merge commit |
+| Merge/tag commit | `170aacf` — merge `ticket/REQ-008-ags-app-install-topology`; local annotated `v0.1.21` (tag object `c0d0265e6842679fbbc0cacac09e176f4b9f2790`, peeled `170aacf`) |
 | Engine version | `0.1.21` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.21]` |
 
 ### Activation landed
