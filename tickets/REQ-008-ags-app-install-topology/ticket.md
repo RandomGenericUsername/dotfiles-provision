@@ -290,14 +290,14 @@ the final topology in the engine and retires the legacy monorepo owner.
 
 ### Gates
 
-- `make gates` → exit 0. Fast suite: **896 passed, 31 skipped, 54 deselected**
-  (21m37s); hermetic: **893 passed, 34 skipped, 54 deselected** (20m36s);
+- `make gates` → exit 0. Fast suite: **897 passed, 31 skipped, 54 deselected**
+  (21m58s); hermetic: **894 passed, 34 skipped, 54 deselected** (20m33s);
   `ruff check`, `uv lock --check`, `docs-check` all pass.
 - `make ci-gates-parity` → PASS.
 - `make build` → sdist + wheel `0.1.21`; wheel-contents check PASS.
 - Targeted execution proof: seven-app all-standalone install, second-run tag
   immutability, rollback/restart, tag bump/state preservation, and launcher
-  toggle/request behavior all pass (GUI-free, local fake repos, no network).
+  toggle/request behavior and fresh-host `--check` dryness all pass (GUI-free, local fake repos, no network).
 
 ### Exact v3 final-cutover follow-up (not edited here)
 
