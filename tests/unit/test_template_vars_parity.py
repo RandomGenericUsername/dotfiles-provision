@@ -238,12 +238,13 @@ class TestPinMirrorsMatchTheManifest:
         )
         print(f"parity: assets.tag {tag} mirrored by {', '.join(sorted(mirrors))}")
 
-    def test_every_assets_pin_mirror_is_v0_6_1(self) -> None:
-        """REQ-007: assets v0.6.1 carries the wlogout Logout fix.
+    def test_every_assets_pin_mirror_is_v0_6_2(self) -> None:
+        """REQ-008: assets v0.6.2 carries the AGS launch-lock autostart and the
+        clipboard rename.
 
         Every role that reads the pinned corpus keeps its own literal mirror
         (spine AD-6), and the fixture manifest repeats the tag in its checkout
-        sources. This guard fails while any leg still says v0.6.0.
+        sources. This guard fails while any leg still says v0.6.1.
         """
         mirrors = {
             "assets": "assets_pinned_tag",
@@ -256,7 +257,7 @@ class TestPinMirrorsMatchTheManifest:
             "wlogout_config": "wlogout_config_assets_pinned_tag",
             "zsh_config": "zsh_config_assets_pinned_tag",
         }
-        expected = "v0.6.1"
+        expected = "v0.6.2"
         drift = {
             role: str(assets_templates.role_vars(role)[key])
             for role, key in mirrors.items()
@@ -351,8 +352,8 @@ class TestCsgAndRuntimePinMirrors:
         assert "/cli-tools/csg/v0.2.0/" not in str(csg_source), (
             "fixture csg-templates source still names the previous csg checkout"
         )
-        assert str(assets_manifest["assets"]["tag"]) == "v0.6.1", (
-            "the assets corpus tag must stay v0.6.1; only the csg template source moves"
+        assert str(assets_manifest["assets"]["tag"]) == "v0.6.2", (
+            "the assets corpus tag must stay v0.6.2 in the fixture manifest"
         )
 
     def test_runtime_mirrors_are_v0_2_3(self) -> None:

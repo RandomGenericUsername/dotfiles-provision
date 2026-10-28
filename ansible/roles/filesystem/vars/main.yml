@@ -28,7 +28,6 @@ filesystem_xdg_cache_home: "{{ ansible_facts.env.XDG_CACHE_HOME | default(ansibl
 filesystem_compositor_dirs:
   - "{{ filesystem_xdg_config_home }}/hypr"
   - "{{ filesystem_xdg_config_home }}/hyprpaper"
-  - "{{ filesystem_xdg_config_home }}/ags"
 
 # Install-spine dirs relative to install_dir (AC 4, parity-locked to the
 # manifest).
@@ -57,15 +56,11 @@ filesystem_spine_dirs:
   - config/color-scheme-generator/templates
   - config/hypr
   - config/hyprpaper
-  # config/ags is DELIBERATELY absent: the ags_apps role owns it as the
-  # live-bar SYMLINK (<install>/config/ags -> the pinned unit's bar/), so the
-  # filesystem role must not claim it as a dir. A dir entry here made verify's
-  # criterion-1 isdir assert false on a real bootstrap (stat.isdir is false
-  # through a symlink); verify asserts the symlink separately via
-  # verify_ags_apps_live_bar_link. config/ags-capture is absent for the SAME
-  # reason (slice 5): the ags_apps role owns it as the live-capture SYMLINK
-  # (<install>/config/ags-capture -> the unit's capture-tool/), asserted via
-  # verify_ags_apps_live_capture_link.
+  # Every config/ags* path is DELIBERATELY absent: ags_apps_units owns each
+  # app's spine link (<install>/config/<spineLink> -> <install>/apps/...), so
+  # the filesystem role must not claim one as a dir. A dir entry here made
+  # verify's criterion-1 isdir assert false through the symlink, and it would
+  # also race the installer's link creation.
   - config/nvim
   - config/starship
   - config/wlogout

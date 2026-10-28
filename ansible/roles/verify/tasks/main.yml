@@ -132,37 +132,21 @@
     verify_ags_apps_document: "{{ lookup('file', verify_ags_apps_units_apps_file) | from_yaml }}"
     verify_ags_tuple: "{{ lookup('file', verify_ags_apps_units_tuple_file) | from_yaml }}"
 
-- name: Partition the app list by its single owner field
+- name: Partition the app list (final all-standalone topology)
   ansible.builtin.set_fact:
-    verify_ags_legacy_apps: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | list }}"
     verify_ags_standalone_apps: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | list }}"
-    verify_ags_legacy_names: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
     verify_ags_standalone_names: "{{ verify_ags_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | map(attribute='app') | list }}"
+    verify_ags_always_on_instances: >-
+      {{ verify_ags_apps_document.apps
+         | selectattr('owner', 'equalto', 'standalone')
+         | selectattr('launch', 'equalto', 'always')
+         | map(attribute='instance') | list }}
 
-# Generated icons.json files land through a LEGACY live link because the
-# compositor_configs role generates them. A standalone app verifies the
-# platform's single-produced artifact instead (AD-37), so drop its generated
-# skeleton from the criterion-7 list without changing the legacy mirror.
-- name: Derive standalone apps' generated icon skeletons
-  ansible.builtin.set_fact:
-    verify_ags_standalone_icon_skeletons: >-
-      {{ verify_ags_standalone_apps
-         | map(attribute='spineLink')
-         | map('regex_replace', '^', verify_ags_apps_units_spine_config_dir ~ '/')
-         | map('regex_replace', '$', '/' ~ 'icons.json')
-         | list }}
-
-- name: Select the compositor skeletons still generated for legacy owners
-  ansible.builtin.set_fact:
-    verify_compositor_skeleton_active_files: >-
-      {{ verify_compositor_skeleton_files
-         | reject('in', verify_ags_standalone_icon_skeletons) | list }}
-
-- name: Assert every AGS app has exactly one owner and unique surfaces
+- name: Assert every AGS app is standalone and the surfaces are unique
   ansible.builtin.assert:
     that:
-      - verify_ags_legacy_apps | length + verify_ags_standalone_apps | length == verify_ags_apps_document.apps | length
-      - verify_ags_legacy_names | intersect(verify_ags_standalone_names) | length == 0
+      - verify_ags_standalone_apps | length == verify_ags_apps_document.apps | length
+      - verify_ags_apps_document.apps | map(attribute='owner') | unique | list == ['standalone']
       - >-
         verify_ags_apps_document.apps | map(attribute='app') | unique | list | length
         == verify_ags_apps_document.apps | length
@@ -185,8 +169,10 @@
         verify_ags_apps_document.apps | map(attribute='installDir') | unique | list | length
         == verify_ags_apps_document.apps | length
     fail_msg: >-
-      the composition app list must assign every AGS app exactly one owner and
-      unique identity/link/install surfaces (AD-31/AD-32).
+      the composition app list must be the final all-standalone topology:
+      every AGS app is owner=standalone and its identity/link/install surfaces
+      are unique (AD-31/AD-32). A legacy entry has no installer — the old
+      `ags_apps` role is retired.
 
 - name: Assert the program tuple names exactly the three program tags
   ansible.builtin.assert:
@@ -246,7 +232,6 @@
       - verify_cli_tools | length > 0
       - verify_notifd_binding_packages | length > 0
       - verify_astal_wp_binding_packages | length > 0
-      - verify_ags_always_on_instances | length > 0
       - verify_install_spine_dirs | length > 0
       - verify_install_spine_files | length > 0
       - verify_palette_files | length > 0
@@ -254,7 +239,6 @@
       - verify_compositor_config_dirs | length > 0
       - verify_compositor_skeleton_files | length > 0
       - verify_ags_platform_unit_files | length > 0
-      - verify_ags_apps_unit_files | length > 0
       - verify_consumer_symlinks | length > 0
       - verify_xdg_dirs | length > 0
       - verify_config_copies_targets | length > 0
@@ -1698,7 +1682,7 @@
     follow: true
   loop: >-
     {{ verify_compositor_config_dirs
-       + (verify_compositor_skeleton_active_files | default(verify_compositor_skeleton_files)) }}
+       + (verify_compositor_skeleton_files) }}
   register: verify_compositor_checks
 
 - name: Assert compositor configs and skeletons are present with correct types
@@ -1708,7 +1692,7 @@
       - >-
         verify_compositor_checks.results[verify_compositor_config_dirs | length:]
         | map(attribute='stat') | selectattr('isreg') | list | length
-        == (verify_compositor_skeleton_active_files | default(verify_compositor_skeleton_files)) | length
+        == (verify_compositor_skeleton_files) | length
     fail_msg: >-
       not every compositor config dir or skeleton is present with the
       right inode type under {{ verify_xdg_config_home }} (done-criterion 7).
@@ -1716,33 +1700,21 @@
       run those playbooks first
   when: not ansible_check_mode
 
-# The AGS platform is ONE versioned unit + a shared-ancestor shortcut (spine
-# AD-17/AD-23), installed by the ags_platform role. The bar imports the bare
-# specifier `ags-platform`; if the unit OR the shortcut is missing, `ags bundle`
-# cannot resolve it and the bar fails to start. verify asserts BOTH: the unit
-# files exist, and the shortcut is a symlink whose target names the pinned
-# version and resolves to a directory. This is the honest coverage the
-# deploy-coverage gate's manifest assertion cannot provide (the gate reads the
-# repo, not the host).
+# The AGS platform is ONE versioned unit (spine AD-17/AD-23), installed by the
+# ags_platform role. Every app imports the bare specifier `ags-platform`; if the
+# unit is missing, `ags bundle` cannot resolve it and no app starts. The shared
+# <install>/apps/node_modules/ags-platform shortcut is created and asserted by
+# the standalone mirror (ags_apps_units). This is the honest coverage the
+# deploy-coverage gate's manifest assertion cannot provide (it reads the repo,
+# not the host).
 - name: Check the ags-platform unit files and pin
   ansible.builtin.stat:
     path: "{{ item }}"
   loop: "{{ [verify_ags_platform_unit_dir, verify_ags_platform_pin_file] + verify_ags_platform_unit_files }}"
   register: verify_ags_platform_unit_checks
 
-- name: Check the ags-platform shortcut is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_platform_shortcut }}"
-    follow: false
-  register: verify_ags_platform_link_check
 
-- name: Check the ags-platform shortcut resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_platform_shortcut }}"
-    follow: true
-  register: verify_ags_platform_link_resolve_check
-
-- name: Assert the ags-platform unit + shared-ancestor shortcut are installed
+- name: Assert the ags-platform unit is installed
   ansible.builtin.assert:
     that:
       - verify_ags_platform_unit_checks.results[0].stat.isdir
@@ -1751,413 +1723,21 @@
         verify_ags_platform_unit_checks.results[2:]
         | map(attribute='stat') | selectattr('isreg') | list | length
         == verify_ags_platform_unit_files | length
-      - verify_ags_platform_link_check.stat.islnk
-      - verify_ags_platform_link_check.stat.lnk_target is search(verify_ags_platform_version)
-      - verify_ags_platform_link_resolve_check.stat.isdir
     fail_msg: >-
-      the ags-platform unit or its shared-ancestor shortcut is missing under
-      {{ install_dir | trim }} (spine AD-17/AD-23). Expected the pinned unit at
+      the ags-platform unit is missing under {{ install_dir | trim }} (spine
+      AD-17/AD-23). Expected the pinned unit at
       {{ verify_ags_platform_unit_dir }}/ (package.json / index.ts / ports/ /
-      adapters/), the pin file at {{ verify_ags_platform_pin_file }}, and
-      {{ verify_ags_platform_shortcut }} as a symlink into the unit. Without them
-      the bar's bare-specifier `ags-platform` import cannot resolve and the bar
-      fails to start. The ags_platform role installs them; run the ags-platform
+      adapters/) and the pin file at {{ verify_ags_platform_pin_file }}. Without
+      it the app tags' bare-specifier `ags-platform` import cannot resolve and
+      no AGS app starts. The ags_platform role installs it; run the ags-platform
       playbook first
   when: not ansible_check_mode
 
-# The AGS bar is ONE versioned unit + a live-bar link + a per-unit resolution
-# shortcut (spine AD-1/AD-17/AD-23), installed by the ags_apps role. The live
-# bar IS the unit's bar/ subdir (no per-file copy can drift); if the unit, the
-# link, or the resolution shortcut is missing, the bar is stale, absent, or
-# cannot resolve its own `ags-platform` imports. verify asserts ALL THREE: the
-# unit files exist, the live-bar link is a symlink whose target names the
-# pinned tag and resolves to a directory, and the resolution shortcut is a
-# symlink whose target names the pinned PLATFORM version and resolves to a
-# directory. This is the honest coverage the deploy-coverage gate's unit
-# assertion cannot provide (the gate reads the repo, not the host).
-- name: Check the ags-apps unit files and pin
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ [verify_ags_apps_unit_dir, verify_ags_apps_pin_file] + verify_ags_apps_unit_files }}"
-  register: verify_ags_apps_unit_checks
-
-- name: Check the live bar is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_bar_link }}"
-    follow: false
-  register: verify_ags_apps_live_bar_check
-
-- name: Check the live bar resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_bar_link }}"
-    follow: true
-  register: verify_ags_apps_live_bar_resolve_check
-
-- name: Check the per-unit resolution shortcut is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_resolution_shortcut }}"
-    follow: false
-  register: verify_ags_apps_resolution_check
-
-- name: Check the per-unit resolution shortcut resolves to the platform unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_resolution_shortcut }}"
-    follow: true
-  register: verify_ags_apps_resolution_resolve_check
-
-- name: Assert the ags-apps unit + live bar + resolution shortcut are installed
-  ansible.builtin.assert:
-    that:
-      - verify_ags_apps_unit_checks.results[0].stat.isdir
-      - verify_ags_apps_unit_checks.results[1].stat.isreg
-      - >-
-        verify_ags_apps_unit_checks.results[2:]
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_unit_files | length
-      - verify_ags_apps_live_bar_check.stat.islnk
-      - verify_ags_apps_live_bar_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_bar_resolve_check.stat.isdir
-      - verify_ags_apps_resolution_check.stat.islnk
-      - verify_ags_apps_resolution_check.stat.lnk_target is search(verify_ags_apps_platform_version)
-      - verify_ags_apps_resolution_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps unit, the live bar, or its resolution shortcut is missing
-      under {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the
-      pinned unit at {{ verify_ags_apps_unit_dir }}/ (bar/app.tsx, bar/Bar.tsx,
-      bar/validate-cli.ts, ...), the pin file at {{ verify_ags_apps_pin_file }},
-      {{ verify_ags_apps_live_bar_link }} as a symlink into the unit's bar/,
-      and {{ verify_ags_apps_resolution_shortcut }} as a symlink into the
-      pinned platform unit. Without them the live bar is absent or cannot
-      resolve its bare-specifier `ags-platform` imports. The ags_apps role
-      installs them; run the ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'bar' in (verify_ags_legacy_names | default([]))"
-
-# The clipboard overlay is deployed the same way as the bar (slice 3): the
-# unit's hypr-pano/ subdir is linked as the live <install>/config/ags-hypr-pano.
-# verify asserts the unit files exist and the live-pano link is a symlink whose
-# target names the pinned tag and resolves to a directory — the host-side
-# coverage the deploy-coverage gate's repo-side shape assertion cannot provide.
-- name: Check the ags-apps hypr-pano unit files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ verify_ags_apps_hypr_pano_files }}"
-  register: verify_ags_apps_hypr_pano_checks
-
-- name: Check the live clipboard overlay is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_pano_link }}"
-    follow: false
-  register: verify_ags_apps_live_pano_check
-
-- name: Check the live clipboard overlay resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_pano_link }}"
-    follow: true
-  register: verify_ags_apps_live_pano_resolve_check
-
-- name: Assert the ags-apps hypr-pano unit + live-pano link are installed
-  ansible.builtin.assert:
-    that:
-      - >-
-        verify_ags_apps_hypr_pano_checks.results
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_hypr_pano_files | length
-      - verify_ags_apps_live_pano_check.stat.islnk
-      - verify_ags_apps_live_pano_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_pano_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps hypr-pano unit or its live link is missing under
-      {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the pinned
-      unit's hypr-pano/ at {{ verify_ags_apps_hypr_pano_dir }}/ (app.tsx,
-      ui/PanoWindow.tsx, lib/history.ts, ...) and
-      {{ verify_ags_apps_live_pano_link }} as a symlink into it. Without them the
-      live clipboard overlay is absent. The ags_apps role installs them; run the
-      ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'hypr-pano' in (verify_ags_legacy_names | default([]))"
-
-# The notification overlay is deployed the same way as the bar and hypr-pano
-# (slice 4): the unit's notifications/ subdir is linked as the live
-# <install>/config/ags-notifications. verify asserts the unit files exist and
-# the live-notifications link is a symlink whose target names the pinned tag and
-# resolves to a directory — the host-side coverage the deploy-coverage gate's
-# repo-side shape assertion cannot provide.
-- name: Check the ags-apps notifications unit files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ verify_ags_apps_notifications_files }}"
-  register: verify_ags_apps_notifications_checks
-
-- name: Check the live notification overlay is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_notifications_link }}"
-    follow: false
-  register: verify_ags_apps_live_notifications_check
-
-- name: Check the live notification overlay resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_notifications_link }}"
-    follow: true
-  register: verify_ags_apps_live_notifications_resolve_check
-
-- name: Assert the ags-apps notifications unit + live-notifications link are installed
-  ansible.builtin.assert:
-    that:
-      - >-
-        verify_ags_apps_notifications_checks.results
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_notifications_files | length
-      - verify_ags_apps_live_notifications_check.stat.islnk
-      - verify_ags_apps_live_notifications_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_notifications_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps notifications unit or its live link is missing under
-      {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the pinned
-      unit's notifications/ at {{ verify_ags_apps_notifications_dir }}/ (app.tsx,
-      ui/NotificationsWindow.tsx, lib/card-model.ts, ...) and
-      {{ verify_ags_apps_live_notifications_link }} as a symlink into it. Without
-      them nothing owns org.freedesktop.Notifications (dunst is masked on
-      purpose) and every notification is dropped silently. The ags_apps role
-      installs them; run the ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'notifications' in (verify_ags_legacy_names | default([]))"
-
-# (slice 5): the unit's capture-tool/ subdir is linked as the live
-# <install>/config/ags-capture. verify asserts the unit files exist and the
-# live-capture link is a symlink whose target names the pinned tag and resolves to
-# a directory — the host-side coverage the deploy-coverage gate's repo-side shape
-# assertion cannot provide. The Python backend now ships in the SAME unit
-# (ags-apps v0.4.0), so the installed CLI entry point is asserted here too: a
-# symlink in the user bin dir whose target names the pinned tag and resolves to
-# the unit's backend. That pairing is what makes the app one self-contained,
-# single-version component.
-- name: Check the ags-apps capture-tool unit files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ verify_ags_apps_capture_tool_files }}"
-  register: verify_ags_apps_capture_tool_checks
-
-- name: Check the live capture GUI is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_capture_link }}"
-    follow: false
-  register: verify_ags_apps_live_capture_check
-
-- name: Check the live capture GUI resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_capture_link }}"
-    follow: true
-  register: verify_ags_apps_live_capture_resolve_check
-
-- name: Assert the ags-apps capture-tool unit + live-capture link are installed
-  ansible.builtin.assert:
-    that:
-      - >-
-        verify_ags_apps_capture_tool_checks.results
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_capture_tool_files | length
-      - verify_ags_apps_live_capture_check.stat.islnk
-      - verify_ags_apps_live_capture_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_capture_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps capture-tool unit or its live link is missing under
-      {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the pinned
-      unit's capture-tool/ at {{ verify_ags_apps_capture_tool_dir }}/ (app.tsx,
-      ui/classic/ClassicWindow.tsx, domain/cli-args.ts, ...) and
-      {{ verify_ags_apps_live_capture_link }} as a symlink into it. Without them
-      the SUPER+PRINT keybind and the `capture-ui` launcher open a dead instance.
-      The ags_apps role installs them; run the ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'capture' in (verify_ags_legacy_names | default([]))"
-
-# The CLI half of the same unit: <bin dir>/capture-tool must be a symlink into
-# the pinned unit's capture-tool/bin/capture-tool. A regular file means a stale
-# cli_tools copy (two sources of truth); a link into another tag means the
-# controller and the GUI can disagree. stat (follow: false) describes the link
-# itself; the second stat (follow: true) proves the target really resolves.
-- name: Check the capture-tool CLI entry point is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_capture_tool_bin_link }}"
-    follow: false
-  register: verify_capture_tool_bin_link_check
-
-- name: Check the capture-tool CLI entry point resolves to the unit backend
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_capture_tool_bin_link }}"
-    follow: true
-  register: verify_capture_tool_backend_check
-
-- name: Assert the capture-tool CLI is the pinned unit's backend symlink
-  ansible.builtin.assert:
-    that:
-      - verify_capture_tool_bin_link_check.stat.exists
-      - verify_capture_tool_bin_link_check.stat.islnk
-      - verify_capture_tool_bin_link_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_capture_tool_backend_check.stat.isreg
-    fail_msg: >-
-      the capture-tool CLI at {{ verify_ags_apps_capture_tool_bin_link }} is not
-      a symlink into the pinned unit ({{ verify_ags_apps_version }}). Expected a
-      link to {{ verify_ags_apps_capture_tool_backend }}. A regular file is a
-      stale copy; a link to another tag lets the controller and the GUI disagree.
-      The ags_apps role installs it; run the ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'capture' in (verify_ags_legacy_names | default([]))"
-
-# (slice 6): the unit's wallpaper-selector/ subdir is linked as the live
-# <install>/config/ags-wallpaper-selector. verify asserts the unit files exist and
-# the live-wallpaper-selector link is a symlink whose target names the pinned tag
-# and resolves to a directory — the host-side coverage the deploy-coverage gate's
-# repo-side shape assertion cannot provide. The selector is a whole package:
-# nothing (no backend) stays in-repo to assert separately.
-- name: Check the ags-apps wallpaper-selector unit files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ verify_ags_apps_wallpaper_selector_files }}"
-  register: verify_ags_apps_wallpaper_selector_checks
-
-- name: Check the live wallpaper selector is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_wallpaper_selector_link }}"
-    follow: false
-  register: verify_ags_apps_live_wallpaper_selector_check
-
-- name: Check the live wallpaper selector resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_wallpaper_selector_link }}"
-    follow: true
-  register: verify_ags_apps_live_wallpaper_selector_resolve_check
-
-- name: Assert the ags-apps wallpaper-selector unit + live-wallpaper-selector link are installed
-  ansible.builtin.assert:
-    that:
-      - >-
-        verify_ags_apps_wallpaper_selector_checks.results
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_wallpaper_selector_files | length
-      - verify_ags_apps_live_wallpaper_selector_check.stat.islnk
-      - verify_ags_apps_live_wallpaper_selector_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_wallpaper_selector_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps wallpaper-selector unit or its live link is missing under
-      {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the pinned
-      unit's wallpaper-selector/ at {{ verify_ags_apps_wallpaper_selector_dir }}/ (app.tsx,
-      ui/WallpaperSelectorWindow.tsx, lib/model.ts, ...) and
-      {{ verify_ags_apps_live_wallpaper_selector_link }} as a symlink into it.
-      Without them the SUPER+W keybind and the `wallpaper-selector-ui` launcher
-      open a dead instance. The ags_apps role installs them; run the ags-apps
-      playbook first
-  when:
-    - not ansible_check_mode
-    - "'wallpaper-selector' in (verify_ags_legacy_names | default([]))"
-
-# (slice 7): the unit's icme/ subdir is linked as the live
-# <install>/config/ags-icme. verify asserts the unit files exist and the
-# live-icme link is a symlink whose target names the pinned tag and resolves to a
-# directory — the host-side coverage the deploy-coverage gate's repo-side shape
-# assertion cannot provide. icme is a whole package: nothing (no backend) stays
-# in-repo to assert separately. The event publisher seam is asserted as part of
-# the unit files (lib/icme-saved.ts + lib/generated/contract.ts).
-- name: Check the ags-apps icme unit files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ verify_ags_apps_icme_files }}"
-  register: verify_ags_apps_icme_checks
-
-- name: Check the live icon color mapping editor is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_icme_link }}"
-    follow: false
-  register: verify_ags_apps_live_icme_check
-
-- name: Check the live icon color mapping editor resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_icme_link }}"
-    follow: true
-  register: verify_ags_apps_live_icme_resolve_check
-
-- name: Assert the ags-apps icme unit + live-icme link are installed
-  ansible.builtin.assert:
-    that:
-      - >-
-        verify_ags_apps_icme_checks.results
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_icme_files | length
-      - verify_ags_apps_live_icme_check.stat.islnk
-      - verify_ags_apps_live_icme_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_icme_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps icme unit or its live link is missing under
-      {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the pinned
-      unit's icme/ at {{ verify_ags_apps_icme_dir }}/ (app.tsx,
-      ui/EditorWindow.tsx, lib/model.ts, lib/icme-saved.ts, ...) and
-      {{ verify_ags_apps_live_icme_link }} as a symlink into it. Without them the
-      SUPER+I keybind and the `icon-color-mapping-editor` launcher open a dead
-      instance (and no icme.saved event can be published). The ags_apps role
-      installs them; run the ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'icme' in (verify_ags_legacy_names | default([]))"
-
-# (slice 8): the unit's btop-theme-studio/ subdir is linked as the live
-# <install>/config/ags-btop-studio. verify asserts the unit files exist and the
-# live-btop-studio link is a symlink whose target names the pinned tag and
-# resolves to a directory — the host-side coverage the deploy-coverage gate's
-# repo-side shape assertion cannot provide. The studio is a whole package:
-# nothing stays in-repo, and the live-preview engine (live/btop_live.py) is
-# asserted as part of the unit files because the app runs it from this tree.
-- name: Check the ags-apps btop-theme-studio unit files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ verify_ags_apps_btop_studio_files }}"
-  register: verify_ags_apps_btop_studio_checks
-
-- name: Check the live btop Theme Studio is a symlink
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_btop_studio_link }}"
-    follow: false
-  register: verify_ags_apps_live_btop_studio_check
-
-- name: Check the live btop Theme Studio resolves to the unit
-  ansible.builtin.stat:
-    path: "{{ verify_ags_apps_live_btop_studio_link }}"
-    follow: true
-  register: verify_ags_apps_live_btop_studio_resolve_check
-
-- name: Assert the ags-apps btop-theme-studio unit + live-btop-studio link are installed
-  ansible.builtin.assert:
-    that:
-      - >-
-        verify_ags_apps_btop_studio_checks.results
-        | map(attribute='stat') | selectattr('isreg') | list | length
-        == verify_ags_apps_btop_studio_files | length
-      - verify_ags_apps_live_btop_studio_check.stat.islnk
-      - verify_ags_apps_live_btop_studio_check.stat.lnk_target is search(verify_ags_apps_version)
-      - verify_ags_apps_live_btop_studio_resolve_check.stat.isdir
-    fail_msg: >-
-      the ags-apps btop-theme-studio unit or its live link is missing under
-      {{ install_dir | trim }} (spine AD-1/AD-17/AD-23). Expected the pinned
-      unit's btop-theme-studio/ at {{ verify_ags_apps_btop_studio_dir }}/ (app.tsx,
-      ui/StudioWindow.tsx, lib/theme-model.ts, live/btop_live.py, ...) and
-      {{ verify_ags_apps_live_btop_studio_link }} as a symlink into it. Without
-      them the SUPER+B keybind and the `btop-theme-studio` launcher open a dead
-      instance (and the live preview engine is unreachable). The ags_apps role
-      installs them; run the ags-apps playbook first
-  when:
-    - not ansible_check_mode
-    - "'btop-theme-studio' in (verify_ags_legacy_names | default([]))"
-
-# ── Generic standalone mirror (dormant while every entry is legacy) ─────────
-# The installer and verifier read the SAME single app list. For every
-# owner: standalone entry, verify the immutable unit, shared platform shortcut,
-# spine/XDG/bin/launcher surfaces, bar palette pointer, single-produced
-# icons.json, assets-owned autostart identity and the shared launch lock. No
-# task writes anything.
+# ── Standalone ownership mirror (the final topology) ─────────────────────────
+# The installer and verifier read the SAME single app list. For every app,
+# verify the immutable unit, shared platform shortcut, spine/XDG/bin/launcher
+# surfaces, bar palette pointer, single-produced icons.json, assets-owned
+# autostart identity and the shared launch lock. No task writes anything.
 - name: Verify each standalone app's ownership surfaces
   ansible.builtin.include_tasks: _verify_standalone.yml
   loop: "{{ verify_ags_standalone_apps | default([]) }}"

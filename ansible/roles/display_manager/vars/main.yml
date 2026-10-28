@@ -34,7 +34,7 @@ display_manager_enable_service: "{{ 'sddm' if display_manager_type == 'sddm-pixi
 # v0.6.0 (assets req-006) added the `[Wayland] CompositorCommand` body. v0.5.0
 # rendered `DisplayServer=wayland` with no compositor at all — the BUG-004
 # session bounce.
-display_manager_assets_pinned_tag: v0.6.1
+display_manager_assets_pinned_tag: v0.6.2
 display_manager_assets_templates_dir: "{{ install_dir | trim }}/assets/{{ display_manager_assets_pinned_tag }}/templates"
 
 # ── SDDM + Pixie (default) ───────────────────────────────────────────────────

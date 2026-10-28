@@ -60,21 +60,12 @@ config_links_backup_policy: auto
 # config_links_managed_dirs: the complete set of config dirs this role
 #   symlinks. Mirrors the union of what the writing roles place:
 #   - assets       → color-scheme-generator (templates/), weg (effects.yaml)
-#   - compositor_configs → hypr, hyprpaper, ags
-#   - gui_tools    → (none since slice 8: gui_tools no longer places app
-#                    sources per file, so it contributes no managed dir)
-#   - ags_apps     → ags, ags-clipboard, ags-notifications, ags-capture,
-#                    ags-wallpaper-selector, ags-icme, ags-btop-studio (the live
-#                    links the config-links role exposes at ~/.config/<name>;
-#                    slice 5: ags-capture's TARGET is the ags_apps role's
-#                    live-capture SYMLINK -> the unit's capture-tool/; slice 6/7:
-#                    ags-wallpaper-selector and ags-icme likewise resolve to the
-#                    ags_apps live links -> the unit's wallpaper-selector/ and
-#                    icme/; slice 8: ags-btop-studio -> the unit's
-#                    btop-theme-studio/. The clipboard pilot's ags-clipboard
-#                    link is rendered by ags_apps_units once the composition
-#                    marks it standalone; the legacy-owner filter below drops
-#                    the basename from this role's active set in that epoch.)
+#   - compositor_configs → hypr, hyprpaper
+#   - gui_tools    → (none)
+#   - ags_apps_units → (none: the ONLY AGS installer creates every app's
+#                    <install>/config/<spineLink> and ~/.config/<xdgLink> from
+#                    the composition app list. No AGS basename appears in this
+#                    role's managed set — that would be a second owner.)
 #   - config_copies → nvim, starship, wlogout, zsh
 #   - settings     → color-scheme-generator, weg, itr
 #   - gt-3-1       → gtk-3.0, gtk-4.0 (the GTK consumer dirs)
@@ -88,13 +79,6 @@ config_links_backup_policy: auto
 config_links_managed_dirs:
   - hypr
   - hyprpaper
-  - ags
-  - ags-capture
-  - ags-icme
-  - ags-clipboard
-  - ags-wallpaper-selector
-  - ags-notifications
-  - ags-btop-studio
   - nvim
   - starship
   - wlogout

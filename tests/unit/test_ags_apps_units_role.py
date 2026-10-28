@@ -1,10 +1,10 @@
-"""REQ-008: generic per-app AGS install topology and one-owner cutover.
+"""REQ-008: the final all-standalone AGS install topology.
 
-The role reads the composition's `apps.yaml` + `program-tuple.yaml` and acts
-only on `owner: standalone`. These tests pin the structure (owner filters,
-immutable-tag discipline, tuple shortcut, quiesce->repoint->start->verify
-ordering, rollback, launch lock) and execute the role against local fake app
-repos with a fake AGS CLI — GUI-free, no network, no real cutover.
+`ags_apps_units` is the ONLY AGS app installer. These tests pin the structure
+(one owner per app, immutable tags, the shared platform shortcut,
+quiesce->repoint->start->verify ordering, rollback, launch lock, launcher
+toggle/request behavior, autostart identities) and execute the role against
+seven local fake app repos with a fake AGS CLI — GUI-free, no network.
 """
 
 from __future__ import annotations
@@ -66,6 +66,17 @@ _ROLE = _ROLES_DIR / "ags_apps_units"
 _FIXTURES = _ENGINE_ROOT / "tests" / "fixtures" / "ags-apps"
 _APP_LISTS = _FIXTURES / "app-list"
 _FAKE_APP = _FIXTURES / "fake-app"
+_ASSETS_AUTOSTART = _FIXTURES / "autostart" / "v0.6.2.lua"
+
+_SEVEN_APPS = [
+    "bar",
+    "notifications",
+    "capture",
+    "clipboard",
+    "wallpaper-selector",
+    "icme",
+    "btop-theme-studio",
+]
 
 
 def _tasks_file(name: str = "main.yml") -> list[dict[str, Any]]:
@@ -98,106 +109,75 @@ def _module(task: dict[str, Any]) -> dict[str, Any]:
     return dict(module)
 
 
-def _named(name: str) -> dict[str, Any]:
-    task = next((item for item in _all_tasks() if item.get("name") == name), None)
-    assert task is not None, f"missing task {name!r}"
-    return task
-
-
-def _app_list(name: str) -> list[dict[str, Any]]:
+def _app_list(name: str = "all-standalone.apps.yaml") -> list[dict[str, Any]]:
     data = yaml.safe_load((_APP_LISTS / name).read_text())
     assert isinstance(data, dict)
     return list(data["apps"])
 
 
-class TestOwnerFilters:
-    @pytest.mark.parametrize(
-        ("fixture", "legacy", "standalone"),
-        [
-            ("legacy.apps.yaml", 2, 0),
-            ("mixed.apps.yaml", 1, 1),
-            ("all-standalone.apps.yaml", 0, 2),
-            ("clipboard.apps.yaml", 1, 1),
-        ],
-    )
-    def test_every_fixture_has_exactly_one_owner(
-        self, fixture: str, legacy: int, standalone: int
-    ) -> None:
-        apps = _app_list(fixture)
-        legacy_apps = [entry for entry in apps if entry["owner"] == "legacy"]
-        standalone_apps = [entry for entry in apps if entry["owner"] == "standalone"]
-        assert len(legacy_apps) == legacy
-        assert len(standalone_apps) == standalone
-        assert {entry["app"] for entry in legacy_apps}.isdisjoint(
-            {entry["app"] for entry in standalone_apps}
-        )
-        assert len(legacy_apps) + len(standalone_apps) == len(apps)
+class TestAllStandaloneFixture:
+    def test_fixture_declares_the_seven_final_apps(self) -> None:
+        apps = _app_list()
+        assert [entry["app"] for entry in apps] == _SEVEN_APPS
+        assert {entry["owner"] for entry in apps} == {"standalone"}
 
-    def test_role_reads_the_single_app_list_and_tuple(self) -> None:
-        vars_text = (_ROLE / "vars" / "main.yml").read_text()
-        assert "manifests_dir" in vars_text
-        assert "apps.yaml" in vars_text
-        assert "program-tuple.yaml" in vars_text
-        assert "owner', 'equalto', 'standalone'" in (_ROLE / "tasks" / "main.yml").read_text()
+    def test_every_app_has_exactly_one_owner_and_unique_surfaces(self) -> None:
+        apps = _app_list()
+        for field in (
+            "app",
+            "installDir",
+            "instance",
+            "configDir",
+            "configLink",
+            "spineLink",
+            "xdgLink",
+        ):
+            values = [entry[field] for entry in apps]
+            assert len(values) == len(set(values)), f"{field} must be unique"
 
-    def test_old_role_filters_legacy_owner_and_keeps_its_pin(self) -> None:
-        old_vars = yaml.safe_load((_ROLES_DIR / "ags_apps" / "vars" / "main.yml").read_text())
-        assert old_vars["ags_apps_version"] == "v0.5.0"
-        old_tasks = (_ROLES_DIR / "ags_apps" / "tasks" / "main.yml").read_text()
-        assert "apps.yaml" in old_tasks
-        assert "selectattr('owner', 'equalto', 'legacy')" in old_tasks
-        assert "ags_apps_legacy_names" in old_tasks
+    def test_only_the_bar_owns_the_palette_pointer(self) -> None:
+        pointers = [entry["app"] for entry in _app_list() if entry.get("barPalettePointer")]
+        assert pointers == ["bar"]
 
+    def test_always_on_and_on_demand_split_matches_the_session(self) -> None:
+        apps = {entry["app"]: entry for entry in _app_list()}
+        assert apps["bar"]["launch"] == "always"
+        assert apps["notifications"]["launch"] == "always"
+        for app in ("capture", "clipboard", "wallpaper-selector", "icme", "btop-theme-studio"):
+            assert apps[app]["launch"] == "on-demand"
 
-class TestClipboardCutoverContract:
-    """The clipboard pilot is the first real per-app cutover.
+    def test_launcher_and_autostart_surfaces_cover_the_keybinds_and_login(self) -> None:
+        apps = {entry["app"]: entry for entry in _app_list()}
+        assert apps["capture"]["launcher"] == "capture-ui"
+        assert apps["capture"]["binLink"] == "capture-tool"
+        assert apps["clipboard"]["launcher"] == "clipboard-ui"
+        assert apps["wallpaper-selector"]["launcher"] == "wallpaper-selector-ui"
+        assert apps["icme"]["launcher"] == "icon-color-mapping-editor"
+        assert apps["btop-theme-studio"]["launcher"] == "btop-theme-studio"
+        assert "launcher" not in apps["bar"]
+        assert "launcher" not in apps["notifications"]
 
-    The engine has to be ready for the composition flip without flipping it:
-    the app-list shape is `clipboard`/`ags-clipboard`/`clipboard-ui`, and every
-    legacy role keys off that same name so an `owner: standalone` entry is left
-    entirely to `ags_apps_units`.
-    """
+        # dotfiles-assets v0.6.2 owns the autostart content: the always-on bar
+        # and notifications overlay plus the boot-staggered capture and
+        # clipboard overlays. The on-demand selector/icme/studio do not appear.
+        assert apps["bar"]["autostart"] == "ags"
+        assert apps["notifications"]["autostart"] == "notifications"
+        assert apps["capture"]["autostart"] == "capture"
+        assert apps["clipboard"]["autostart"] == "clipboard"
+        for app in ("wallpaper-selector", "icme", "btop-theme-studio"):
+            assert "autostart" not in apps[app]
 
-    def test_clipboard_fixture_names_the_exact_standalone_surfaces(self) -> None:
-        apps = {entry["app"]: entry for entry in _app_list("clipboard.apps.yaml")}
-        assert apps["bar"]["owner"] == "legacy"
-        clipboard = apps["clipboard"]
-        assert clipboard["owner"] == "standalone"
-        assert clipboard["installDir"] == "clipboard"
-        assert clipboard["instance"] == "clipboard"
-        assert clipboard["configDir"] == "ags-clipboard"
-        assert clipboard["configLink"] == "ags-clipboard"
-        assert clipboard["spineLink"] == "ags-clipboard"
-        assert clipboard["xdgLink"] == "ags-clipboard"
-        assert clipboard["launcher"] == "clipboard-ui"
-        assert clipboard["autostart"] == "clipboard"
-        assert clipboard["launch"] == "on-demand"
-
-    def test_legacy_roles_key_on_clipboard_so_standalone_skips(self) -> None:
-        cli_tasks = (_ROLES_DIR / "cli_tools" / "tasks" / "main.yml").read_text()
-        assert 'src: clipboard-ui.j2' in cli_tasks
-        assert '"{{ cli_tools_bin_dir }}/clipboard-ui"' in cli_tasks
-        assert "when: \"'clipboard' in cli_tools_legacy_app_names\"" in cli_tasks
-        assert "hypr-pano-ui" not in cli_tasks
-
-        config_vars = (_ROLES_DIR / "config_links" / "vars" / "main.yml").read_text()
-        assert "ags-clipboard" in config_vars
-        assert "ags-hypr-pano" not in config_vars
-        config_tasks = (_ROLES_DIR / "config_links" / "tasks" / "main.yml").read_text()
-        assert "selectattr('owner', 'equalto', 'standalone')" in config_tasks
-        assert "map(attribute='xdgLink')" in config_tasks
-
-        gui_vars = (_ROLES_DIR / "gui_tools" / "vars" / "main.yml").read_text()
-        assert "  - name: clipboard\n    always_on: false" in gui_vars
-        assert "  - name: hypr-pano\n" not in gui_vars
-
-        # The old monorepo role remains the legacy owner of hypr-pano (the
-        # v0.5.0 unit still ships that directory), so its live-pano link stays
-        # gated on the OLD app id. Once the composition list says `clipboard`,
-        # no legacy name matches and the old role creates no pano link.
-        old_tasks = (_ROLES_DIR / "ags_apps" / "tasks" / "main.yml").read_text()
-        assert "when: \"'hypr-pano' in ags_apps_legacy_names\"" in old_tasks
-        assert "'clipboard' in ags_apps_legacy_names" not in old_tasks
+    def test_assets_v062_autostart_starts_each_declared_identity_once(self) -> None:
+        content = _ASSETS_AUTOSTART.read_text()
+        for entry in _app_list():
+            if "autostart" not in entry:
+                continue
+            identity = entry["autostart"]
+            assert content.count(f"--expect-instance {identity}") == 1, identity
+            assert "ags-run-locked" in content
+        # No on-demand app is started at login.
+        for app in ("wallpaper-selector", "icme", "btop-theme-studio"):
+            assert f"--expect-instance {app}" not in content
 
 
 class TestRoleStructure:
@@ -206,12 +186,23 @@ class TestRoleStructure:
         assert (_ROLE / "vars" / "main.yml").is_file()
         assert (_ANSIBLE_DIR / "playbooks" / "ags-apps-units.yaml").is_file()
 
-    def test_bootstrap_imports_the_generic_role_after_the_legacy_role(self) -> None:
+    def test_legacy_monorepo_role_and_playbook_are_retired(self) -> None:
+        assert not (_ROLES_DIR / "ags_apps").exists()
+        assert not (_ANSIBLE_DIR / "playbooks" / "ags-apps.yaml").exists()
         imports = [
             str(entry["import_playbook"])
             for entry in yaml.safe_load((_ANSIBLE_DIR / "playbooks" / "bootstrap.yaml").read_text())
         ]
-        assert imports.index("ags-apps.yaml") < imports.index("ags-apps-units.yaml")
+        assert "ags-apps.yaml" not in imports
+        assert "ags-apps-units.yaml" in imports
+
+    def test_bootstrap_order_puts_gui_tools_before_the_installer(self) -> None:
+        imports = [
+            str(entry["import_playbook"])
+            for entry in yaml.safe_load((_ANSIBLE_DIR / "playbooks" / "bootstrap.yaml").read_text())
+        ]
+        assert imports.index("ags-platform.yaml") < imports.index("gui-tools.yaml")
+        assert imports.index("gui-tools.yaml") < imports.index("ags-apps-units.yaml")
         assert imports.index("ags-apps-units.yaml") < imports.index("compositor-configs.yaml")
 
     def test_install_path_and_shared_shortcut_match_ad31(self) -> None:
@@ -222,6 +213,20 @@ class TestRoleStructure:
         assert "node_modules" in vars_text
         assert "ags_apps_units_platform_shortcut" in vars_text
         assert "ags_apps_units_tuple['ags-platform']" in vars_text
+
+    def test_role_consumes_the_program_tuple_not_a_second_pin(self) -> None:
+        vars_text = (_ROLE / "vars" / "main.yml").read_text()
+        assert "program-tuple.yaml" in vars_text
+        assert "ags_apps_units_tuple['ags-platform']" in vars_text
+        assert "v0.5.0" not in vars_text
+        assert "v0.3.0" not in vars_text
+        assert "ags_apps_version" not in vars_text
+
+    def test_main_task_asserts_every_entry_is_standalone(self) -> None:
+        text = (_ROLE / "tasks" / "main.yml").read_text()
+        assert "difference(['standalone'])" in text
+        assert "owner', 'equalto', 'legacy'" not in text
+        assert "is dormant" not in text
 
     def test_quiesce_happens_before_install_and_links(self) -> None:
         one = _tasks_file("_one.yml")
@@ -294,6 +299,78 @@ class TestRoleStructure:
             "the autostart identity must appear exactly once (no duplicate process)"
         )
 
+
+class TestSingleOwnerSurfaces:
+    def test_cli_tools_no_longer_owns_ags_app_launchers(self) -> None:
+        tasks = (_ROLES_DIR / "cli_tools" / "tasks" / "main.yml").read_text()
+        assert "cli_tools_legacy_app_names" not in tasks
+        for launcher in (
+            "capture-ui.j2",
+            "clipboard-ui.j2",
+            "wallpaper-selector-ui.j2",
+            "icon-color-mapping-editor.j2",
+            "btop-theme-studio.j2",
+        ):
+            assert not (_ROLES_DIR / "cli_tools" / "templates" / launcher).exists()
+        assert "ags-run-locked" in tasks
+
+    def test_gui_tools_owns_no_ags_app_lifecycle(self) -> None:
+        tasks = (_ROLES_DIR / "gui_tools" / "tasks" / "main.yml").read_text()
+        variables = (_ROLES_DIR / "gui_tools" / "vars" / "main.yml").read_text()
+        assert "gui_tools_ags_instances" not in variables
+        assert "gui_tools_ags_always_on" not in variables
+        assert "ags quit" not in tasks
+        assert "ags run" not in tasks
+        # dunst must still be out of the way before notifications starts.
+        assert "dunst.service" in variables
+        assert "mask dunst.service" in tasks
+
+    def test_config_links_owns_no_ags_app_dirs(self) -> None:
+        variables = (_ROLES_DIR / "config_links" / "vars" / "main.yml").read_text()
+        for basename in (
+            "ags",
+            "ags-capture",
+            "ags-icme",
+            "ags-clipboard",
+            "ags-wallpaper-selector",
+            "ags-notifications",
+            "ags-btop-studio",
+        ):
+            assert f"  - {basename}\n" not in variables, basename
+        tasks = (_ROLES_DIR / "config_links" / "tasks" / "main.yml").read_text()
+        assert "apps.yaml" not in tasks
+
+    def test_compositor_configs_does_not_generate_ags_artifacts(self) -> None:
+        tasks = (_ROLES_DIR / "compositor_configs" / "tasks" / "main.yml").read_text()
+        assert "compositor_configs_icon_manifest" not in tasks
+        assert "ags-bar-validate" not in tasks
+        assert "apps.yaml" not in tasks
+
+    def test_filesystem_does_not_claim_the_ags_xdg_dir(self) -> None:
+        variables = (_ROLES_DIR / "filesystem" / "vars" / "main.yml").read_text()
+        assert '"{{ filesystem_xdg_config_home }}/ags"' not in variables
+
+
+class TestLauncherTemplate:
+    def test_generic_launcher_is_lock_routed_and_toggle_aware(self) -> None:
+        text = (_ROLE / "templates" / "ags-app-launcher.j2").read_text()
+        assert "ags-run-locked" in text
+        assert "exec ags run" not in text
+        assert "ags run -d" not in text
+        # Warm instance: request toggle (clipboard) and window toggle (the
+        # other apps), never a restart.
+        assert 'ags request "$1"' in text
+        assert "ags toggle" in text
+        assert '"${INSTANCE}-window"' in text
+        assert '"${CONFIG_BASENAME#ags-}-window"' in text
+        # Cold start: reveal a start-hidden overlay through its request surface.
+        assert 'request show' in text
+
+    def test_launcher_renders_every_app_list_launcher(self) -> None:
+        text = (_ROLE / "tasks" / "_one.yml").read_text()
+        assert "ags-app-launcher.j2" in text
+        assert "app.launcher" in text
+
     def test_verify_mirror_requires_the_autostart_surface_under_the_shared_lock(
         self,
     ) -> None:
@@ -303,19 +380,9 @@ class TestRoleStructure:
         assert "ags-run-locked" in verify_one
         assert "| length - 1) == 1" in verify_one
 
-    def test_role_consumes_the_program_tuple_not_a_second_pin(self) -> None:
-        vars_text = (_ROLE / "vars" / "main.yml").read_text()
-        assert "program-tuple.yaml" in vars_text
-        assert "ags_apps_units_tuple['ags-platform']" in vars_text
-        assert "v0.5.0" not in vars_text
-        assert "v0.3.0" not in vars_text
-
-
-class TestVerifyMirror:
-    def test_verify_role_mirrors_the_generic_topology(self) -> None:
+    def test_verify_mirror_covers_all_standalone_surfaces(self) -> None:
         verify_tasks = (_ROLES_DIR / "verify" / "tasks" / "main.yml").read_text()
         assert "_verify_standalone.yml" in verify_tasks
-        assert "verify_ags_standalone_apps" in verify_tasks
         verify_one = (_ROLES_DIR / "verify" / "tasks" / "_verify_standalone.yml").read_text()
         for needle in (
             "app.installDir",
@@ -327,48 +394,6 @@ class TestVerifyMirror:
             "ags-run-locked",
         ):
             assert needle in verify_one, f"verify mirror misses {needle!r}"
-        verify_vars = (_ROLES_DIR / "verify" / "vars" / "main.yml").read_text()
-        assert "verify_ags_apps_units_apps_file" in verify_vars
-        assert "ags-run-locked" in verify_vars
-
-
-class TestLaunchLockWiring:
-    def test_shared_wrapper_is_installed_by_cli_tools(self) -> None:
-        tasks = (_ROLES_DIR / "cli_tools" / "tasks" / "main.yml").read_text()
-        assert "ags-run-locked" in tasks
-        wrapper = _ROLES_DIR / "cli_tools" / "files" / "ags-run-locked"
-        assert wrapper.is_file()
-        assert os.access(wrapper, os.X_OK)
-
-    def test_every_provisioned_launcher_uses_the_wrapper(self) -> None:
-        templates = _ROLES_DIR / "cli_tools" / "templates"
-        for name in (
-            "capture-ui.j2",
-            "clipboard-ui.j2",
-            "wallpaper-selector-ui.j2",
-            "icon-color-mapping-editor.j2",
-            "btop-theme-studio.j2",
-        ):
-            text = (templates / name).read_text()
-            assert "ags-run-locked" in text, f"{name} bypasses the launch lock"
-            executable = "\n".join(
-                line for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")
-            )
-            assert "exec ags run" not in executable
-            assert "ags run -d" not in executable
-        generic = (_ROLE / "templates" / "ags-app-launcher.j2").read_text()
-        assert "ags-run-locked" in generic
-        assert "exec ags run" not in generic
-
-    def test_gui_tools_start_paths_and_instance_filter_use_the_owner_list(self) -> None:
-        tasks = (_ROLES_DIR / "gui_tools" / "tasks" / "main.yml").read_text()
-        assert "apps.yaml" in tasks
-        assert "gui_tools_ags_active_instances" in tasks
-        assert "gui_tools_ags_always_on_active_instances" in tasks
-        variables = (_ROLES_DIR / "gui_tools" / "vars" / "main.yml").read_text()
-        assert "ags-run-locked --expect-instance ags" in variables
-        assert "ags-run-locked --expect-instance notifications" in variables
-        assert 'launch: "ags run"' not in variables
 
 
 # ── GUI-free execution harness ──────────────────────────────────────────────
@@ -388,8 +413,12 @@ def _fake_ags(bin_dir: Path) -> Path:
         """#!/usr/bin/env bash
 set -euo pipefail
 REG="${FAKE_AGS_REGISTRY:?}"
+CALLS="${FAKE_AGS_CALLS:-$REG.calls}"
+WINDOWS="${FAKE_AGS_WINDOWS:-$REG.windows}"
+TOGGLES="${FAKE_AGS_REQUEST_TOGGLES:-$REG.request-toggles}"
 mkdir -p "$(dirname "$REG")"
-touch "$REG"
+touch "$REG" "$CALLS" "$WINDOWS" "$TOGGLES"
+log() { printf '%s\\n' "$*" >> "$CALLS"; }
 case "$1" in
   list) cat "$REG" ;;
   quit)
@@ -398,6 +427,7 @@ case "$1" in
     while [ "$#" -gt 0 ]; do
       case "$1" in -i) name="$2"; shift 2 ;; *) shift ;; esac
     done
+    log "quit $name"
     [ -n "$name" ] || exit 0
     grep -vx "$name" "$REG" > "$REG.tmp" 2>/dev/null || true
     mv "$REG.tmp" "$REG"
@@ -419,6 +449,7 @@ case "$1" in
     done
     [ -n "$dir" ] || { echo "fake ags: missing -d" >&2; exit 2; }
     name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["instance"])' "$dir/app.manifest.json")"
+    log "run $name"
     echo "$name" >> "$REG"
     echo "$$" > "$REG.$name.pid"
     trap 'grep -vx "$name" "$REG" > "$REG.tmp" 2>/dev/null || true; mv "$REG.tmp" "$REG"; rm -f "$REG.$name.pid"; exit 0' TERM INT
@@ -426,10 +457,43 @@ case "$1" in
     wait $!
     ;;
   request)
-    if [ "${2:-}" = "palette-refresh" ]; then
+    argv=()
+    shift
+    while [ "$#" -gt 0 ]; do
+      case "$1" in -i) shift 2 ;; *) argv+=("$1"); shift ;; esac
+    done
+    log "request ${argv[*]}"
+    if [ "${argv[0]:-}" = "palette-refresh" ]; then
       echo '{"ok":true}'
       exit 0
     fi
+    if [ "${argv[0]:-}" = "toggle" ] && grep -qx "${argv[0]}" "$TOGGLES" 2>/dev/null; then
+      echo "ok"
+      exit 0
+    fi
+    if [ "${argv[0]:-}" = "show" ] && grep -qx "show" "$TOGGLES" 2>/dev/null; then
+      echo "ok"
+      exit 0
+    fi
+    echo "unknown request: ${argv[*]}"
+    ;;
+  toggle)
+    shift
+    window=""
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        -i) shift 2 ;;
+        *)
+          if [ -z "$window" ]; then window="$1"; fi
+          shift
+          ;;
+      esac
+    done
+    log "toggle $window"
+    if [ -n "$window" ] && grep -qx "$window" "$WINDOWS" 2>/dev/null; then
+      exit 0
+    fi
+    echo "no window registered with name \\"$window\\"" >&2
     exit 1
     ;;
   *) exit 0 ;;
@@ -453,6 +517,7 @@ def _make_app_repo(
     app: str | None = None,
     instance: str | None = None,
     config_dir: str | None = None,
+    bin_link: str | None = None,
     colors_pointer: Path | None = None,
     include_bin_tool: bool = True,
     icons_json: str | None = None,
@@ -462,8 +527,12 @@ def _make_app_repo(
     config_dir = config_dir or f"ags-{name}"
     repo = root / "repos" / name
     shutil.copytree(_FAKE_APP, repo)
-    if not include_bin_tool:
-        (repo / "bin" / "fake-app-tool").unlink()
+    fixture_tool = repo / "bin" / "fake-app-tool"
+    if include_bin_tool:
+        if bin_link:
+            fixture_tool.rename(repo / "bin" / bin_link)
+    else:
+        fixture_tool.unlink()
     (repo / "app.tsx").write_text(
         (repo / "app.tsx").read_text(encoding="utf-8").replace("__INSTANCE__", instance),
         encoding="utf-8",
@@ -498,34 +567,27 @@ def _make_app_repo(
 
 def _write_composition(
     root: Path,
-    fixture: str,
     repos: dict[str, Path],
     *,
     tags: dict[str, str] | None = None,
-    owners: dict[str, str] | None = None,
+    fixture: str = "all-standalone.apps.yaml",
 ) -> Path:
-    """Write the composition app list with per-test repo/tag/owner overrides."""
+    """Write the composition app list with per-test repo/tag overrides."""
     provisioning = root / "composition" / "dotfiles" / "provisioning"
     provisioning.mkdir(parents=True, exist_ok=True)
     document = yaml.safe_load((_APP_LISTS / fixture).read_text(encoding="utf-8"))
     tags = tags or {}
-    owners = owners or {}
     for entry in document["apps"]:
         app_id = entry["app"]
-        if app_id in owners:
-            entry["owner"] = owners[app_id]
-            if owners[app_id] == "legacy":
-                entry.pop("repo", None)
-                entry.pop("tag", None)
-        if app_id in repos and entry["owner"] == "standalone":
+        if app_id in repos:
             entry["repo"] = str(repos[app_id])
-        if app_id in tags and entry["owner"] == "standalone":
+        if app_id in tags:
             entry["tag"] = tags[app_id]
     (provisioning / "apps.yaml").write_text(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v0.3.0\ncontracts: v0.3.0\ndotfiles-assets: v0.6.1\n",
+        "schemaVersion: 1\nags-platform: v0.3.0\ncontracts: v0.3.0\ndotfiles-assets: v0.6.2\n",
         encoding="utf-8",
     )
     return provisioning
@@ -539,20 +601,11 @@ def _stage_fake_platform(install: Path, icons_json: str = '{"schemaVersion": 1}\
     return unit
 
 
-def _stage_autostart(install: Path, entries: list[dict[str, Any]]) -> Path:
-    """Write the assets-owned autostart file the role verifies (never writes)."""
+def _stage_autostart(install: Path) -> Path:
+    """Install the verbatim assets v0.6.2 autostart fixture (never written by a role)."""
     path = install / "config" / "hypr" / "autostart.lua"
     path.parent.mkdir(parents=True)
-    lines = ['hl.on("hyprland.start", function()']
-    for entry in entries:
-        if "autostart" not in entry:
-            continue
-        lines.append(
-            '    hl.exec_cmd("ags-run-locked --expect-instance '
-            f'{entry["autostart"]} -d $HOME/.config/{entry["xdgLink"]}")'
-        )
-    lines.append("end)")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text(_ASSETS_AUTOSTART.read_text(encoding="utf-8"), encoding="utf-8")
     return path
 
 
@@ -585,6 +638,9 @@ def _run_role(
         XDG_RUNTIME_DIR=str(runtime),
         UV_TOOL_BIN_DIR=str(bin_dir),
         FAKE_AGS_REGISTRY=str(registry),
+        FAKE_AGS_CALLS=str(tmp_path / "fake-ags-calls"),
+        FAKE_AGS_WINDOWS=str(tmp_path / "fake-ags-windows"),
+        FAKE_AGS_REQUEST_TOGGLES=str(tmp_path / "fake-ags-request-toggles"),
         FAKE_AGS_RUN_SECONDS="30",
         ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
         PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
@@ -603,7 +659,7 @@ def _run_role(
     ]
     if check:
         args.insert(2, "--check")
-    result = subprocess.run(args, capture_output=True, text=True, env=env, timeout=180)
+    result = subprocess.run(args, capture_output=True, text=True, env=env, timeout=240)
     return result, {
         "install": str(install),
         "xdg": str(xdg),
@@ -612,6 +668,31 @@ def _run_role(
         "registry": str(registry),
         "home": str(home),
     }
+
+
+def _stage_seven_app_repos(tmp_path: Path) -> tuple[dict[str, Path], Path]:
+    """Build the seven fake app repos and the runtime palette pointer."""
+    colors = tmp_path / "state" / "dotfiles" / "current" / "colors.gtk.css"
+    colors.parent.mkdir(parents=True)
+    colors.write_text("@define-color color_background #0b0b1a;\n", encoding="utf-8")
+    repos: dict[str, Path] = {}
+    icons = None
+    for entry in _app_list():
+        app_id = entry["app"]
+        icons_json = (_FAKE_APP / "icons.json").read_text(encoding="utf-8")
+        if app_id == "bar":
+            icons = icons_json
+        repos[app_id] = _make_app_repo(
+            tmp_path,
+            app_id,
+            app=app_id,
+            instance=entry["instance"],
+            config_dir=entry["configDir"],
+            bin_link=entry.get("binLink"),
+            colors_pointer=colors if entry.get("barPalettePointer") else None,
+            icons_json=icons_json if app_id == "bar" else None,
+        )
+    return repos, icons or ""
 
 
 def _stop_fake_ags(paths: dict[str, str]) -> None:
@@ -628,142 +709,81 @@ def _stop_fake_ags(paths: dict[str, str]) -> None:
 
 
 class TestRoleExecution:
-    def test_legacy_list_is_a_complete_noop(self, tmp_path: Path) -> None:
-        provisioning = _write_composition(tmp_path, "legacy.apps.yaml", {})
-        result, paths = _run_role(tmp_path, provisioning)
-        try:
-            assert result.returncode == 0, result.stdout + result.stderr
-            assert "is dormant" in result.stdout
-            assert not Path(paths["install"]).exists(), (
-                "the generic role must not create <install>/apps for an all-legacy list"
-            )
-        finally:
-            _stop_fake_ags(paths)
-
-    def test_mixed_list_installs_only_the_standalone_owner(self, tmp_path: Path) -> None:
-        repo = _make_app_repo(tmp_path, "fake-app", config_dir="ags-fake-app")
-        provisioning = _write_composition(tmp_path, "mixed.apps.yaml", {"fake-app": repo})
-        _stage_fake_platform(tmp_path / "install")
-        _stage_autostart(tmp_path / "install", _app_list("mixed.apps.yaml"))
-        result, paths = _run_role(tmp_path, provisioning)
-        install = Path(paths["install"])
-        try:
-            assert result.returncode == 0, result.stdout + result.stderr
-            assert (install / "apps" / "fake-app" / "v0.1.0" / "app.tsx").is_file()
-            assert not (install / "apps" / "bar").exists(), (
-                "a legacy entry must not be installed by the standalone role"
-            )
-            assert (install / "apps" / "fake-app" / "pinned").read_text().strip() == "v0.1.0"
-            assert (install / "config" / "ags-fake-app").is_symlink()
-            assert (Path(paths["xdg"]) / "ags-fake-app").is_symlink()
-            assert (Path(paths["bin"]) / "fake-app-ui").is_file()
-            assert Path(paths["registry"]).read_text().splitlines() == ["fake-app"]
-        finally:
-            _stop_fake_ags(paths)
-
-    def test_clipboard_cutover_installs_the_standalone_topology_and_surfaces(
-        self, tmp_path: Path
-    ) -> None:
-        """The clipboard pilot is the first real cutover: one list flip must
-        install `<install>/apps/clipboard/<tag>`, create the
-        config/spine/XDG surfaces `ags-clipboard`, render `clipboard-ui`
-        through the shared launch lock with the clipboard instance/log, and
-        verify the assets-owned `clipboard` autostart identity exactly once.
-        The old monorepo surfaces (`ags-hypr-pano`, `hypr-pano-ui`) must not be
-        created by the standalone role."""
+    def test_all_seven_apps_install_the_full_topology(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
-        repo = _make_app_repo(
-            tmp_path,
-            "clipboard",
-            app="clipboard",
-            instance="clipboard",
-            config_dir="ags-clipboard",
-        )
-        provisioning = _write_composition(
-            tmp_path, "clipboard.apps.yaml", {"clipboard": repo}
-        )
-        _stage_fake_platform(install)
-        _stage_autostart(install, _app_list("clipboard.apps.yaml"))
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
         result, paths = _run_role(tmp_path, provisioning, cutover=True)
         try:
             assert result.returncode == 0, result.stdout + result.stderr
-            unit = install / "apps" / "clipboard" / "v0.1.0"
-            spine_link = install / "config" / "ags-clipboard"
-            xdg_link = Path(paths["xdg"]) / "ags-clipboard"
-            launcher = Path(paths["bin"]) / "clipboard-ui"
-            assert (unit / "app.tsx").is_file()
-            assert (install / "apps" / "clipboard" / "pinned").read_text().strip() == "v0.1.0"
-            assert spine_link.is_symlink() and os.readlink(spine_link) == str(unit)
-            assert xdg_link.is_symlink() and os.readlink(xdg_link) == str(spine_link)
-            assert launcher.is_file()
-            text = launcher.read_text()
-            assert 'INSTANCE="clipboard"' in text
-            assert 'DIR="' + str(Path(paths["xdg"]) / "ags-clipboard") + '"' in text
-            assert 'LOG="' + str(Path(paths["state"]) / "ags" / "clipboard.log") + '"' in text
-            assert "ags-run-locked" in text
-            assert "--expect-instance" in text
-            assert "clipboard" in text
-            assert not (install / "config" / "ags-hypr-pano").exists(), (
-                "the standalone role must not create the retired pano link"
-            )
-            assert not (Path(paths["bin"]) / "hypr-pano-ui").exists(), (
-                "the standalone role must not create the retired pano launcher"
-            )
-            assert Path(paths["registry"]).read_text().splitlines() == [], (
-                "the on-demand clipboard instance is stopped after cutover proof"
-            )
-        finally:
-            _stop_fake_ags(paths)
+            apps = {entry["app"]: entry for entry in _app_list()}
+            for app_id, entry in apps.items():
+                unit = install / "apps" / entry["installDir"] / "v0.1.0"
+                spine = install / "config" / entry["spineLink"]
+                xdg = Path(paths["xdg"]) / entry["xdgLink"]
+                assert (unit / "app.tsx").is_file(), app_id
+                assert not (unit / ".git").exists(), app_id
+                assert (install / "apps" / entry["installDir"] / "pinned").read_text().strip() == "v0.1.0"
+                assert spine.is_symlink() and os.readlink(spine) == str(unit), app_id
+                assert xdg.is_symlink() and os.readlink(xdg) == str(spine), app_id
+                if "binLink" in entry:
+                    link = Path(paths["bin"]) / entry["binLink"]
+                    assert link.is_symlink()
+                    assert os.readlink(link) == str(unit / "bin" / entry["binLink"])
+                if "launcher" in entry:
+                    launcher = Path(paths["bin"]) / entry["launcher"]
+                    text = launcher.read_text()
+                    assert f'INSTANCE="{entry["instance"]}"' in text
+                    assert str(xdg) in text
+                    assert "ags-run-locked" in text
 
-    def test_all_standalone_installs_full_topology_and_tags_stay_immutable(
-        self, tmp_path: Path
-    ) -> None:
-        install = tmp_path / "install"
-        state = tmp_path / "state"
-        colors = state / "dotfiles" / "current" / "colors.gtk.css"
-        colors.parent.mkdir(parents=True)
-        colors.write_text("", encoding="utf-8")
-        bar = _make_app_repo(
-            tmp_path,
-            "bar",
-            app="bar",
-            instance="ags",
-            config_dir="ags",
-            colors_pointer=colors,
-        )
-        app = _make_app_repo(tmp_path, "fake-app", config_dir="ags-fake-app")
-        provisioning = _write_composition(
-            tmp_path, "all-standalone.apps.yaml", {"bar": bar, "fake-app": app}
-        )
-        _stage_fake_platform(install, icons_json=(app / "icons.json").read_text())
-        _stage_autostart(install, _app_list("all-standalone.apps.yaml"))
-        result, paths = _run_role(tmp_path, provisioning, cutover=True)
-        try:
-            assert result.returncode == 0, result.stdout + result.stderr
-            unit = install / "apps" / "fake-app" / "v0.1.0"
-            bar_unit = install / "apps" / "bar" / "v0.1.0"
             shortcut = install / "apps" / "node_modules" / "ags-platform"
             assert shortcut.is_symlink()
             assert os.readlink(shortcut) == str(install / "ags-platform" / "v0.3.0")
-            assert (install / "config" / "ags").is_symlink()
-            assert os.readlink(install / "config" / "ags") == str(bar_unit)
-            assert Path(paths["xdg"]) / "ags-fake-app" / "app.tsx"
-            assert (Path(paths["bin"]) / "fake-app-tool").is_symlink()
-            launcher = Path(paths["bin"]) / "fake-app-ui"
-            assert "ags-run-locked" in launcher.read_text()
-            assert (bar_unit / "colors.css").is_symlink()
-            assert os.readlink(bar_unit / "colors.css") == str(colors)
-            assert not (unit / ".git").exists()
-            assert not (bar_unit / ".git").exists()
-            # The on-demand app was started for the epoch, verified, then
-            # stopped; the always-on bar remains on the bus.
-            assert Path(paths["registry"]).read_text().splitlines() == ["ags"]
 
-            before = {str(path): _sha256_tree(path) for path in (unit, bar_unit)}
-            second, _paths2 = _run_role(tmp_path, provisioning, cutover=True)
+            assert os.readlink(install / "config" / "ags") == str(
+                install / "apps" / "bar" / "v0.1.0"
+            )
+            bar_unit = install / "apps" / "bar" / "v0.1.0"
+            assert (bar_unit / "colors.css").is_symlink()
+            assert os.readlink(bar_unit / "colors.css") == str(
+                Path(paths["state"]) / "dotfiles" / "current" / "colors.gtk.css"
+            )
+            assert (bar_unit / "icons.json").read_bytes() == bar_icons.encode()
+
+            # Always-on apps remain on the bus; every on-demand app was started
+            # for the cutover proof and stopped again.
+            assert sorted(Path(paths["registry"]).read_text().splitlines()) == [
+                "ags",
+                "notifications",
+            ]
+            # No legacy monorepo surface was created by any role.
+            assert not (install / "ags-apps").exists()
+            assert not (install / "config" / "ags-hypr-pano").exists()
+            assert not (Path(paths["bin"]) / "hypr-pano-ui").exists()
+        finally:
+            _stop_fake_ags(paths)
+
+    def test_second_run_does_not_write_inside_installed_tags(self, tmp_path: Path) -> None:
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
+        first, paths = _run_role(tmp_path, provisioning, cutover=True)
+        try:
+            assert first.returncode == 0, first.stdout + first.stderr
+            units = [
+                install / "apps" / entry["installDir"] / "v0.1.0"
+                for entry in _app_list()
+            ]
+            before = {str(path): _sha256_tree(path) for path in units}
+            second, _ = _run_role(tmp_path, provisioning, cutover=True)
             assert second.returncode == 0, second.stdout + second.stderr
-            after = {str(path): _sha256_tree(path) for path in (unit, bar_unit)}
-            assert before == after, "a re-provision must not write inside installed tags"
+            after = {str(path): _sha256_tree(path) for path in units}
+            assert before == after
         finally:
             _stop_fake_ags(paths)
 
@@ -772,15 +792,15 @@ class TestRoleExecution:
     ) -> None:
         install = tmp_path / "install"
         xdg = tmp_path / "xdg"
-        old_dir = tmp_path / "old-fake-app"
+        old_dir = tmp_path / "old-capture"
         old_dir.mkdir()
         (old_dir / "app.manifest.json").write_text(
             json.dumps(
                 {
                     "schemaVersion": 1,
-                    "app": "fake-app",
-                    "instance": "fake-app",
-                    "configDir": "ags-fake-app",
+                    "app": "capture",
+                    "instance": "capture",
+                    "configDir": "ags-capture",
                     "mode": "live",
                     "holdsUnsavedState": False,
                 }
@@ -790,121 +810,67 @@ class TestRoleExecution:
         install.mkdir()
         xdg.mkdir()
         (install / "config").mkdir()
-        (install / "config" / "ags-fake-app").symlink_to(old_dir)
-        (xdg / "ags-fake-app").symlink_to(install / "config" / "ags-fake-app")
-        (tmp_path / "fake-ags-registry").write_text("fake-app\n", encoding="utf-8")
-        _stage_fake_platform(install)
-        _stage_autostart(install, _app_list("mixed.apps.yaml"))
-        # The repo omits its declared bin entry, so the post-repoint surface
-        # assertion fails and the rollback block must restore the old links.
-        repo = _make_app_repo(
-            tmp_path, "fake-app", config_dir="ags-fake-app", include_bin_tool=False
+        (install / "config" / "ags-capture").symlink_to(old_dir)
+        (xdg / "ags-capture").symlink_to(install / "config" / "ags-capture")
+        (tmp_path / "fake-ags-registry").write_text("capture\n", encoding="utf-8")
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        # The capture repo omits its declared bin entry, so the post-repoint
+        # surface assertion fails and the rollback block must restore the links.
+        capture = repos["capture"]
+        (capture / "bin" / "capture-tool").unlink()
+        subprocess.run(["git", "-C", str(capture), "add", "-A"], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(capture),
+                "-c",
+                "user.email=t@example.invalid",
+                "-c",
+                "user.name=test",
+                "commit",
+                "-qm",
+                "drop bin",
+            ],
+            check=True,
         )
-        provisioning = _write_composition(tmp_path, "mixed.apps.yaml", {"fake-app": repo})
+        subprocess.run(["git", "-C", str(capture), "tag", "-f", "v0.1.0"], check=True)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
         result, paths = _run_role(tmp_path, provisioning)
         registry = Path(paths["registry"])
         try:
             assert result.returncode != 0
             assert "rollback restored" in result.stdout.lower()
-            assert os.readlink(install / "config" / "ags-fake-app") == str(old_dir)
-            assert os.readlink(xdg / "ags-fake-app") == str(install / "config" / "ags-fake-app")
-            assert registry.read_text().splitlines() == ["fake-app"]
-        finally:
-            _stop_fake_ags(paths)
-
-    def test_owner_flip_quiesces_the_old_instance_then_installs_and_starts(
-        self, tmp_path: Path
-    ) -> None:
-        """AD-32: the composition flip is the only ownership change. Before the
-        flip the generic role is dormant; after it, the role quiesces the old
-        instance, installs the tag, repoints the links and starts/verifies."""
-        install = tmp_path / "install"
-        xdg = tmp_path / "xdg"
-        old_dir = tmp_path / "old-fake-app"
-        old_dir.mkdir()
-        (old_dir / "app.manifest.json").write_text(
-            json.dumps(
-                {
-                    "schemaVersion": 1,
-                    "app": "fake-app",
-                    "instance": "fake-app",
-                    "configDir": "ags-fake-app",
-                    "mode": "live",
-                    "holdsUnsavedState": False,
-                }
-            ),
-            encoding="utf-8",
-        )
-        install.mkdir()
-        xdg.mkdir()
-        (install / "config").mkdir()
-        (install / "config" / "ags-fake-app").symlink_to(old_dir)
-        (xdg / "ags-fake-app").symlink_to(install / "config" / "ags-fake-app")
-        (tmp_path / "fake-ags-registry").write_text("fake-app\n", encoding="utf-8")
-        _stage_fake_platform(install)
-        _stage_autostart(install, _app_list("mixed.apps.yaml"))
-        repo = _make_app_repo(tmp_path, "fake-app", config_dir="ags-fake-app")
-
-        before_path = _write_composition(
-            tmp_path,
-            "mixed.apps.yaml",
-            {"fake-app": repo},
-            owners={"fake-app": "legacy"},
-        )
-        before, paths = _run_role(tmp_path, before_path, cutover=True)
-        try:
-            assert before.returncode == 0, before.stdout + before.stderr
-            assert "is dormant" in before.stdout
-            assert os.readlink(install / "config" / "ags-fake-app") == str(old_dir)
-            assert Path(paths["registry"]).read_text().splitlines() == ["fake-app"]
-
-            after_path = _write_composition(
-                tmp_path, "mixed.apps.yaml", {"fake-app": repo}
-            )
-            after, paths = _run_role(tmp_path, after_path, cutover=True)
-            assert after.returncode == 0, after.stdout + after.stderr
-            unit = install / "apps" / "fake-app" / "v0.1.0"
-            assert os.readlink(install / "config" / "ags-fake-app") == str(unit)
-            assert os.readlink(xdg / "ags-fake-app") == str(
-                install / "config" / "ags-fake-app"
-            )
-            assert Path(paths["registry"]).read_text().splitlines() == ["fake-app"]
+            assert os.readlink(install / "config" / "ags-capture") == str(old_dir)
+            assert os.readlink(xdg / "ags-capture") == str(install / "config" / "ags-capture")
+            assert "capture" in registry.read_text().splitlines()
         finally:
             _stop_fake_ags(paths)
 
     def test_tag_bump_repoints_links_and_preserves_external_state(
         self, tmp_path: Path
     ) -> None:
-        """AD-37: a tag bump installs a NEW immutable tree, repoints the links
-        and leaves the previous tag plus the runtime-owned state unchanged."""
         install = tmp_path / "install"
-        state = tmp_path / "state"
-        colors = state / "dotfiles" / "current" / "colors.gtk.css"
-        colors.parent.mkdir(parents=True)
-        colors.write_text("@define-color color_background #0b0b1a;\n", encoding="utf-8")
-        bar = _make_app_repo(
-            tmp_path,
-            "bar",
-            app="bar",
-            instance="ags",
-            config_dir="ags",
-            colors_pointer=colors,
-        )
-        app = _make_app_repo(tmp_path, "fake-app", config_dir="ags-fake-app")
-        provisioning = _write_composition(
-            tmp_path, "all-standalone.apps.yaml", {"bar": bar, "fake-app": app}
-        )
-        _stage_fake_platform(install, icons_json=(app / "icons.json").read_text())
-        _stage_autostart(install, _app_list("all-standalone.apps.yaml"))
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
         first, paths = _run_role(tmp_path, provisioning, cutover=True)
         try:
             assert first.returncode == 0, first.stdout + first.stderr
-            old_app_unit = install / "apps" / "fake-app" / "v0.1.0"
-            old_bar_unit = install / "apps" / "bar" / "v0.1.0"
-            before = {str(path): _sha256_tree(path) for path in (old_app_unit, old_bar_unit)}
+            colors = (
+                Path(paths["state"]) / "dotfiles" / "current" / "colors.gtk.css"
+            )
             state_before = colors.read_text()
+            old_units = [
+                install / "apps" / entry["installDir"] / "v0.1.0"
+                for entry in _app_list()
+            ]
+            before = {str(path): _sha256_tree(path) for path in old_units}
 
-            for repo in (bar, app):
+            for repo in repos.values():
                 subprocess.run(
                     [
                         "git",
@@ -924,131 +890,143 @@ class TestRoleExecution:
                 subprocess.run(["git", "-C", str(repo), "tag", "v0.2.0"], check=True)
 
             bumped = _write_composition(
-                tmp_path,
-                "all-standalone.apps.yaml",
-                {"bar": bar, "fake-app": app},
-                tags={"bar": "v0.2.0", "fake-app": "v0.2.0"},
+                tmp_path, repos, tags={app_id: "v0.2.0" for app_id in repos}
             )
-            second, paths = _run_role(tmp_path, bumped, cutover=True)
+            second, _ = _run_role(tmp_path, bumped, cutover=True)
             assert second.returncode == 0, second.stdout + second.stderr
-            new_app_unit = install / "apps" / "fake-app" / "v0.2.0"
-            new_bar_unit = install / "apps" / "bar" / "v0.2.0"
-            assert (new_app_unit / "app.tsx").is_file()
-            assert (install / "apps" / "fake-app" / "pinned").read_text().strip() == "v0.2.0"
-            assert os.readlink(install / "config" / "ags") == str(new_bar_unit)
-            assert os.readlink(install / "config" / "ags-fake-app") == str(new_app_unit)
-            assert os.readlink(new_bar_unit / "colors.css") == str(colors)
-            after = {str(path): _sha256_tree(path) for path in (old_app_unit, old_bar_unit)}
+            for entry in _app_list():
+                new_unit = install / "apps" / entry["installDir"] / "v0.2.0"
+                assert (new_unit / "app.tsx").is_file()
+                assert (install / "apps" / entry["installDir"] / "pinned").read_text().strip() == "v0.2.0"
+                assert os.readlink(install / "config" / entry["spineLink"]) == str(new_unit)
+            after = {str(path): _sha256_tree(path) for path in old_units}
             assert before == after, "a tag bump must not mutate an installed tag"
-            assert colors.read_text() == state_before, (
-                "a tag bump must not reset runtime-owned state"
-            )
+            assert colors.read_text() == state_before
         finally:
             _stop_fake_ags(paths)
 
 
-class TestLaunchLockWrapper:
-    def test_wrapper_registers_and_releases_the_shared_lock(self, tmp_path: Path) -> None:
+class TestLauncherBehavior:
+    def _run_launcher(
+        self,
+        tmp_path: Path,
+        launcher_text: str,
+        *,
+        running: bool,
+        windows: tuple[str, ...] = (),
+        request_toggles: tuple[str, ...] = (),
+    ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         _fake_ags(bin_dir)
         _write_wrapper(bin_dir)
-        runtime = tmp_path / "runtime"
-        runtime.mkdir()
         registry = tmp_path / "registry"
+        calls = tmp_path / "calls"
+        windows_file = tmp_path / "windows"
+        toggles_file = tmp_path / "request-toggles"
+        windows_file.write_text("\n".join(windows) + ("\n" if windows else ""))
+        toggles_file.write_text(
+            "\n".join(request_toggles) + ("\n" if request_toggles else "")
+        )
+        if running:
+            registry.write_text("fake-app\n")
+        launcher = tmp_path / "fake-app-ui"
+        launcher.write_text(launcher_text)
+        launcher.chmod(0o755)
         env = dict(
             os.environ,
-            XDG_RUNTIME_DIR=str(runtime),
+            XDG_RUNTIME_DIR=str(tmp_path / "runtime"),
             FAKE_AGS_REGISTRY=str(registry),
-            FAKE_AGS_RUN_SECONDS="30",
+            FAKE_AGS_CALLS=str(calls),
+            FAKE_AGS_WINDOWS=str(windows_file),
+            FAKE_AGS_REQUEST_TOGGLES=str(toggles_file),
+            FAKE_AGS_RUN_SECONDS="1",
             PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
         )
-        app_dir = tmp_path / "app"
-        app_dir.mkdir()
+        (tmp_path / "runtime").mkdir()
+        result = subprocess.run(
+            [str(launcher)], capture_output=True, text=True, env=env, timeout=60
+        )
+        lines = calls.read_text().splitlines() if calls.exists() else []
+        _stop_fake_ags({"registry": str(registry)})
+        return result, lines
+
+    def _render(self, app: dict[str, Any], tmp_path: Path) -> str:
+        """Render the generic launcher template for one app entry."""
+        from jinja2 import Environment, FileSystemLoader
+
+        xdg = tmp_path / "xdg"
+        app_dir = xdg / app["xdgLink"]
+        app_dir.mkdir(parents=True)
         (app_dir / "app.manifest.json").write_text(
             json.dumps(
                 {
                     "schemaVersion": 1,
-                    "app": "fake-app",
-                    "instance": "fake-app",
-                    "configDir": "ags-fake-app",
+                    "app": app["app"],
+                    "instance": app["instance"],
+                    "configDir": app["configDir"],
                     "mode": "live",
                     "holdsUnsavedState": False,
                 }
-            )
+            ),
+            encoding="utf-8",
         )
-        try:
-            first = subprocess.run(
-                [
-                    str(bin_dir / "ags-run-locked"),
-                    "--expect-instance",
-                    "fake-app",
-                    "-d",
-                    str(app_dir),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            assert first.returncode == 0, first.stderr
-            assert (runtime / "ags-launch.lock").exists()
-            # A matching expected instance is a delegation no-op.
-            second = subprocess.run(
-                [
-                    str(bin_dir / "ags-run-locked"),
-                    "--expect-instance",
-                    "fake-app",
-                    "-d",
-                    str(app_dir),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            assert second.returncode == 0, second.stderr
-        finally:
-            if registry.exists():
-                subprocess.run(
-                    [str(bin_dir / "ags"), "quit", "-i", "fake-app"], env=env, check=False
-                )
-                for pidfile in registry.parent.glob(registry.name + ".*.pid"):
-                    pidfile.unlink(missing_ok=True)
-                registry.unlink(missing_ok=True)
-
-    def test_wrapper_times_out_when_the_lock_is_held(self, tmp_path: Path) -> None:
-        import fcntl
-
-        bin_dir = tmp_path / "bin"
-        bin_dir.mkdir()
-        _fake_ags(bin_dir)
-        _write_wrapper(bin_dir)
-        runtime = tmp_path / "runtime"
-        runtime.mkdir()
-        lock = runtime / "ags-launch.lock"
-        env = dict(
-            os.environ,
-            XDG_RUNTIME_DIR=str(runtime),
-            FAKE_AGS_REGISTRY=str(tmp_path / "registry"),
-            PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
+        env = Environment(
+            loader=FileSystemLoader(str(_ROLE / "templates")),
+            autoescape=False,
+            keep_trailing_newline=True,
         )
-        with lock.open("w") as stream:
-            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
-            result = subprocess.run(
-                [
-                    str(bin_dir / "ags-run-locked"),
-                    "--expect-instance",
-                    "fake-app",
-                    "--lock-timeout",
-                    "1",
-                    "-d",
-                    str(tmp_path),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        assert result.returncode == 1
-        assert "timed out waiting for the shared AGS launch lock" in result.stderr
+        template = env.get_template("ags-app-launcher.j2")
+        return template.render(
+            app=app,
+            ags_apps_units_xdg_config_home=str(xdg),
+            ags_apps_units_log_file=str(tmp_path / "state" / "ags" / f"{app['instance']}.log"),
+            ags_apps_units_run_locked="ags-run-locked",
+            ags_apps_units_lock_timeout=10,
+            ags_apps_units_register_timeout=10,
+        )
+
+    def test_warm_window_app_toggles_its_window(self, tmp_path: Path) -> None:
+        app = next(entry for entry in _app_list() if entry["app"] == "capture")
+        # The harness writes INSTANCE=fake-app for both win candidates; render
+        # with fake-app so the fake CLI's window list can answer.
+        app = {**app, "app": "fake-app", "instance": "fake-app", "xdgLink": "ags-fake-app"}
+        result, calls = self._run_launcher(
+            tmp_path, self._render(app, tmp_path), running=True, windows=("fake-app-window",)
+        )
+        assert result.returncode == 0, result.stderr
+        assert "toggle fake-app-window" in calls
+        assert not any(line.startswith("run ") for line in calls)
+
+    def test_warm_request_app_uses_request_toggle(self, tmp_path: Path) -> None:
+        app = {**next(entry for entry in _app_list() if entry["app"] == "clipboard")}
+        app = {**app, "app": "fake-app", "instance": "fake-app", "xdgLink": "ags-fake-app"}
+        result, calls = self._run_launcher(
+            tmp_path, self._render(app, tmp_path), running=True, request_toggles=("toggle",)
+        )
+        assert result.returncode == 0, result.stderr
+        assert "request toggle" in calls
+        assert not any(line.startswith("run ") for line in calls)
+
+    def test_warm_icme_falls_back_to_the_config_basename_window(self, tmp_path: Path) -> None:
+        app = {**next(entry for entry in _app_list() if entry["app"] == "icme")}
+        app = {**app, "app": "fake-app", "instance": "fake-app", "xdgLink": "ags-fake-app"}
+        result, calls = self._run_launcher(
+            tmp_path, self._render(app, tmp_path), running=True, windows=("fake-app-window",)
+        )
+        assert result.returncode == 0, result.stderr
+        # The instance-derived candidate answers before the config-basename one.
+        assert calls.count("toggle fake-app-window") == 1
+
+    def test_cold_start_reveals_a_hidden_overlay(self, tmp_path: Path) -> None:
+        app = {**next(entry for entry in _app_list() if entry["app"] == "clipboard")}
+        app = {**app, "app": "fake-app", "instance": "fake-app", "xdgLink": "ags-fake-app"}
+        result, calls = self._run_launcher(
+            tmp_path,
+            self._render(app, tmp_path),
+            running=False,
+            request_toggles=("show",),
+        )
+        assert result.returncode == 0, result.stderr
+        assert "run fake-app" in calls
+        assert "request show" in calls

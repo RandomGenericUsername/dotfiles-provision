@@ -751,7 +751,7 @@ class TestVerifyTasks:
             "Assert verify list vars are not empty",
             "Assert binary and tool names are safe identifiers",
             "Assert composition manifests seam is provided",
-            "Assert every AGS app has exactly one owner and unique surfaces",
+            "Assert every AGS app is standalone and the surfaces are unique",
             "Assert the program tuple names exactly the three program tags",
         }
         for task in _load_tasks():
@@ -1406,23 +1406,6 @@ class TestVerifyTasks:
             "the empty-list guard must cover verify_gtk_skeleton_files"
         )
 
-    def test_empty_list_guard_covers_the_ags_always_on_instances(self) -> None:
-        """The vacuous-pass guard covers verify_ags_always_on_instances — an
-        emptied list would make the difference assert pass 0 == 0 on an
-        unprovisioned machine."""
-        matches = [
-            task
-            for task in _assert_tasks()
-            if "verify_system_binaries | length > 0" in str(_module(task).get("that", ""))
-        ]
-        assert len(matches) == 1, (
-            f"expected exactly one empty-list guard assert; found {len(matches)}"
-        )
-        that = str(_module(matches[0]).get("that", ""))
-        assert "verify_ags_always_on_instances | length > 0" in that, (
-            "the empty-list guard must cover verify_ags_always_on_instances"
-        )
-
     def test_every_guarded_list_var_is_declared_non_empty(self) -> None:
         """Every var named in the non-empty guard must itself be non-empty in
         vars/main.yml.
@@ -1728,477 +1711,6 @@ class TestVerifyVars:
         assert spine == filesystem_spine, (
             "verify_install_spine_dirs must be parity-EXACT with "
             "filesystem_spine_dirs (the test locks exact set equality)"
-        )
-
-    def test_install_spine_dirs_exclude_the_ags_live_links(self) -> None:
-        """<install>/config/ags, <install>/config/ags-capture and
-        <install>/config/ags-wallpaper-selector are owned by the ags_apps role as
-        SYMLINKS (verify_ags_apps_live_bar_link / verify_ags_apps_live_capture_link
-        / verify_ags_apps_live_wallpaper_selector_link), NOT by the filesystem role
-        as dirs. The criterion-1 spine assert counts verify_install_spine_dirs
-        entries via stat.isdir, so a symlinked config/ags made it false on a real
-        bootstrap (the regression this locks); slice 5 retired config/ags-capture
-        and slice 6 retired config/ags-wallpaper-selector for the same reason. Each
-        path must be absent here and asserted as a symlink by the matching ags_apps
-        assertion instead."""
-        data = _vars()
-        spine = [str(item) for item in data["verify_install_spine_dirs"]]
-        assert "config/ags" not in spine, (
-            "config/ags must not be in verify_install_spine_dirs — it is a "
-            "symlink, and the isdir spine assert would fail on it"
-        )
-        assert "config/ags-capture" not in spine, (
-            "config/ags-capture must not be in verify_install_spine_dirs — it is "
-            "the live-capture symlink (slice 5), and the isdir spine assert would "
-            "fail on it"
-        )
-        assert "config/ags-wallpaper-selector" not in spine, (
-            "config/ags-wallpaper-selector must not be in verify_install_spine_dirs "
-            "— it is the live-wallpaper-selector symlink (slice 6), and the isdir "
-            "spine assert would fail on it"
-        )
-        # Tie the exclusions to the SAME paths the ags_apps assertions check as
-        # symlinks, so the two cannot silently desync.
-        live_bar = str(data["verify_ags_apps_live_bar_link"])
-        assert live_bar == "{{ install_dir | trim }}/config/ags", (
-            "verify_ags_apps_live_bar_link must remain <install>/config/ags — "
-            f"the path excluded from verify_install_spine_dirs; got {live_bar!r}"
-        )
-        live_capture = str(data["verify_ags_apps_live_capture_link"])
-        assert live_capture == "{{ install_dir | trim }}/config/ags-capture", (
-            "verify_ags_apps_live_capture_link must remain "
-            "<install>/config/ags-capture — the path excluded from "
-            f"verify_install_spine_dirs; got {live_capture!r}"
-        )
-        live_selector = str(data["verify_ags_apps_live_wallpaper_selector_link"])
-        assert live_selector == "{{ install_dir | trim }}/config/ags-wallpaper-selector", (
-            "verify_ags_apps_live_wallpaper_selector_link must remain "
-            "<install>/config/ags-wallpaper-selector — the path excluded from "
-            f"verify_install_spine_dirs; got {live_selector!r}"
-        )
-
-    def test_live_pano_link_mirrors_the_ags_apps_role_and_is_not_a_spine_dir(
-        self,
-    ) -> None:
-        """Slice 3: <install>/config/ags-hypr-pano is the ags_apps role's
-        live-pano SYMLINK (-> the unit's hypr-pano/), NOT a filesystem/gui_tools
-        dir. It must be absent from verify_install_spine_dirs (the criterion-1
-        isdir assert counts dirs), absent from verify_gui_tools_app_files (the
-        overlay deploys WHOLE), and its vars must mirror the ags_apps role."""
-        data = _vars()
-        apps = _sibling_vars("ags_apps")
-
-        live = str(data["verify_ags_apps_live_pano_link"])
-        assert live == "{{ install_dir | trim }}/config/ags-hypr-pano", (
-            f"verify_ags_apps_live_pano_link must be <install>/config/ags-hypr-pano; got {live!r}"
-        )
-        # Mirror of the role: the link DEST is the spine config path, the unit
-        # dir is the hypr-pano/ subdir of the versioned unit.
-        role_live = str(apps["ags_apps_live_pano_link"])
-        assert role_live.endswith("/ags-hypr-pano") and "spine_config_dir" in role_live, (
-            f"the ags_apps role must deploy the live-pano link at config/ags-hypr-pano; got {role_live!r}"
-        )
-        unit_pano = str(data["verify_ags_apps_hypr_pano_dir"])
-        assert unit_pano.endswith("/hypr-pano") and "verify_ags_apps_unit_dir" in unit_pano, (
-            f"verify_ags_apps_hypr_pano_dir must be <unit>/hypr-pano; got {unit_pano!r}"
-        )
-        assert str(apps["ags_apps_hypr_pano_dir"]).endswith("/hypr-pano"), (
-            "the ags_apps role must declare the unit's hypr-pano/ subdir"
-        )
-
-        # Not a spine dir, and not a per-file gui_tools assertion.
-        assert "config/ags-hypr-pano" not in [
-            str(item) for item in data["verify_install_spine_dirs"]
-        ], "config/ags-hypr-pano is a symlink, not a verify_install_spine_dirs dir"
-        per_file_pano = [
-            str(f)
-            for f in data["verify_gui_tools_app_files"]
-            if "/config/ags-hypr-pano/" in str(f)
-        ]
-        assert per_file_pano == [], (
-            "verify_gui_tools_app_files must not mirror per-file hypr-pano "
-            f"sources (the overlay deploys WHOLE): {per_file_pano}"
-        )
-        # The unit files are asserted under the unit, and there are some.
-        pano_files = [str(f) for f in data["verify_ags_apps_hypr_pano_files"]]
-        assert pano_files, "verify_ags_apps_hypr_pano_files must not be empty"
-        for entry in pano_files:
-            assert entry.startswith("{{ verify_ags_apps_hypr_pano_dir }}/"), (
-                f"a hypr-pano unit file must derive from the unit dir; got {entry!r}"
-            )
-
-    def test_live_notifications_link_mirrors_the_ags_apps_role_and_is_not_a_spine_dir(
-        self,
-    ) -> None:
-        """Slice 4: <install>/config/ags-notifications is the ags_apps role's
-        live-notifications SYMLINK (-> the unit's notifications/), NOT a
-        filesystem/gui_tools dir. It must be absent from verify_install_spine_dirs
-        (the criterion-1 isdir assert counts dirs), absent from
-        verify_gui_tools_app_files (the daemon deploys WHOLE), and its vars must
-        mirror the ags_apps role."""
-        data = _vars()
-        apps = _sibling_vars("ags_apps")
-
-        live = str(data["verify_ags_apps_live_notifications_link"])
-        assert live == "{{ install_dir | trim }}/config/ags-notifications", (
-            f"verify_ags_apps_live_notifications_link must be "
-            f"<install>/config/ags-notifications; got {live!r}"
-        )
-        # Mirror of the role: the link DEST is the spine config path, the unit
-        # dir is the notifications/ subdir of the versioned unit.
-        role_live = str(apps["ags_apps_live_notifications_link"])
-        assert (
-            role_live.endswith("/ags-notifications") and "spine_config_dir" in role_live
-        ), (
-            "the ags_apps role must deploy the live-notifications link at "
-            f"config/ags-notifications; got {role_live!r}"
-        )
-        unit_notifications = str(data["verify_ags_apps_notifications_dir"])
-        assert (
-            unit_notifications.endswith("/notifications")
-            and "verify_ags_apps_unit_dir" in unit_notifications
-        ), (
-            "verify_ags_apps_notifications_dir must be <unit>/notifications; "
-            f"got {unit_notifications!r}"
-        )
-        assert str(apps["ags_apps_notifications_dir"]).endswith("/notifications"), (
-            "the ags_apps role must declare the unit's notifications/ subdir"
-        )
-
-        # Not a spine dir, and not a per-file gui_tools assertion.
-        assert "config/ags-notifications" not in [
-            str(item) for item in data["verify_install_spine_dirs"]
-        ], "config/ags-notifications is a symlink, not a verify_install_spine_dirs dir"
-        per_file_notifications = [
-            str(f)
-            for f in data["verify_gui_tools_app_files"]
-            if "/config/ags-notifications/" in str(f)
-        ]
-        assert per_file_notifications == [], (
-            "verify_gui_tools_app_files must not mirror per-file notifications "
-            f"sources (the daemon deploys WHOLE): {per_file_notifications}"
-        )
-        # The unit files are asserted under the unit, and there are some.
-        notifications_files = [
-            str(f) for f in data["verify_ags_apps_notifications_files"]
-        ]
-        assert notifications_files, (
-            "verify_ags_apps_notifications_files must not be empty"
-        )
-        for entry in notifications_files:
-            assert entry.startswith("{{ verify_ags_apps_notifications_dir }}/"), (
-                f"a notifications unit file must derive from the unit dir; got {entry!r}"
-            )
-
-    def test_live_capture_link_mirrors_the_ags_apps_role_and_is_not_a_spine_dir(
-        self,
-    ) -> None:
-        """Slice 5: <install>/config/ags-capture is the ags_apps role's
-        live-capture SYMLINK (-> the unit's capture-tool/), NOT a
-        filesystem/gui_tools dir. It must be absent from verify_install_spine_dirs
-        (the criterion-1 isdir assert counts dirs), absent from
-        verify_gui_tools_app_files (the GUI deploys WHOLE), and its vars must
-        mirror the ags_apps role."""
-        data = _vars()
-        apps = _sibling_vars("ags_apps")
-
-        live = str(data["verify_ags_apps_live_capture_link"])
-        assert live == "{{ install_dir | trim }}/config/ags-capture", (
-            f"verify_ags_apps_live_capture_link must be "
-            f"<install>/config/ags-capture; got {live!r}"
-        )
-        # Mirror of the role: the link DEST is the spine config path, the unit
-        # dir is the capture-tool/ subdir of the versioned unit.
-        role_live = str(apps["ags_apps_live_capture_link"])
-        assert (
-            role_live.endswith("/ags-capture") and "spine_config_dir" in role_live
-        ), (
-            "the ags_apps role must deploy the live-capture link at "
-            f"config/ags-capture; got {role_live!r}"
-        )
-        unit_capture = str(data["verify_ags_apps_capture_tool_dir"])
-        assert (
-            unit_capture.endswith("/capture-tool")
-            and "verify_ags_apps_unit_dir" in unit_capture
-        ), (
-            "verify_ags_apps_capture_tool_dir must be <unit>/capture-tool; "
-            f"got {unit_capture!r}"
-        )
-        assert str(apps["ags_apps_capture_tool_dir"]).endswith("/capture-tool"), (
-            "the ags_apps role must declare the unit's capture-tool/ subdir"
-        )
-
-        # Not a spine dir, and not a per-file gui_tools assertion.
-        assert "config/ags-capture" not in [
-            str(item) for item in data["verify_install_spine_dirs"]
-        ], "config/ags-capture is a symlink, not a verify_install_spine_dirs dir"
-        per_file_capture = [
-            str(f)
-            for f in data["verify_gui_tools_app_files"]
-            if "/config/ags-capture/" in str(f)
-        ]
-        assert per_file_capture == [], (
-            "verify_gui_tools_app_files must not mirror per-file capture GUI "
-            f"sources (the GUI deploys WHOLE): {per_file_capture}"
-        )
-        # The unit files are asserted under the unit, and there are some.
-        capture_files = [str(f) for f in data["verify_ags_apps_capture_tool_files"]]
-        assert capture_files, (
-            "verify_ags_apps_capture_tool_files must not be empty"
-        )
-        for entry in capture_files:
-            assert entry.startswith("{{ verify_ags_apps_capture_tool_dir }}/"), (
-                f"a capture-tool unit file must derive from the unit dir; got {entry!r}"
-            )
-        # The Python backend ships in the SAME unit from ags-apps v0.4.0, but it
-        # is a CLI (symlinked into the bin dir), not a GUI source: it stays out
-        # of the unit-file list and is asserted by its own symlink check.
-        assert not any("bin/capture-tool" in entry for entry in capture_files), (
-            "the capture-tool Python backend must not be asserted as a GUI unit "
-            "file; it is asserted separately as the bin-dir symlink"
-        )
-        # The installed CLI mirrors the ags_apps role: unit-derived backend +
-        # the same user bin dir the rest of provisioning uses.
-        assert (
-            str(data["verify_ags_apps_capture_tool_backend"])
-            == "{{ verify_ags_apps_capture_tool_dir }}/bin/capture-tool"
-        )
-        assert (
-            str(data["verify_ags_apps_capture_tool_bin_link"])
-            == "{{ verify_cli_bin_dir | trim }}/capture-tool"
-        )
-        role_bin = str(apps["ags_apps_capture_tool_bin_link"])
-        assert role_bin == "{{ ags_apps_bin_dir | trim }}/capture-tool", (
-            "the ags_apps role must install the CLI into its user bin dir"
-        )
-
-    def test_capture_cli_assertion_is_a_pinned_symlink_check(self) -> None:
-        """v0.4.0: verify must catch both failure modes a regular-file stat
-        cannot — a stale copy (not a symlink) and a link into another tag (the
-        controller and the GUI can then disagree)."""
-        tasks = _load_tasks()
-        names = [str(t.get("name", "")) for t in tasks]
-        check_name = "Check the capture-tool CLI entry point is a symlink"
-        resolve_name = "Check the capture-tool CLI entry point resolves to the unit backend"
-        assert_name = "Assert the capture-tool CLI is the pinned unit's backend symlink"
-        for name in (check_name, resolve_name, assert_name):
-            assert name in names, f"missing task {name!r}"
-
-        check = tasks[names.index(check_name)]
-        assert _module_key(check) == "ansible.builtin.stat"
-        assert _module(check).get("follow") is False, (
-            "the link check must inspect the link itself, not its target"
-        )
-        resolve = tasks[names.index(resolve_name)]
-        assert _module(resolve).get("follow") is True, (
-            "the resolve check must follow the link to prove the target exists"
-        )
-        assertion = tasks[names.index(assert_name)]
-        that = str(_module(assertion).get("that"))
-        assert "islnk" in that, "the assertion must reject a stale regular file"
-        assert "verify_ags_apps_version" in that, (
-            "the assertion must pin the link target to the installed tag"
-        )
-        assert names.index(check_name) < names.index(assert_name), (
-            "the stats must run before the assertion"
-        )
-
-    def test_live_wallpaper_selector_link_mirrors_the_ags_apps_role_and_is_not_a_spine_dir(
-        self,
-    ) -> None:
-        """Slice 6: <install>/config/ags-wallpaper-selector is the ags_apps role's
-        live-wallpaper-selector SYMLINK (-> the unit's wallpaper-selector/), NOT a
-        filesystem/gui_tools dir. It must be absent from verify_install_spine_dirs
-        (the criterion-1 isdir assert counts dirs), absent from
-        verify_gui_tools_app_files (the selector deploys WHOLE), and its vars must
-        mirror the ags_apps role."""
-        data = _vars()
-        apps = _sibling_vars("ags_apps")
-
-        live = str(data["verify_ags_apps_live_wallpaper_selector_link"])
-        assert live == "{{ install_dir | trim }}/config/ags-wallpaper-selector", (
-            f"verify_ags_apps_live_wallpaper_selector_link must be "
-            f"<install>/config/ags-wallpaper-selector; got {live!r}"
-        )
-        # Mirror of the role: the link DEST is the spine config path, the unit
-        # dir is the wallpaper-selector/ subdir of the versioned unit.
-        role_live = str(apps["ags_apps_live_wallpaper_selector_link"])
-        assert (
-            role_live.endswith("/ags-wallpaper-selector")
-            and "spine_config_dir" in role_live
-        ), (
-            "the ags_apps role must deploy the live-wallpaper-selector link at "
-            f"config/ags-wallpaper-selector; got {role_live!r}"
-        )
-        unit_selector = str(data["verify_ags_apps_wallpaper_selector_dir"])
-        assert (
-            unit_selector.endswith("/wallpaper-selector")
-            and "verify_ags_apps_unit_dir" in unit_selector
-        ), (
-            "verify_ags_apps_wallpaper_selector_dir must be <unit>/wallpaper-selector; "
-            f"got {unit_selector!r}"
-        )
-        assert str(apps["ags_apps_wallpaper_selector_dir"]).endswith(
-            "/wallpaper-selector"
-        ), "the ags_apps role must declare the unit's wallpaper-selector/ subdir"
-
-        # Not a spine dir, and not a per-file gui_tools assertion.
-        assert "config/ags-wallpaper-selector" not in [
-            str(item) for item in data["verify_install_spine_dirs"]
-        ], (
-            "config/ags-wallpaper-selector is a symlink, not a "
-            "verify_install_spine_dirs dir"
-        )
-        per_file_selector = [
-            str(f)
-            for f in data["verify_gui_tools_app_files"]
-            if "/config/ags-wallpaper-selector/" in str(f)
-        ]
-        assert per_file_selector == [], (
-            "verify_gui_tools_app_files must not mirror per-file wallpaper-selector "
-            f"sources (the selector deploys WHOLE): {per_file_selector}"
-        )
-        # The unit files are asserted under the unit, and there are some.
-        selector_files = [
-            str(f) for f in data["verify_ags_apps_wallpaper_selector_files"]
-        ]
-        assert selector_files, (
-            "verify_ags_apps_wallpaper_selector_files must not be empty"
-        )
-        for entry in selector_files:
-            assert entry.startswith(
-                "{{ verify_ags_apps_wallpaper_selector_dir }}/"
-            ), (
-                f"a wallpaper-selector unit file must derive from the unit dir; "
-                f"got {entry!r}"
-            )
-
-    def test_live_icme_link_mirrors_the_ags_apps_role_and_is_not_a_per_file_assertion(
-        self,
-    ) -> None:
-        """Slice 7: <install>/config/ags-icme is the ags_apps role's live-icme
-        SYMLINK (-> the unit's icme/), NOT a gui_tools per-file dir. It must be
-        absent from verify_gui_tools_app_files (the editor deploys WHOLE), absent
-        from verify_install_spine_dirs (it is not a filesystem dir), and its vars
-        must mirror the ags_apps role."""
-        data = _vars()
-        apps = _sibling_vars("ags_apps")
-
-        live = str(data["verify_ags_apps_live_icme_link"])
-        assert live == "{{ install_dir | trim }}/config/ags-icme", (
-            f"verify_ags_apps_live_icme_link must be "
-            f"<install>/config/ags-icme; got {live!r}"
-        )
-        # Mirror of the role: the link DEST is the spine config path, the unit
-        # dir is the icme/ subdir of the versioned unit.
-        role_live = str(apps["ags_apps_live_icme_link"])
-        assert (
-            role_live.endswith("/ags-icme")
-            and "spine_config_dir" in role_live
-        ), (
-            "the ags_apps role must deploy the live-icme link at "
-            f"config/ags-icme; got {role_live!r}"
-        )
-        unit_icme = str(data["verify_ags_apps_icme_dir"])
-        assert (
-            unit_icme.endswith("/icme")
-            and "verify_ags_apps_unit_dir" in unit_icme
-        ), (
-            "verify_ags_apps_icme_dir must be <unit>/icme; "
-            f"got {unit_icme!r}"
-        )
-        assert str(apps["ags_apps_icme_dir"]).endswith("/icme"), (
-            "the ags_apps role must declare the unit's icme/ subdir"
-        )
-
-        # Not a spine dir, and not a per-file gui_tools assertion.
-        assert "config/ags-icme" not in [
-            str(item) for item in data["verify_install_spine_dirs"]
-        ], (
-            "config/ags-icme is a symlink, not a "
-            "verify_install_spine_dirs dir"
-        )
-        per_file_icme = [
-            str(f)
-            for f in data["verify_gui_tools_app_files"]
-            if "/config/ags-icme/" in str(f)
-        ]
-        assert per_file_icme == [], (
-            "verify_gui_tools_app_files must not mirror per-file icme "
-            f"sources (the editor deploys WHOLE): {per_file_icme}"
-        )
-        # The unit files are asserted under the unit, and there are some.
-        icme_files = [str(f) for f in data["verify_ags_apps_icme_files"]]
-        assert icme_files, "verify_ags_apps_icme_files must not be empty"
-        for entry in icme_files:
-            assert entry.startswith("{{ verify_ags_apps_icme_dir }}/"), (
-                f"an icme unit file must derive from the unit dir; got {entry!r}"
-            )
-
-    def test_live_btop_studio_link_mirrors_the_ags_apps_role_and_is_not_a_per_file_assertion(
-        self,
-    ) -> None:
-        """Slice 8: <install>/config/ags-btop-studio is the ags_apps role's
-        live-btop-studio SYMLINK (-> the unit's btop-theme-studio/), NOT a
-        gui_tools per-file dir. It must be absent from verify_gui_tools_app_files
-        (the studio deploys WHOLE), absent from verify_install_spine_dirs (it is
-        not a filesystem dir), and its vars must mirror the ags_apps role."""
-        data = _vars()
-        apps = _sibling_vars("ags_apps")
-
-        live = str(data["verify_ags_apps_live_btop_studio_link"])
-        assert live == "{{ install_dir | trim }}/config/ags-btop-studio", (
-            f"verify_ags_apps_live_btop_studio_link must be "
-            f"<install>/config/ags-btop-studio; got {live!r}"
-        )
-        role_live = str(apps["ags_apps_live_btop_studio_link"])
-        assert (
-            role_live.endswith("/ags-btop-studio")
-            and "spine_config_dir" in role_live
-        ), (
-            "the ags_apps role must deploy the live-btop-studio link at "
-            f"config/ags-btop-studio; got {role_live!r}"
-        )
-        unit_studio = str(data["verify_ags_apps_btop_studio_dir"])
-        assert (
-            unit_studio.endswith("/btop-theme-studio")
-            and "verify_ags_apps_unit_dir" in unit_studio
-        ), (
-            "verify_ags_apps_btop_studio_dir must be <unit>/btop-theme-studio; "
-            f"got {unit_studio!r}"
-        )
-        assert str(apps["ags_apps_btop_studio_dir"]).endswith("/btop-theme-studio"), (
-            "the ags_apps role must declare the unit's btop-theme-studio/ subdir"
-        )
-
-        # Not a spine dir, and not a per-file gui_tools assertion.
-        assert "config/ags-btop-studio" not in [
-            str(item) for item in data["verify_install_spine_dirs"]
-        ], "config/ags-btop-studio is a symlink, not a verify_install_spine_dirs dir"
-        per_file_studio = [
-            str(f)
-            for f in data["verify_gui_tools_app_files"]
-            if "/config/ags-btop-studio/" in str(f)
-        ]
-        assert per_file_studio == [], (
-            "verify_gui_tools_app_files must not mirror per-file studio "
-            f"sources (the studio deploys WHOLE): {per_file_studio}"
-        )
-        # The unit files are asserted under the unit, and there are some. The
-        # live-preview engine is part of them: the app runs it from this tree.
-        studio_files = [str(f) for f in data["verify_ags_apps_btop_studio_files"]]
-        assert studio_files, "verify_ags_apps_btop_studio_files must not be empty"
-        for entry in studio_files:
-            assert entry.startswith("{{ verify_ags_apps_btop_studio_dir }}/"), (
-                f"a btop-theme-studio unit file must derive from the unit dir; "
-                f"got {entry!r}"
-            )
-        assert (
-            "{{ verify_ags_apps_btop_studio_dir }}/live/btop_live.py"
-            in studio_files
-        ), (
-            "verify must assert the live-preview engine inside the unit — the "
-            "app executes it from the linked tree"
         )
 
     def test_settings_files_parity_with_settings_role(self) -> None:
@@ -2721,16 +2233,24 @@ class TestVerifyVars:
         assert str(data["verify_bluetooth_service"]) == "bluetooth.service"
         assert str(data["verify_backlight_binary"]) == "brightnessctl"
 
-    def test_ags_always_on_instances_are_bar_and_overlay(self) -> None:
-        """The always-on AGS gate pins exactly the status bar and the
-        notification overlay — the two instances the session cannot afford to
-        lose (the overlay is the only notification daemon once dunst is
-        masked)."""
-        data = _vars()
-        assert [str(n) for n in data["verify_ags_always_on_instances"]] == [
-            "ags",
-            "notifications",
+    def test_ags_always_on_instances_are_derived_from_the_app_list(self) -> None:
+        """The always-on set has ONE source: the composition app list's
+        `launch: always` entries. The session cannot afford to lose the bar or
+        the notification overlay (the overlay is the only notification daemon
+        once dunst is masked), so verify derives the gate from the same list
+        ags_apps_units starts from."""
+        tasks = _load_tasks()
+        derive = [
+            task
+            for task in tasks
+            if "verify_ags_always_on_instances" in str(task.get("ansible.builtin.set_fact", ""))
         ]
+        assert derive, "verify must derive verify_ags_always_on_instances"
+        fact = str(derive[0]["ansible.builtin.set_fact"]["verify_ags_always_on_instances"])
+        assert "launch', 'equalto', 'always'" in fact
+        assert "map(attribute='instance')" in fact
+        # The static var stays empty so an absent/legacy list fails loud.
+        assert _vars()["verify_ags_always_on_instances"] == []
 
     def test_audio_user_units_are_pinned(self) -> None:
         """add-pipewire-audio-control: the audio bar/popup read the graph via
@@ -2745,127 +2265,13 @@ class TestVerifyVars:
             "wireplumber.service",
         ]
 
-    def test_ags_always_on_instances_parity_with_gui_tools(self) -> None:
-        """Parity lock: verify_ags_always_on_instances mirrors the gui_tools
-        always_on subset EXACTLY — a new always-on instance (or a flag flip)
-        that verify does not gate would silently ship unasserted."""
-        data = _vars()
-        verify_names = [str(n) for n in data["verify_ags_always_on_instances"]]
-        gui_instances = _sibling_vars("gui_tools")["gui_tools_ags_instances"]
-        gui_always_on = [str(i["name"]) for i in gui_instances if i["always_on"]]
-        assert verify_names == gui_always_on, (
-            "verify_ags_always_on_instances must be parity-EXACT with the "
-            "gui_tools always_on subset"
-        )
-
-    def test_capture_gui_is_not_mirrored_per_file(self) -> None:
-        """Slice 5 replaced the derived per-file capture coverage lock. The GUI
-        moved into the ags-apps unit and deploys WHOLE via the live-capture link,
-        so NO ags-capture/ dest may remain in gui_tools_app_files or in
-        verify_gui_tools_app_files — the per-file placement/assertion pair is
-        retired together. The unit's sources are asserted by
-        verify_ags_apps_capture_tool_files instead; the generated icons.json
-        (which lands through the link) stays a criterion-7 skeleton."""
-        gui_tools = _sibling_vars("gui_tools")
-        for key, value in gui_tools.items():
-            if key.endswith("_app_files") and isinstance(value, list):
-                for entry in value:
-                    dest = str(entry.get("dest", "")) if isinstance(entry, dict) else ""
-                    assert "/ags-capture/" not in dest, (
-                        f"{key} still places a per-file capture GUI source: {dest} "
-                        "— the GUI deploys WHOLE via the live-capture link"
-                    )
-        verified = [str(f) for f in _vars()["verify_gui_tools_app_files"]]
-        assert not any("/config/ags-capture/" in f for f in verified), (
-            "verify_gui_tools_app_files must not assert per-file capture GUI "
-            f"sources (the GUI deploys WHOLE): {verified}"
-        )
-        # The generated manifest that lands THROUGH the link stays asserted.
-        skeletons = [str(f) for f in _vars()["verify_compositor_skeleton_files"]]
-        assert "{{ install_dir | trim }}/config/ags-capture/icons.json" in skeletons, (
-            "the capture instance's generated icons.json must stay a criterion-7 "
-            "skeleton (it lands through the live-capture link)"
-        )
-
-    def test_capture_ags_instance_still_launches_from_the_symlink(self) -> None:
-        """The GUI still launches: the on-demand `capture` AGS instance entry
-        stays in the gui_tools instance list, started from the symlinked
-        ~/.config/ags-capture (config-links -> live-capture link)."""
-        gui_instances = _sibling_vars("gui_tools")["gui_tools_ags_instances"]
-        names = [str(i["name"]) for i in gui_instances]
-        assert "capture" in names, (
-            f"the capture AGS instance must stay in gui_tools_ags_instances; got {names}"
-        )
-
-    def test_wallpaper_selector_is_not_mirrored_per_file(self) -> None:
-        """Slice 6 retired the per-file wallpaper-selector coverage. The selector
-        moved into the ags-apps unit and deploys WHOLE via the
-        live-wallpaper-selector link, so NO ags-wallpaper-selector/ dest may remain
-        in gui_tools_app_files or in verify_gui_tools_app_files — the per-file
-        placement/assertion pair is retired together. The unit's sources are
-        asserted by verify_ags_apps_wallpaper_selector_files instead."""
-        gui_tools = _sibling_vars("gui_tools")
-        for key, value in gui_tools.items():
-            if key.endswith("_app_files") and isinstance(value, list):
-                for entry in value:
-                    dest = str(entry.get("dest", "")) if isinstance(entry, dict) else ""
-                    assert "/ags-wallpaper-selector/" not in dest, (
-                        f"{key} still places a per-file wallpaper-selector source: "
-                        f"{dest} — the selector deploys WHOLE via the "
-                        "live-wallpaper-selector link"
-                    )
-        verified = [str(f) for f in _vars()["verify_gui_tools_app_files"]]
-        assert not any("/config/ags-wallpaper-selector/" in f for f in verified), (
-            "verify_gui_tools_app_files must not assert per-file wallpaper-selector "
-            f"sources (the selector deploys WHOLE): {verified}"
-        )
-
-    def test_wallpaper_selector_ags_instance_still_launches_from_the_symlink(
-        self,
-    ) -> None:
-        """The selector still launches: the on-demand `wallpaper-selector` AGS
-        instance entry stays in the gui_tools instance list, started from the
-        symlinked ~/.config/ags-wallpaper-selector (config-links ->
-        live-wallpaper-selector link)."""
-        gui_instances = _sibling_vars("gui_tools")["gui_tools_ags_instances"]
-        names = [str(i["name"]) for i in gui_instances]
-        assert "wallpaper-selector" in names, (
-            "the wallpaper-selector AGS instance must stay in "
-            f"gui_tools_ags_instances; got {names}"
-        )
-
-    def test_icme_is_not_mirrored_per_file(self) -> None:
-        """Slice 7 retired the per-file icme coverage. The editor moved into the
-        ags-apps unit and deploys WHOLE via the live-icme link, so NO ags-icme/
-        dest may remain in gui_tools_app_files or in verify_gui_tools_app_files —
-        the per-file placement/assertion pair is retired together. The unit's
-        sources are asserted by verify_ags_apps_icme_files instead."""
-        gui_tools = _sibling_vars("gui_tools")
-        for key, value in gui_tools.items():
-            if key.endswith("_app_files") and isinstance(value, list):
-                for entry in value:
-                    dest = str(entry.get("dest", "")) if isinstance(entry, dict) else ""
-                    assert "/ags-icme/" not in dest, (
-                        f"{key} still places a per-file icme source: {dest} — "
-                        "the editor deploys WHOLE via the live-icme link"
-                    )
-        verified = [str(f) for f in _vars()["verify_gui_tools_app_files"]]
-        assert not any("/config/ags-icme/" in f for f in verified), (
-            "verify_gui_tools_app_files must not assert per-file icme "
-            f"sources (the editor deploys WHOLE): {verified}"
-        )
-
-    def test_icme_ags_instance_still_launches_from_the_symlink(self) -> None:
-        """The editor still launches: the on-demand
-        `icon-color-mapping-editor` AGS instance entry stays in the gui_tools
-        instance list, started from the symlinked ~/.config/ags-icme
-        (config-links -> live-icme link)."""
-        gui_instances = _sibling_vars("gui_tools")["gui_tools_ags_instances"]
-        names = [str(i["name"]) for i in gui_instances]
-        assert "icon-color-mapping-editor" in names, (
-            "the icon-color-mapping-editor AGS instance must stay in "
-            f"gui_tools_ags_instances; got {names}"
-        )
+    def test_gui_tools_no_longer_owns_an_always_on_instance_list(self) -> None:
+        """The always-on subset moved to the installer/app list; a gui_tools
+        instance list would be a second owner and could disagree with the
+        processes ags_apps_units starts."""
+        variables = _sibling_vars("gui_tools")
+        assert "gui_tools_ags_instances" not in variables
+        assert "gui_tools_ags_always_on_instances" not in variables
 
     def test_ags_gate_is_session_aware(self) -> None:
         """The bar and overlay are Hyprland-session apps (autostart.lua); a
@@ -2964,75 +2370,28 @@ class TestVerifyVars:
         assert not any("/platform/" in f for f in skeletons), (
             "the platform is external (AD-17); verify must not mirror it per file"
         )
-        # The ICME editor's event publisher seam is part of the external unit
-        # (slice 7) and deploys WHOLE via the live-icme link: NO per-file icme
-        # mirror remains here (its sources are asserted as a unit by
-        # verify_ags_apps_icme_files). A stale per-file mirror would assert files
-        # the bridge no longer deploys.
+        # ICME is an immutable standalone tag now: _verify_standalone.yml
+        # asserts its installed unit, so no per-file mirror may remain here.
         gui = [str(f) for f in data["verify_gui_tools_app_files"]]
-        assert not any("/config/ags-icme/" in f for f in gui), (
-            "the editor is external (slice 7); verify must not mirror it per file"
-        )
-        icme = [str(f) for f in data["verify_ags_apps_icme_files"]]
-        assert "{{ verify_ags_apps_icme_dir }}/lib/icme-saved.ts" in icme, (
-            "verify must assert the unit's icme.saved publisher seam"
-        )
-        assert "{{ verify_ags_apps_icme_dir }}/lib/generated/contract.ts" in icme, (
-            "verify must assert the vendored contract the publisher uses"
-        )
+        assert not gui, "gui_tools places no AGS app file anymore"
 
-    def test_verify_compositor_skeletons_cover_the_reachable_bar_sources(self) -> None:
-        """ags-apps-bar-first slice 2 (AD-1/AD-17/AD-23): the bar is now ONE
-        versioned unit, NOT a per-file skeleton — so verify must mirror
-        compositor_configs' retirement and carry NO per-file `config/ags/*`
-        entry. A stale per-file entry here would assert files the bridge no
-        longer deploys (and the live-bar link makes them resolve INTO the
-        unit, so the mirror would silently pin the wrong shape). The bar's
-        sources are asserted as a unit by `verify_ags_apps_*` instead; the
-        only `config/ags` entries left are GENERATED artifacts that land
-        through the link (icons.json)."""
+    def test_verify_compositor_skeletons_have_no_ags_sources(self) -> None:
+        """Every AGS app is an immutable standalone tag now, so verify must
+        carry NO per-file `config/ags*` skeleton. A stale entry would assert a
+        file the role never places (or would resolve INTO an app tag through a
+        live link and pin the wrong shape). _verify_standalone.yml asserts the
+        installed units instead."""
         data = _vars()
         skeletons = [str(f) for f in data["verify_compositor_skeleton_files"]]
-        per_file_bar = [
-            entry
-            for entry in skeletons
-            if "/config/ags/" in entry and not entry.endswith("/icons.json")
-        ]
-        assert per_file_bar == [], (
-            "verify_compositor_skeleton_files must not mirror per-file bar "
-            f"sources (the bar deploys WHOLE via the ags_apps unit): {per_file_bar}"
-        )
-        # The generated artifacts that DO land through the live-bar link stay
-        # asserted (both the bar's and the capture instance's manifest).
-        assert "{{ install_dir | trim }}/config/ags/icons.json" in skeletons
-        assert "{{ install_dir | trim }}/config/ags-capture/icons.json" in skeletons
-        # And the retired platform tree must not creep back in either.
-        assert not any("/config/ags/platform/" in entry for entry in skeletons), (
-            "the retired per-file platform tree must not be mirrored in verify"
-        )
+        assert not any("/config/ags" in entry for entry in skeletons), skeletons
 
-    def test_standalone_generated_icon_skeletons_are_filtered_by_owner(self) -> None:
-        """AD-37: a standalone app verifies the platform's single-produced
-        icons.json. The compositor-generated `config/<spine>/icons.json`
-        skeleton must drop out for that owner instead of asserting a file
-        compositor_configs deliberately no longer writes."""
-        tasks = _load_tasks()
-        names = [str(task.get("name", "")) for task in tasks]
-        assert "Derive standalone apps' generated icon skeletons" in names
-        assert "Select the compositor skeletons still generated for legacy owners" in names
-        source = (_ROLES_DIR / "tasks" / "main.yml").read_text()
-        assert "verify_ags_standalone_icon_skeletons" in source
-        check = next(
-            task for task in tasks if task.get("name") == "Check compositor configs and skeletons"
-        )
-        assert "verify_compositor_skeleton_active_files" in str(check.get("loop"))
-        assertion = next(
-            task
-            for task in tasks
-            if task.get("name")
-            == "Assert compositor configs and skeletons are present with correct types"
-        )
-        assert "verify_compositor_skeleton_active_files" in str(_module(assertion).get("that"))
+    def test_verify_has_no_generated_ags_icon_skeletons(self) -> None:
+        """icons.json has ONE producer — the pinned platform artifact app tags
+        carry. The compositor role no longer generates a second manifest, so no
+        generated-AGS-icon skeleton may remain."""
+        data = _vars()
+        skeletons = [str(f) for f in data["verify_compositor_skeleton_files"]]
+        assert not any(entry.endswith("/icons.json") for entry in skeletons)
 
     def test_verify_standalone_autostart_requires_one_locked_entry(self) -> None:
         text = (_ROLES_DIR / "tasks" / "_verify_standalone.yml").read_text()
@@ -3142,79 +2501,25 @@ class TestVerifyVars:
         assert hit is None, f"vars/main.yml hardcodes an absolute path: {hit!r} (trim lock)"
 
 
-class TestVerifyAgsAppsPinMirror:
-    """The verify role must assert the SAME ags-apps unit the role installs.
+class TestVerifyAgsPinMirror:
+    """The legacy monorepo pin is retired; the platform tuple remains shared."""
 
-    The installer and verifier live in different roles, so their version vars are
-    a hand-maintained mirror. v0.1.5 shipped `ags_apps_version: v0.4.1` with
-    `verify_ags_apps_version: v0.4.0`, which failed the first post-apply verify.
-    """
+    def test_legacy_apps_pin_vars_are_retired(self) -> None:
+        data = _vars()
+        assert not (_ANSIBLE_DIR / "roles" / "ags_apps").exists()
+        for retired in (
+            "verify_ags_apps_version",
+            "verify_ags_apps_platform_version",
+            "verify_ags_apps_unit_dir",
+            "verify_ags_apps_live_bar_link",
+        ):
+            assert retired not in data, retired
 
-    def test_ags_apps_version_mirrors_the_role(self) -> None:
+    def test_verify_platform_pin_mirrors_the_platform_role(self) -> None:
         verify_vars = _vars()
-        apps_vars = _sibling_vars("ags_apps")
-        assert verify_vars["verify_ags_apps_version"] == apps_vars["ags_apps_version"]
-        assert (
-            verify_vars["verify_ags_apps_platform_version"]
-            == apps_vars["ags_apps_platform_version"]
-        )
-
-    def test_engine_consumes_the_adoption_tuple(self) -> None:
-        """REQ-008 adoption: ags-apps v0.5.0 + ags-platform v0.3.0.
-
-        ags-apps v0.5.0 adds the per-app manifests and palette-refresh handlers
-        for the standalone contract; it builds against ags-platform v0.3.0. The
-        engine installs one monorepo unit, so the installer, platform role and
-        verify mirrors must all move together. This is the red/green guard for
-        the tuple: it fails while any leg still names v0.4.3/v0.2.0.
-        """
-        verify_vars = _vars()
-        apps_vars = _sibling_vars("ags_apps")
         platform_vars = _sibling_vars("ags_platform")
-        assert apps_vars["ags_apps_version"] == "v0.5.0", (
-            "the ags_apps role must install the adoption release v0.5.0; got "
-            f"{apps_vars['ags_apps_version']!r}"
-        )
-        assert verify_vars["verify_ags_apps_version"] == "v0.5.0", (
-            "verify_ags_apps_version must mirror ags_apps_version v0.5.0; got "
-            f"{verify_vars['verify_ags_apps_version']!r}"
-        )
-        assert platform_vars["ags_platform_version"] == "v0.3.0", (
-            "the ags_platform role must install the adoption tuple v0.3.0; got "
-            f"{platform_vars['ags_platform_version']!r}"
-        )
-        assert verify_vars["verify_ags_platform_version"] == "v0.3.0", (
-            "verify_ags_platform_version must mirror ags_platform_version v0.3.0; "
-            f"got {verify_vars['verify_ags_platform_version']!r}"
-        )
-        assert apps_vars["ags_apps_platform_version"] == "v0.3.0", (
-            "the legacy per-unit shortcut must resolve the same v0.3.0 tuple; got "
-            f"{apps_vars['ags_apps_platform_version']!r}"
-        )
-
-    def test_platform_pin_matches_every_consumer(self) -> None:
-        """The platform tag is one tuple: platform role, legacy per-unit
-        shortcut and both verify mirrors must agree."""
-        verify_vars = _vars()
-        apps_vars = _sibling_vars("ags_apps")
-        platform_vars = _sibling_vars("ags_platform")
-        assert (
-            verify_vars["verify_ags_platform_version"]
-            == apps_vars["ags_apps_platform_version"]
-            == platform_vars["ags_platform_version"]
-        )
-        assert (
-            verify_vars["verify_ags_apps_platform_version"]
-            == apps_vars["ags_apps_platform_version"]
-        )
-
-    def test_the_live_links_are_asserted_against_the_mirror(self) -> None:
-        tasks = _load_tasks()
-        by_name = {str(t.get("name", "")): t for t in tasks}
-        bar_assert = by_name["Assert the ags-apps unit + live bar + resolution shortcut are installed"]
-        that = str(_module(bar_assert).get("that"))
-        assert "verify_ags_apps_version" in that
-        assert "verify_ags_apps_platform_version" in that
+        assert verify_vars["verify_ags_platform_version"] == platform_vars["ags_platform_version"]
+        assert platform_vars["ags_platform_version"] == "v0.3.0"
 
 
 class TestVerifyRuntimePinMirror:
@@ -4679,21 +3984,8 @@ def _build_provisioned_layout(
         "config/color-scheme-generator/templates",
         "config/hypr",
         "config/hyprpaper",
-        # The clipboard cutover moves the managed basename from ags-hypr-pano to
-        # ags-clipboard. The fixture still models the pre-flip all-legacy list,
-        # so config_links creates this spine dir; after the flip ags_apps_units
-        # repoints it at <install>/apps/clipboard/<tag>`.
-        "config/ags-clipboard",
-        # config/ags is the ags_apps live-bar SYMLINK (<install>/config/ags ->
-        # the pinned unit's bar/), config/ags-capture is the live-capture SYMLINK
-        # (-> the unit's capture-tool/) and config/ags-wallpaper-selector is the
-        # live-wallpaper-selector SYMLINK (-> the unit's wallpaper-selector/), NOT
-        # spine dirs; all are created in the ags-apps unit block below.
-        # config/ags-hypr-pano is likewise the live-pano SYMLINK (slice 3), not a
-        # spine dir — created in the same block. config/ags-icme is the live-icme
-        # SYMLINK (slice 7, -> the unit's icme/), also created there.
-        # config/ags-btop-studio is the live-btop-studio SYMLINK (slice 8, -> the
-        # unit's btop-theme-studio/), also created there.
+        # Every config/ags* path is a spine SYMLINK into an app tag, created
+        # in the all-standalone block below — never a filesystem dir.
         "config/nvim",
         "config/starship",
         "config/wlogout",
@@ -4905,13 +4197,8 @@ def _build_provisioned_layout(
     # The capture instance's generated icons.json lands THROUGH the live-capture
     # symlink (into the unit's capture-tool/); it is written in the ags-apps unit
     # block below, after that link exists.
-    # Sibling AGS apps stay spine dirs (the ags_apps role owns the bar, the
-    # clipboard overlay, the notification overlay, the capture GUI, the wallpaper
-    # selector and the icon color mapping editor as live links; those links are
-    # built in the unit block below).
-    # The btop Theme Studio deploys WHOLE like the other AGS apps (slice 8): its
-    # unit subdir is linked as <install>/config/ags-btop-studio in the unit block
-    # below, so it is NOT a spine dir.
+    # Every AGS app's spine path is a symlink into its immutable tag; the
+    # all-standalone block below creates all of them.
     # The ags-platform unit + shared-ancestor shortcut (spine AD-17/AD-23):
     # installed by the ags_platform role as ONE versioned unit, NOT mirrored
     # per file under config/ags. The fixture mirrors verify_ags_platform_unit_dir
@@ -4929,198 +4216,58 @@ def _build_provisioned_layout(
     (unit / "adapters" / "icon-registry.ts").write_text("")
     (unit / "adapters" / "astal.ts").write_text("")
     (install / "ags-platform" / "pinned").write_text("v0.3.0\n")
-    (install / "config" / "node_modules").mkdir(parents=True, exist_ok=True)
-    (install / "config" / "node_modules" / "ags-platform").symlink_to(unit)
-    # The ags-apps unit + live-bar link + per-unit resolution shortcut (spine
-    # AD-1/AD-17/AD-23): the bar is installed by the ags_apps role as ONE
-    # versioned unit (the ags-apps monorepo checkout at the pinned tag), and
-    # <install>/config/ags is a SYMLINK into the unit's bar/ subdir — NOT a
-    # real dir of per-file bar sources. The fixture mirrors
-    # verify_ags_apps_unit_dir / _bar_dir / _pin_file / _live_bar_link /
-    # _resolution_shortcut so the criterion asserts have something to pass on.
-    apps_version = str(verify_vars["verify_ags_apps_version"])
-    apps_unit = install / "ags-apps" / apps_version
-    apps_bar = apps_unit / "bar"
-    (apps_bar / "bar" / "widgets").mkdir(parents=True, exist_ok=True)
-    for apps_file in (
-        "app.tsx",
-        "style.css",
-        "overlays.ts",
-        "bar/Bar.tsx",
-        "bar/widgets/workspaces.tsx",
-        "bar/layout.default.ts",
-        "bar/registry.ts",
-        "bar/bar-manifest.ts",
-        "bar/validate.ts",
-        "bar/validate-cli.ts",
-    ):
-        (apps_bar / apps_file).write_text("")
-    (install / "ags-apps" / "pinned").write_text(f"{apps_version}\n")
-    (apps_unit / "node_modules").mkdir(parents=True, exist_ok=True)
-    (apps_unit / "node_modules" / "ags-platform").symlink_to(unit)
-    (install / "config" / "ags").symlink_to(apps_bar, target_is_directory=True)
-    # The clipboard overlay deploys WHOLE like the bar (slice 3): the unit's
-    # hypr-pano/ subdir is linked as <install>/config/ags-hypr-pano — NOT a real
-    # dir of per-file app sources. Mirror of verify_ags_apps_hypr_pano_dir /
-    # _live_pano_link / _hypr_pano_files.
-    apps_pano = apps_unit / "hypr-pano"
-    (apps_pano / "ui").mkdir(parents=True, exist_ok=True)
-    (apps_pano / "lib").mkdir(parents=True, exist_ok=True)
-    for pano_file in (
-        "app.tsx",
-        "style.css",
-        "ui/PanoWindow.tsx",
-        "ui/ItemCard.tsx",
-        "ui/Preview.tsx",
-        "lib/clipboard-types.ts",
-        "lib/history.ts",
-    ):
-        (apps_pano / pano_file).write_text("")
-    (install / "config" / "ags-hypr-pano").symlink_to(
-        apps_pano, target_is_directory=True
+    # The final all-standalone AGS topology (AD-31/AD-37): every app is its
+    # own immutable tag under <install>/apps/<installDir>/<tag>, resolving the
+    # ONE shared apps/node_modules/ags-platform shortcut. ags_apps_units owns
+    # the spine/XDG links, the optional bin link, the launchers and the
+    # always-on starts; the assets corpus owns the autostart file.
+    app_fixture = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "ags-apps" / "app-list" / "all-standalone.apps.yaml").read_text()
     )
-    # The notification daemon deploys WHOLE like the bar (slice 4): the unit's
-    # notifications/ subdir is linked as <install>/config/ags-notifications — NOT
-    # a real dir of per-file app sources. Mirror of
-    # verify_ags_apps_notifications_dir / _live_notifications_link /
-    # _notifications_files.
-    apps_notifications = apps_unit / "notifications"
-    (apps_notifications / "ui").mkdir(parents=True, exist_ok=True)
-    (apps_notifications / "lib").mkdir(parents=True, exist_ok=True)
-    for notif_file in (
-        "app.tsx",
-        "style.css",
-        "ui/NotificationsWindow.tsx",
-        "lib/card-model.ts",
-    ):
-        (apps_notifications / notif_file).write_text("")
-    (install / "config" / "ags-notifications").symlink_to(
-        apps_notifications, target_is_directory=True
+    apps_root = install / "apps"
+    (apps_root / "node_modules").mkdir(parents=True, exist_ok=True)
+    (apps_root / "node_modules" / "ags-platform").symlink_to(unit)
+    for entry in app_fixture["apps"]:
+        app_unit = apps_root / entry["installDir"] / entry["tag"]
+        app_unit.mkdir(parents=True, exist_ok=True)
+        (app_unit / "app.manifest.json").write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "app": entry["app"],
+                    "instance": entry["instance"],
+                    "configDir": entry["configDir"],
+                    "mode": "live",
+                    "holdsUnsavedState": False,
+                }
+            )
+            + "\n"
+        )
+        (app_unit / "app.tsx").write_text(
+            f'const appOptions = {{ instanceName: "{entry["instance"]}" }};\n'
+        )
+        (app_unit / "handler.ts").write_text('export const command = "palette-refresh";\n')
+        if entry["app"] == "bar":
+            (app_unit / "icons.json").write_text("{}")
+            (app_unit / "colors.css").symlink_to(state_current / "colors.gtk.css")
+        (apps_root / entry["installDir"] / "pinned").write_text(entry["tag"] + "\n")
+        spine = install / "config" / entry["spineLink"]
+        spine.symlink_to(app_unit, target_is_directory=True)
+        (xdg / entry["xdgLink"]).symlink_to(spine, target_is_directory=True)
+        if "binLink" in entry:
+            bin_source = app_unit / "bin" / entry["binLink"]
+            bin_source.parent.mkdir(parents=True, exist_ok=True)
+            bin_source.write_text("#!/bin/sh\nexit 0\n")
+            bin_source.chmod(0o755)
+            (home / ".local" / "bin" / entry["binLink"]).symlink_to(bin_source)
+        if "launcher" in entry:
+            launcher = home / ".local" / "bin" / entry["launcher"]
+            launcher.write_text("#!/bin/sh\nexec ags-run-locked --expect-instance " + entry["instance"] + "\n")
+            launcher.chmod(0o755)
+    (install / "config" / "hypr" / "autostart.lua").write_text(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "ags-apps" / "autostart" / "v0.6.2.lua").read_text()
     )
-    # Generated (icons.json) and runtime-owned (colors.css) artifacts resolve
-    # THROUGH the live-bar link into the unit tree, exactly as on a real host:
-    # the icon manifest is a criterion-7 skeleton, the colors.css pointer is an
-    # R2 consumer symlink (Epic 4 current-only).
-    (install / "config" / "ags" / "icons.json").write_text("{}")
-    (install / "config" / "ags" / "colors.css").symlink_to(
-        state_current / "colors.gtk.css"
-    )
-    # The capture-tool AGS GUI deploys WHOLE like the bar (slice 5): the unit's
-    # capture-tool/ subdir is linked as <install>/config/ags-capture — NOT a real
-    # dir of per-file app sources. Mirror of verify_ags_apps_capture_tool_dir /
-    # _live_capture_link / _capture_tool_files. The generated icons.json lands
-    # THROUGH that link into the unit tree, exactly like the bar's.
-    apps_capture = apps_unit / "capture-tool"
-    (apps_capture / "ui" / "classic").mkdir(parents=True, exist_ok=True)
-    (apps_capture / "domain").mkdir(parents=True, exist_ok=True)
-    (apps_capture / "ports").mkdir(parents=True, exist_ok=True)
-    (apps_capture / "adapters").mkdir(parents=True, exist_ok=True)
-    for capture_file in (
-        "app.tsx",
-        "style.css",
-        "ui/classic/ClassicWindow.tsx",
-        "domain/settings.ts",
-        "domain/cli-args.ts",
-        "ports/capture-ports.ts",
-        "adapters/exec-capture-launcher.ts",
-    ):
-        (apps_capture / capture_file).write_text("")
-    (install / "config" / "ags-capture").symlink_to(
-        apps_capture, target_is_directory=True
-    )
-    (install / "config" / "ags-capture" / "icons.json").write_text("{}")
-    # v0.4.0: the CLI ships in the SAME unit's capture-tool/bin/ and the
-    # ags_apps role installs it as a user-bin symlink. The fixture mirrors both
-    # halves so verify's islnk + pin-target assertion has a real link to check.
-    apps_capture_bin = apps_capture / "bin"
-    apps_capture_bin.mkdir(parents=True, exist_ok=True)
-    apps_capture_backend = apps_capture_bin / "capture-tool"
-    apps_capture_backend.write_text("#!/bin/sh\nexit 0\n")
-    apps_capture_backend.chmod(0o755)
-    (home / ".local" / "bin" / "capture-tool").symlink_to(apps_capture_backend)
-    # The icon color mapping editor deploys WHOLE like the bar (slice 7): the
-    # unit's icme/ subdir is linked as <install>/config/ags-icme — NOT a real dir
-    # of per-file app sources. Mirror of verify_ags_apps_icme_dir /
-    # _live_icme_link / _icme_files (including the icme.saved publisher seam and
-    # the vendored generated contract).
-    apps_icme = apps_unit / "icme"
-    (apps_icme / "ui").mkdir(parents=True, exist_ok=True)
-    (apps_icme / "lib" / "generated").mkdir(parents=True, exist_ok=True)
-    for icme_file in (
-        "app.tsx",
-        "style.css",
-        "ui/EditorWindow.tsx",
-        "ui/TemplatesTab.tsx",
-        "lib/model.ts",
-        "lib/inputs.ts",
-        "lib/substitute.ts",
-        "lib/svg.ts",
-        "lib/icme-saved.ts",
-        "lib/generated/contract.ts",
-    ):
-        (apps_icme / icme_file).write_text("")
-    (install / "config" / "ags-icme").symlink_to(
-        apps_icme, target_is_directory=True
-    )
-    # hypr-pano is NOT a gui_tools per-file app anymore (slice 3): it deploys
-    # WHOLE via the ags_apps live-pano link created in the unit block above, so
-    # there is no per-file mirror here and verify_gui_tools_app_files asserts
-    # none of it.
-    # The wallpaper selector deploys WHOLE like the bar (slice 6): the unit's
-    # wallpaper-selector/ subdir is linked as
-    # <install>/config/ags-wallpaper-selector — NOT a real dir of per-file app
-    # sources. Mirror of verify_ags_apps_wallpaper_selector_dir /
-    # _live_wallpaper_selector_link / _wallpaper_selector_files. No generated
-    # icons.json lands here (unlike the bar/capture), and nothing stays in-repo.
-    apps_selector = apps_unit / "wallpaper-selector"
-    (apps_selector / "ui").mkdir(parents=True, exist_ok=True)
-    (apps_selector / "lib").mkdir(parents=True, exist_ok=True)
-    for selector_file in (
-        "app.tsx",
-        "style.css",
-        "ui/WallpaperSelectorWindow.tsx",
-        "lib/model.ts",
-        "lib/scan.ts",
-        "lib/thumbnails.ts",
-        "lib/apply.ts",
-        "lib/contrast.ts",
-    ):
-        (apps_selector / selector_file).write_text("")
-    (install / "config" / "ags-wallpaper-selector").symlink_to(
-        apps_selector, target_is_directory=True
-    )
-    # Notifications overlay is NOT a gui_tools per-file app anymore (slice 4): it
-    # deploys WHOLE via the ags_apps live-notifications link created in the unit
-    # block above, so there is no per-file mirror here and verify_gui_tools_app_files
-    # asserts none of it.
-    # btop Theme Studio deploys WHOLE like the bar (slice 8): the unit's
-    # btop-theme-studio/ subdir is linked as <install>/config/ags-btop-studio —
-    # NOT a real dir of per-file app sources. Mirror of
-    # verify_ags_apps_btop_studio_dir / _live_btop_studio_link /
-    # _btop_studio_files (including the live/btop_live.py preview engine, which
-    # the app runs from this tree).
-    apps_btop_studio = apps_unit / "btop-theme-studio"
-    (apps_btop_studio / "ui").mkdir(parents=True, exist_ok=True)
-    (apps_btop_studio / "lib").mkdir(parents=True, exist_ok=True)
-    (apps_btop_studio / "live").mkdir(parents=True, exist_ok=True)
-    for studio_file in (
-        "app.tsx",
-        "style.css",
-        "ui/StudioWindow.tsx",
-        "lib/theme-keys.ts",
-        "lib/btop-conf.ts",
-        "lib/key-map.ts",
-        "lib/key-widgets.generated.ts",
-        "lib/schematic.ts",
-        "lib/theme-model.ts",
-        "lib/preview.ts",
-        "lib/targets.ts",
-        "live/btop_live.py",
-    ):
-        (apps_btop_studio / studio_file).write_text("")
-    (install / "config" / "ags-btop-studio").symlink_to(
-        apps_btop_studio, target_is_directory=True
-    )
+
     # NOTE: no palette fragments are placed (Epic 4 — the runtime seeder
     # owns the R2 consumer symlink, created above).
 
@@ -5181,14 +4328,6 @@ def _build_provisioned_layout(
     for name in (
         "hypr",
         "hyprpaper",
-        "ags",
-        "ags-capture",
-        "ags-icme",
-        "ags-clipboard",
-        "ags-hypr-pano",
-        "ags-wallpaper-selector",
-        "ags-notifications",
-        "ags-btop-studio",
         "nvim",
         "starship",
         "wlogout",

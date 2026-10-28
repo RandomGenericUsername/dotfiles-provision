@@ -1,11 +1,11 @@
 """Tests for the ags_platform role (spine AD-17/AD-23).
 
 The role installs the AGS platform as ONE versioned unit and creates the
-shared-ancestor `node_modules/ags-platform` shortcut every AGS config resolves
-the bare specifier through. These tests pin the STRUCTURE (the role, the
+versioned unit. The ONE app-install resolver shortcut is created by
+`ags_apps_units` under <install>/apps/node_modules/ags-platform. These tests pin the STRUCTURE (the role, the
 playbook, the vars' shapes, the presence guard, the check gating, the `.git`
-removal, the pin record, the shortcut) and EXECUTE the playbook against a
-pre-seeded unit so the pin + shortcut are proven by a real run — without a
+removal, the pin record) and EXECUTE the playbook against a pre-seeded unit so
+the pin is proven by a real run — without a
 network clone (the clone is presence-guarded; the fetch is proven separately by
 the deploy-coverage gate's role assertion and the manual simulated install).
 """
@@ -120,14 +120,13 @@ class TestAgsPlatformVars:
         assert "ags_platform_version" in str(data["ags_platform_unit_dir"])
         assert "ags_platform_install_root" in str(data["ags_platform_unit_dir"])
 
-    def test_shortcut_is_the_shared_ancestor(self) -> None:
-        """The shortcut lives under <install>/config/node_modules so config/ags
-        AND every config/ags-* resolve the bare specifier (AD-17)."""
+    def test_no_second_resolver_shortcut_is_owned_here(self) -> None:
+        """App tags live under <install>/apps, so the only correct ancestor is
+        <install>/apps/node_modules — ags_apps_units owns it. A config/
+        node_modules shortcut here would be a second, dead resolver."""
         data = _vars()
-        assert "install_dir" in str(data["ags_platform_spine_config_dir"])
-        assert "config" in str(data["ags_platform_spine_config_dir"])
-        assert "node_modules" in str(data["ags_platform_shortcut_dir"])
-        assert str(data["ags_platform_shortcut"]).endswith("/ags-platform")
+        assert "ags_platform_shortcut" not in data
+        assert "ags_platform_shortcut_dir" not in data
 
     def test_unit_marker_guards_the_clone(self) -> None:
         data = _vars()
@@ -178,14 +177,9 @@ class TestAgsPlatformTasks:
         assert module["dest"] == "{{ ags_platform_pin_file }}"
         assert "ags_platform_version" in str(module["content"])
 
-    def test_shortcut_is_forced_symlink_into_the_unit(self) -> None:
-        task = _named("Point the shared-ancestor shortcut at the pinned unit")
-        assert _module_key(task) == "ansible.builtin.file"
-        module = _module(task)
-        assert module["state"] == "link"
-        assert module["force"] is True, "force makes a rollback repoint converge"
-        assert module["src"] == "{{ ags_platform_unit_dir }}"
-        assert module["dest"] == "{{ ags_platform_shortcut }}"
+    def test_no_shortcut_task_remains(self) -> None:
+        names = [str(task.get("name", "")) for task in _load_tasks()]
+        assert not any("shortcut" in name.lower() for name in names)
 
     def test_no_become_anywhere(self) -> None:
         for task in _load_tasks():
@@ -224,7 +218,7 @@ class TestAgsPlatformPlaybook:
 
 class TestAgsPlatformExecution:
     """Run the real playbook against a pre-seeded unit (no network): the clone
-    is presence-guarded, so the run exercises the pin + shortcut path."""
+    is presence-guarded, so the run exercises the pin path."""
 
     _PATH = _PLAYBOOKS_DIR / "ags-platform.yaml"
 
@@ -243,7 +237,7 @@ class TestAgsPlatformExecution:
             timeout=120,
         )
 
-    def test_places_pin_and_shortcut_for_a_present_unit(self, tmp_path: Path) -> None:
+    def test_places_the_pin_for_a_present_unit(self, tmp_path: Path) -> None:
         home = tmp_path / "home"
         install = tmp_path / "install"
         home.mkdir()
@@ -262,17 +256,15 @@ class TestAgsPlatformExecution:
         assert pin.is_file(), "the pin must be recorded"
         assert pin.read_text().strip() == "v0.3.0"
 
-        shortcut = install / "config" / "node_modules" / "ags-platform"
-        assert shortcut.is_symlink(), "the shared-ancestor shortcut must be a symlink"
-        assert shortcut.resolve() == unit.resolve(), (
-            "the shortcut must point at the pinned unit"
+        assert not (install / "config" / "node_modules" / "ags-platform").exists(), (
+            "the platform role must not create a second resolver shortcut"
         )
         assert not (unit / ".git").exists(), "the clone's .git must be removed"
 
         # Idempotent: a second run converges to the same state.
         second = self._run(install, home)
         assert second.returncode == 0, second.stdout + second.stderr
-        assert shortcut.resolve() == unit.resolve()
+        assert pin.read_text().strip() == "v0.3.0"
 
 
 if __name__ == "__main__":

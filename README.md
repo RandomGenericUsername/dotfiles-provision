@@ -13,7 +13,7 @@ repo (`dotfiles-runtime`). The btop active-theme preference is host state in the
 seam below.
 
 **Workspace.** The engine is developed beside its consumers under `~/Development/dotfiles/`
-(`dotfiles-v3`, `dotfiles-assets`, `ags-apps`, `ags-platform`, `contracts`, …). The canonical
+(`dotfiles-v3`, `dotfiles-assets`, the per-app `ags-*` repos, `ags-platform`, `contracts`, …). The canonical
 ownership/pin map is [`../dotfiles-v3/docs/WORKSPACE.md`](../dotfiles-v3/docs/WORKSPACE.md);
 the engine's own consumers pin it by tag.
 

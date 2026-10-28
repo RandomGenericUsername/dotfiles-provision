@@ -1,5 +1,20 @@
-# All-standalone fixture: both apps are owned by the generic role; the legacy
-# role must be a complete no-op. fake-bar owns the stable palette pointer.
+# FINAL all-standalone app list (REQ-008 / AD-31/AD-32/AD-37).
+#
+# This is the host-shape fixture for the seven standalone AGS apps the final
+# cutover composes: bar, notifications, capture, clipboard,
+# wallpaper-selector, icme and btop-theme-studio. Every entry is
+# `owner: standalone`; `ags_apps_units` is the ONE installer/owner of its
+# <install>/apps/<installDir>/<tag> unit and every config/spine/XDG/bin/
+# launcher/autostart surface. The retired `ags_apps` monorepo role does not
+# exist.
+#
+# `repo`/`tag` are overridden by the execution harness; the checked-in values
+# only document the shape. The bar keeps the ONE stable palette pointer
+# (colors.css -> the runtime-owned XDG state pointer); its v0.1.1 tag is the
+# state-migration release. Autostart identities mirror dotfiles-assets v0.6.2:
+# only the always-on bar and notification overlay plus the boot-staggered
+# capture and clipboard overlays appear there; the on-demand launchers carry no
+# autostart entry.
 apps:
   - app: bar
     installDir: bar
@@ -14,20 +29,91 @@ apps:
     autostart: ags
     launch: always
     barPalettePointer: true
-    cutoverId: REQ-999
+    cutoverId: REQ-015
 
-  - app: fake-app
-    installDir: fake-app
+  - app: notifications
+    installDir: notifications
     owner: standalone
     repo: PLACEHOLDER
     tag: v0.1.0
-    instance: fake-app
-    configDir: ags-fake-app
-    configLink: ags-fake-app
-    spineLink: ags-fake-app
-    xdgLink: ags-fake-app
-    binLink: fake-app-tool
-    launcher: fake-app-ui
-    autostart: fake-app
+    instance: notifications
+    configDir: ags-notifications
+    configLink: ags-notifications
+    spineLink: ags-notifications
+    xdgLink: ags-notifications
+    autostart: notifications
+    launch: always
+    cutoverId: REQ-012
+
+  - app: capture
+    installDir: capture
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: capture
+    configDir: ags-capture
+    configLink: ags-capture
+    spineLink: ags-capture
+    xdgLink: ags-capture
+    binLink: capture-tool
+    launcher: capture-ui
+    autostart: capture
     launch: on-demand
-    cutoverId: REQ-999
+    cutoverId: REQ-011
+
+  - app: clipboard
+    installDir: clipboard
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: clipboard
+    configDir: ags-clipboard
+    configLink: ags-clipboard
+    spineLink: ags-clipboard
+    xdgLink: ags-clipboard
+    launcher: clipboard-ui
+    autostart: clipboard
+    launch: on-demand
+    cutoverId: REQ-009
+
+  - app: wallpaper-selector
+    installDir: wallpaper-selector
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: wallpaper-selector
+    configDir: ags-wallpaper-selector
+    configLink: ags-wallpaper-selector
+    spineLink: ags-wallpaper-selector
+    xdgLink: ags-wallpaper-selector
+    launcher: wallpaper-selector-ui
+    launch: on-demand
+    cutoverId: REQ-013
+
+  - app: icme
+    installDir: icme
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: icon-color-mapping-editor
+    configDir: ags-icme
+    configLink: ags-icme
+    spineLink: ags-icme
+    xdgLink: ags-icme
+    launcher: icon-color-mapping-editor
+    launch: on-demand
+    cutoverId: REQ-014
+
+  - app: btop-theme-studio
+    installDir: btop-theme-studio
+    owner: standalone
+    repo: PLACEHOLDER
+    tag: v0.1.0
+    instance: btop-theme-studio
+    configDir: ags-btop-studio
+    configLink: ags-btop-studio
+    spineLink: ags-btop-studio
+    xdgLink: ags-btop-studio
+    launcher: btop-theme-studio
+    launch: on-demand
+    cutoverId: REQ-010

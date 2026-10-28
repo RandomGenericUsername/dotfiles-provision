@@ -6,6 +6,69 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-10-28
+
+### Added
+
+- **Seven-app all-standalone fixture and execution proof (REQ-008):**
+  `tests/fixtures/ags-apps/app-list/all-standalone.apps.yaml` models the final
+  composition exactly — `bar`, `notifications`, `capture`, `clipboard`,
+  `wallpaper-selector`, `icme`, `btop-theme-studio`, all `owner: standalone`.
+  A real `ansible-playbook` run installs all seven tags under
+  `<install>/apps/<installDir>/<tag>`, creates the ONE shared
+  `<install>/apps/node_modules/ags-platform` shortcut, asserts every
+  config/spine/XDG/bin/launcher surface, the bar's palette pointer and
+  platform-produced icons, the always-on process set, rollback and tag-bump
+  immutability.
+- **Verbatim assets v0.6.2 autostart fixture:** the lock-routed autostart
+  corpus (`ags`, `notifications`, `capture`, `clipboard` once each;
+  on-demand apps absent) now drives the installer/verify autostart assertions.
+
+### Changed
+
+- **`ags_apps_units` is the ONLY AGS app installer (AD-31/AD-32/AD-37):** the
+  role now requires every app-list entry to be `owner: standalone` (a legacy
+  entry fails loud instead of shipping with no owner) and owns every immutable
+  tag plus its config/spine/XDG/bin/launcher surfaces. The shared platform
+  resolver is now only `<install>/apps/node_modules/ags-platform`; the
+  `ags_platform` role no longer creates the obsolete
+  `<install>/config/node_modules` shortcut.
+- **Legacy AGS ownership retired:** the `ags_apps` monorepo role and
+  `ags-apps.yaml` playbook are deleted, along with their pin and tests.
+  `cli_tools` no longer renders per-app AGS launchers; `gui_tools` no longer
+  tracks an AGS instance list or starts/quits app instances; `config_links` no
+  longer exposes AGS basenames; `compositor_configs` no longer generates or
+  validates an AGS `icons.json`. Each surface has exactly one owner.
+- **Generic launcher keeps the existing toggle/request behavior:** warm presses
+  use the app's `ags request toggle` response ("ok") or fall back to
+  `ags toggle` on the instance/config-derived window name (capture,
+  wallpaper-selector, icme, btop-theme-studio); cold starts go through
+  `ags-run-locked`, then reveal a start-hidden overlay through `request show`
+  (clipboard). `capture-ui`, `clipboard-ui`, `wallpaper-selector-ui`,
+  `icon-color-mapping-editor` and `btop-theme-studio` are rendered from the
+  app-list `launcher` field, and the always-on bar/notifications are started by
+  the installer.
+- **Bootstrap order:** `gui-tools` now runs before `ags-apps-units` so dunst is
+  stopped/masked before the notifications overlay starts; the retired
+  `ags-apps` import is gone.
+- **Assets pin moves to `v0.6.2`** (launch-lock autostart + clipboard rename)
+  in every `*_assets_pinned_tag` mirror, the fixture manifest and the program
+  tuple's `dotfiles-assets` leg.
+- **Bar state migration expectations:** the standalone bar tag (v0.1.1) carries
+  `colors.css` as a symlink to the runtime-owned
+  `$XDG_STATE_HOME/dotfiles/current/colors.gtk.css` and the one produced
+  `icons.json`; the role verifies both through `<install>/config/ags` and never
+  writes into the tag.
+
+### Notes
+
+- No host provision, no push/publish, and no `dotfiles-v3`/assets/app-repo
+  edits. The composition must flip all seven entries, bump its assets pin to
+  `v0.6.2` and its engine pin to `v0.1.21` (and bar to `v0.1.1`) in its own
+  cutover.
+- `make gates`, `make ci-gates-parity` and `make build` are green; the release
+  tag is local-only.
+
 ## [0.1.20] - 2026-10-27
 
 ### Added

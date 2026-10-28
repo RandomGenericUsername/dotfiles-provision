@@ -3,11 +3,11 @@
 # from the PINNED assets `configs/` class (`<install>/assets/<tag>/configs/
 # {hypr,hyprpaper,rofi}/`, the checkout the assets role materialized) into the
 # config-in-spine dirs.
-# The AGS bar is NOT placed here: the `ags_apps` role installs it as ONE
-# versioned unit and deploys it as the live <install>/config/ags symlink
-# (ags-apps-bar-first slice 2, AD-17). This role still GENERATES the bar's
-# icons.json through that link and runs the unit's `ags-bar-validate` CLI as
-# the strict install gate, so it runs AFTER ags-apps in bootstrap order.
+# The AGS apps are NOT placed, generated or validated here. The only AGS
+# installer, `ags_apps_units`, owns every app tag and its config/spine/XDG
+# links; each app tag carries its own sources and the platform-produced
+# icons.json (AD-37). This role is therefore purely compositor config
+# (hypr/hyprpaper/rofi/desktop entries).
 # Palette fragments are NOT copied here: the runtime seeder owns the
 # consumer palette paths (R2 symlinks → current/, rt-4-2) and
 # `wallpaper set` keeps them current (FR-19, chaining-spine.md).
@@ -69,81 +69,11 @@
       the install_dir seam extra-var (the orchestrator resolves
       $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
 
-- name: Assert composition manifests seam is provided
-  ansible.builtin.assert:
-    that:
-      - manifests_dir is defined
-      - manifests_dir is string
-      - manifests_dir | trim | length > 0
-    fail_msg: >-
-      manifests_dir is undefined or empty — compositor_configs reads the
-      composition apps.yaml to decide whether a generated icons.json would be
-      written through a LEGACY live link. The engine CLI resolves it from
-      --manifests-dir; direct runs pass -e manifests_dir=...
-
-- name: Read the composition app list for the AGS icon-manifest owner
-  ansible.builtin.set_fact:
-    compositor_configs_composition_apps: "{{ lookup('file', manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
-
-- name: Resolve the bar/capture owners before generating icons.json
-  ansible.builtin.set_fact:
-    compositor_configs_bar_owner: >-
-      {{ compositor_configs_composition_apps.apps
-         | selectattr('app', 'equalto', 'bar')
-         | map(attribute='owner') | first | default('legacy') }}
-    compositor_configs_capture_owner: >-
-      {{ compositor_configs_composition_apps.apps
-         | selectattr('app', 'equalto', 'capture')
-         | map(attribute='owner') | first | default('legacy') }}
-
 - name: Ensure compositor config dirs exist
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
   loop: "{{ compositor_configs_config_dirs }}"
-
-- name: Check deployed icon manifest exists
-  ansible.builtin.stat:
-    path: "{{ compositor_configs_icon_manifest_source }}"
-  register: compositor_configs_icon_manifest_check
-  when: not ansible_check_mode
-
-- name: Assert deployed icon manifest is present
-  ansible.builtin.assert:
-    that:
-      - compositor_configs_icon_manifest_check.stat.exists
-      - not compositor_configs_icon_manifest_check.stat.isdir
-    fail_msg: >-
-      deployed icon manifest missing at {{ compositor_configs_icon_manifest_source }}
-      — the assets role must run first so icons.yaml is available for AGS manifest
-      generation
-  when: not ansible_check_mode
-
-- name: Read deployed icon manifest
-  ansible.builtin.slurp:
-    src: "{{ compositor_configs_icon_manifest_source }}"
-  register: compositor_configs_icon_manifest
-  when: not ansible_check_mode
-
-- name: Generate AGS JSON manifest from icon mappings
-  ansible.builtin.copy:
-    content: "{{ (compositor_configs_icon_manifest.content | b64decode | from_yaml) | combine({'schemaVersion': compositor_configs_icon_manifest_schema_version}) | to_nice_json(indent=2) }}\n"
-    dest: "{{ compositor_configs_icon_manifest_dest }}"
-    force: true
-    mode: "0644"
-  when:
-    - not ansible_check_mode
-    - compositor_configs_bar_owner == 'legacy'
-
-- name: Generate capture AGS JSON manifest from icon mappings
-  ansible.builtin.copy:
-    content: "{{ (compositor_configs_icon_manifest.content | b64decode | from_yaml) | combine({'schemaVersion': compositor_configs_icon_manifest_schema_version}) | to_nice_json(indent=2) }}\n"
-    dest: "{{ compositor_configs_capture_icon_manifest_dest }}"
-    force: true
-    mode: "0644"
-  when:
-    - not ansible_check_mode
-    - compositor_configs_capture_owner == 'legacy'
 
 - name: Check the pinned assets configs class exists
   ansible.builtin.stat:
@@ -324,80 +254,3 @@
     path: "{{ compositor_configs_spine_config_dir }}/hypr/hyprland.conf"
     state: absent
   when: not ansible_check_mode
-
-# The `ags-bar-validate` strict install gate (spine AD-15;
-# ags-bar-validation task 2.1): run the deployed validator over the DEPLOYED
-# artifacts and fail the install on any rule error. Placement is LAST on
-# purpose — the gate reads the deployed `validate-cli.ts` + `icons.json`, so
-# it must run after the manifest generation above AND after the `ags_apps`
-# role deploys the live bar: the CLI it runs is the UNIT's own
-# (<install>/config/ags is the live-bar symlink into the pinned
-# <install>/ags-apps/<tag>/bar/), and the icons.json it validates is the one
-# just generated through that same link. Bootstrap order guarantees the unit
-# is installed first (ags-apps.yaml precedes compositor-configs.yaml); a
-# direct compositor-configs.yaml run without the unit fails the gate on the
-# missing CLI, which is the honest outcome. A gate placed earlier would
-# validate a missing or stale CLI.
-#
-# Design (mirrors the role's existing check-gating, but STRICT):
-# - There is NO `bar.json` in the repo today (no user/runtime layout override
-#   exists yet), so no `--layout` is passed: the gate validates the deployed
-#   `icons.json` plus the repo-default layout (the CLI's always-non-null
-#   floor, AD-9/AD-18). Validating the default IS the gate until an override
-#   exists — do NOT invent a runtime `bar.json` to satisfy it; pass
-#   `--layout <deployed bar.json>` the day one appears.
-# - `--expect-schema-version` passes the role's OWNED
-#   `compositor_configs_icon_manifest_schema_version` (the single owner), so a
-#   stale deployed artifact fails against the current expectation. (The
-#   `icons-json-drift` gate that also consumed this version was retired with the
-#   in-repo bar bridge and now lives in `ags-apps`.) A version mismatch is a
-#   WARNING (task 2.3: warn and degrade, never crash) and does NOT fail the
-#   install; only rule errors do.
-# - STRICT means no `failed_when: false` and no `ignore_errors`: a non-zero
-#   validator exit fails the install by default ansible semantics. (The
-#   gui_tools `ags quit` tasks carry `failed_when: false` because a missing
-#   live session is a no-op there; here a bad artifact is exactly what must
-#   be loud.)
-# - `changed_when: false`: the gate writes nothing, so it must never count
-#   as changed. `when: not ansible_check_mode` mirrors the generation tasks:
-#   the deployed files the gate reads do not exist yet under `--check`.
-# - Runner: plain `node` (type-stripping runs the deployed `.ts` directly —
-#   the same runner `make ags-test` hard-requires on PATH). If node is absent
-#   the task fails with ansible's "Failed to find required executable", which
-#   is the honest outcome: the install cannot prove the bar artifacts valid.
-# - REALPATH, not the live-bar link: node resolves a module's own URL to its
-#   REAL path (`import.meta.url`) but leaves `process.argv[1]` as the path it
-#   was handed. The deployed CLI's `invokedAsMain` guard compares the two
-#   (`resolve(process.argv[1]) === join(HERE, "validate-cli.ts")`), so invoking
-#   it through the <install>/config/ags SYMLINK makes the guard FALSE: the CLI
-#   no-ops, exits 0, and the "strict" gate would pass WITHOUT validating
-#   anything. (Regression-guarded by
-#   test_gate_fails_the_install_on_a_bad_icons_artifact, which failed exactly
-#   this way before the resolution task below.) The command therefore runs
-#   `node` on the `readlink -f`-resolved path — the unit's own file — so the
-#   guard matches and a bad artifact actually fails the install.
-- name: Resolve the deployed bar validator's real path
-  ansible.builtin.command:
-    argv:
-      - readlink
-      - -f
-      - "{{ compositor_configs_spine_config_dir }}/ags/bar/validate-cli.ts"
-  register: compositor_configs_bar_validate_cli
-  changed_when: false
-  when:
-    - not ansible_check_mode
-    - compositor_configs_bar_owner == 'legacy'
-
-- name: Validate the deployed bar artifacts (strict install gate)
-  ansible.builtin.command:
-    argv:
-      - node
-      - "{{ compositor_configs_bar_validate_cli.stdout }}"
-      - --icons
-      - "{{ compositor_configs_icon_manifest_dest }}"
-      - --expect-schema-version
-      - "{{ compositor_configs_icon_manifest_schema_version }}"
-  changed_when: false
-  when:
-    - not ansible_check_mode
-    - compositor_configs_bar_owner == 'legacy'

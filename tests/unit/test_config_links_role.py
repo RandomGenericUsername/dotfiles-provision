@@ -231,7 +231,7 @@ class TestConfigLinksTasks:
         tasks = _load_tasks(_TASKS_MAIN)
         includes = [task for task in tasks if _module_key(task) == "ansible.builtin.include_tasks"]
         assert len(includes) == 1, f"expected exactly one include_tasks; found {len(includes)}"
-        assert "{{ config_links_active_managed_dirs }}" in str(includes[0].get("loop", ""))
+        assert "{{ config_links_managed_dirs }}" in str(includes[0].get("loop", ""))
 
     def test_backup_mv_task_is_check_gated(self) -> None:
         """Check-mode discipline: the backup mv (the only mutating command) is

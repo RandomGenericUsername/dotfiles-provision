@@ -1,31 +1,85 @@
 #!/usr/bin/env bash
-# {{ app.launcher }} launcher — provisioned from the composition app list by
-# the ags_apps_units role (AD-31/AD-32).
+# {{ app.launcher }} launcher — provisioned from the one composition app list by
+# the ags_apps_units role (AD-31/AD-32). The app id is {{ app.app }}, the AGS bus
+# name is {{ app.instance }}, and the live config is the XDG link
+# {{ ags_apps_units_xdg_config_home }}/{{ app.xdgLink }}.
 #
 # Every cold start goes through `ags-run-locked`, the shared per-user AGS
 # launch-lock wrapper (AD-28): `ags run` bundles the shared AGS source, so two
-# concurrent starts can race. A warm instance is toggled through its
-# `palette-refresh`/request surface (no bundle, no lock); if the warm request
-# path is broken the zombie is quit and restarted under the lock.
+# concurrent starts can race. Warm instances are toggled, not restarted:
+#   - apps with an `ags request` toggle handler answer `request toggle` with
+#     "ok" (the clipboard overlay does this);
+#   - window-based apps answer `ags toggle <window>` (capture,
+#     wallpaper-selector, icme and btop-theme-studio do this). The window name
+#     is either `<instance>-window` or the config basename without its `ags-`
+#     prefix plus `-window` (icme's window is `icme-window`); a wrong candidate
+#     fails the D-Bus call, so probing is safe.
+# If neither warm path answers, the zombie is quit and the app is cold-started
+# under the lock.
+#
+# A cold start runs in the background so an app that starts hidden can be
+# revealed through its request surface (the clipboard overlay starts
+# `visible={false}` and answers `request show`). Apps without that request
+# surface reject `show`; their window is already visible, so the launcher exits
+# successfully either way.
 set -uo pipefail
 INSTANCE="{{ app.instance }}"
 DIR="{{ ags_apps_units_xdg_config_home }}/{{ app.xdgLink }}"
 LOG="{{ ags_apps_units_log_file }}"
 LOCKED="{{ ags_apps_units_run_locked }}"
+CONFIG_BASENAME="{{ app.xdgLink }}"
+
+# Bounded waits (0.2s ticks): ~2s of retries for the request handler to accept
+# the reveal after ags-run-locked returns (the instance is on the bus slightly
+# before its requestHandler is ready).
+REQUEST_RETRIES=10
+
+request() { timeout 8 ags request "$1" -i "$INSTANCE" 2>/dev/null; }
 
 if ags list 2>/dev/null | grep -qx "$INSTANCE"; then
-    if timeout 8 ags request toggle -i "$INSTANCE" >/dev/null 2>&1; then
+    # 1. Request-based toggle (returns "ok" only when the app handled it).
+    if [ "$(request toggle)" = "ok" ]; then
         exit 0
     fi
-    # A stale/zombie instance with no live request handler: quit it before the
-    # locked cold start. The bounded wait happens inside ags-run-locked.
+    # 2. Window-based toggle. `ags toggle` fails for a name the instance does
+    #    not own, so trying both spellings never toggles an unrelated window.
+    for window in "${INSTANCE}-window" "${CONFIG_BASENAME#ags-}-window"; do
+        if timeout 8 ags toggle "$window" -i "$INSTANCE" >/dev/null 2>&1; then
+            exit 0
+        fi
+    done
+    # 3. A stale/zombie instance with no live toggle surface: quit it before
+    #    the locked cold start.
     ags quit -i "$INSTANCE" 2>/dev/null || true
     sleep 1
 fi
 
-exec "$LOCKED" \
+mkdir -p "$(dirname "$LOG")"
+if ! "$LOCKED" \
     --expect-instance "$INSTANCE" \
     --lock-timeout {{ ags_apps_units_lock_timeout }} \
     --register-timeout {{ ags_apps_units_register_timeout }} \
     -d "$DIR" \
-    --log-file "$LOG"
+    --log-file "$LOG"; then
+    echo "{{ app.launcher }}: failed to start instance '$INSTANCE'" >&2
+    exit 1
+fi
+
+# Reveal a start-hidden app (clipboard). Ordinary apps return "unknown request"
+# for `show` — they have no such handler and their window is already mapped, so
+# stop immediately instead of retrying. A missing/no-reply handler (the
+# instance registered before its requestHandler was ready) is retried briefly.
+retries=0
+while [ "$retries" -lt "$REQUEST_RETRIES" ]; do
+    response="$(request show)"
+    if [ "$response" = "ok" ]; then
+        exit 0
+    fi
+    case "$response" in
+        unknown*) exit 0 ;;
+    esac
+    sleep 0.2
+    retries=$((retries + 1))
+done
+
+exit 0

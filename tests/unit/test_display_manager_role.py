@@ -316,10 +316,10 @@ class TestSddmVars:
             == "1e1a863761f742e8d509d569382b17c112e29fdc"
         )
 
-    def test_assets_pin_is_v061(self) -> None:
+    def test_assets_pin_is_v062(self) -> None:
         """The `[Wayland] CompositorCommand` body ships in assets v0.6.0
         (req-006); v0.5.0 has no [Wayland] section at all."""
-        assert _vars()["display_manager_assets_pinned_tag"] == "v0.6.1"
+        assert _vars()["display_manager_assets_pinned_tag"] == "v0.6.2"
 
     def test_pixie_repo_and_theme_dir(self) -> None:
         data = _vars()

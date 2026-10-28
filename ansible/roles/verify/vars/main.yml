@@ -73,22 +73,21 @@ verify_state_current_dir: "{{ verify_xdg_state_home | trim }}/dotfiles/current"
 verify_bin_scripts:
   - "{{ verify_cli_bin_dir | trim }}/toggle-touchpad"
   # The shared AGS launch-lock wrapper (AD-28): every provisioned launcher and
-  # gui_tools start path routes cold `ags run` through it, so a missing wrapper
-  # would break every launcher at once.
+  # the ags_apps_units start/rollback paths route cold `ags run` through it, so
+  # a missing wrapper would break every launcher at once.
   - "{{ verify_cli_bin_dir | trim }}/ags-run-locked"
-  # The capture UI launcher: `capture-ui` (SUPER+PRINT). Installed by the
-  # cli_tools role; without it the keybind is a silent no-op, so its presence is
-  # asserted here too. The `capture-tool` CLI itself is installed from the
-  # ags-apps unit and asserted (symlink + pin) in the ags-apps section below.
+  # The capture UI launcher: `capture-ui` (SUPER+PRINT). Rendered by
+  # ags_apps_units from the app list; without it the keybind is a silent no-op,
+  # so its presence is asserted here too. The `capture-tool` CLI itself is the
+  # app tag's binLink, asserted in the standalone section below.
   - "{{ verify_cli_bin_dir | trim }}/capture-ui"
   # rofi's toggle launcher: the SUPER+D bind calls `rofi-ui` (open+close), so a
   # missing launcher would leave the key dead.
   - "{{ verify_cli_bin_dir | trim }}/rofi-ui"
   # The remaining keybind launchers (keybindings.lua: clipboard history,
-  # wallpaper picker, icon-mapping editor, btop studio). All four are
-  # cli_tools-rendered wrappers; a missing one is a dead key, exactly like
-  # rofi-ui/capture-ui above. Once the clipboard app list entry is standalone,
-  # ags_apps_units renders the same name from the app-list launcher field.
+  # wallpaper picker, icon-mapping editor, btop studio). ags_apps_units renders
+  # them from the app list's launcher field; a missing one is a dead key,
+  # exactly like rofi-ui/capture-ui above.
   - "{{ verify_cli_bin_dir | trim }}/clipboard-ui"
   - "{{ verify_cli_bin_dir | trim }}/wallpaper-selector-ui"
   - "{{ verify_cli_bin_dir | trim }}/icon-color-mapping-editor"
@@ -138,13 +137,10 @@ verify_install_spine_dirs:
   - config/color-scheme-generator/templates
   - config/hypr
   - config/hyprpaper
-  # config/ags is DELIBERATELY absent: it is the ags_apps role's live-bar
-  # SYMLINK (<install>/config/ags -> the pinned unit's bar/), asserted
-  # separately by verify_ags_apps_live_bar_link. Listing it here made the
-  # criterion-1 isdir assert fail on a real bootstrap (stat.isdir is false
-  # through a symlink). config/ags-capture is absent for the SAME reason
-  # (slice 5): it is the live-capture SYMLINK into the unit's capture-tool/,
-  # asserted separately by verify_ags_apps_live_capture_link.
+  # Every config/ags* path is DELIBERATELY absent: ags_apps_units owns each
+  # app's spine link (<install>/config/<spineLink> -> <install>/apps/...), and
+  # listing one here would make the criterion-1 isdir assert false (stat.isdir
+  # is false through a symlink). The standalone mirror asserts each link.
   - config/nvim
   - config/starship
   - config/wlogout
@@ -170,7 +166,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.6.1
+verify_assets_pinned_tag: v0.6.2
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -475,20 +471,13 @@ verify_pixie_repo_ref: 1e1a863761f742e8d509d569382b17c112e29fdc
 verify_masked_user_units:
   - dunst.service
 
-# verify_ags_always_on_instances: the always-on AGS instances the session must
-#   keep running after provisioning — the status bar (`ags`) and the
-#   notifications overlay (`notifications`). gui_tools quits EVERY managed AGS
-#   instance to force a re-bundle of the freshly placed sources, then restarts
-#   this always-on subset (start-if-down, detached). Both the quit and the
-#   restart are `failed_when: false` (provisioning must not break on a machine
-#   without a live session), so this gate is the only place a regression
-#   becomes visible: a missing bar is a hidden status bar, and a missing overlay
-#   means nothing owns org.freedesktop.Notifications (dunst is masked on
-#   purpose) so every notification is silently dropped. Parity with the
-#   gui_tools always_on subset is locked by test.
-verify_ags_always_on_instances:
-  - ags
-  - notifications
+# verify_ags_always_on_instances: DERIVED in tasks/main.yml from the one
+#   composition app list (`launch: always` -> instance). There is no second
+#   always-on list: the installer starts exactly this subset, and the verify
+#   gate asserts exactly this subset is on the bus. Empty here so an
+#   unprovisioned/legacy list fails the non-empty guard instead of silently
+#   passing.
+verify_ags_always_on_instances: []
 
 # verify_audio_user_units: the systemd --user units that back the audio stack
 #   (pipewire + wireplumber for the graph/session, pipewire-pulse for Pulse
@@ -631,7 +620,7 @@ verify_icons_samples:
   - "{{ verify_state_current_dir }}/icons/media-transport-panel-play.svg"
   - "{{ verify_state_current_dir }}/icons/media-transport-panel-pause.svg"
 
-# verify_compositor_config_dirs: the three compositor config dirs under the XDG
+# verify_compositor_config_dirs: the compositor config dirs under the XDG
 #   config home (criterion 7). config-in-spine (2026-08-16): these are now
 #   SYMLINKS into the spine (~/.config/hypr -> <install>/config/hypr etc.,
 #   created by the config-links role) — the 5-layer symlink check applies
@@ -639,7 +628,6 @@ verify_icons_samples:
 verify_compositor_config_dirs:
   - "{{ verify_xdg_config_home }}/hypr"
   - "{{ verify_xdg_config_home }}/hyprpaper"
-  - "{{ verify_xdg_config_home }}/ags"
 
 # verify_compositor_skeleton_files: the skeleton files that must be present
 #   THROUGH the compositor config symlinks (criterion 7), mirror of
@@ -657,29 +645,20 @@ verify_compositor_skeleton_files:
   - "{{ install_dir | trim }}/config/hypr/cursor.lua"
   - "{{ install_dir | trim }}/config/hypr/env-variables.lua"
   - "{{ install_dir | trim }}/config/hyprpaper/hyprpaper.conf"
-  - "{{ install_dir | trim }}/config/ags/icons.json"
-  - "{{ install_dir | trim }}/config/ags-capture/icons.json"
-# NOTE: the bar is deliberately NOT mirrored per file here anymore. It used
-# to be placed per file under config/ags/ (mirror of
-# compositor_configs_skeleton_files); the consumption step (ags-apps-bar-first
-# slice 2, AD-17/AD-23) installs it as ONE versioned unit via the `ags_apps`
-# role and deploys the unit's bar/ subdir as the live config/ags symlink.
-# The bar's sources are asserted as a UNIT below (verify_ags_apps_*); the only
-# per-file bar assertions left are GENERATED artifacts that land through the
-# link (icons.json above). Keeping a stale per-file mirror here would assert
-# files the bridge no longer deploys.
+# NOTE: AGS app sources/icons are NOT mirrored per file here. Every app is an
+# immutable standalone tag installed and linked by `ags_apps_units`; verify
+# asserts the unit and its surfaces in _verify_standalone.yml.
 
 # verify_ags_platform_version / _unit_dir / _pin_file / _shortcut: the AGS
 #   platform, installed as ONE versioned unit (spine AD-17/AD-23). Mirror of the
 #   ags_platform role vars. The unit lives at <install>/ags-platform/<version>/;
 #   the SHARED-ANCESTOR shortcut <install>/config/node_modules/ags-platform is a
-#   symlink pointing at it, so config/ags and every config/ags-* resolve the
-#   bare specifier `ags-platform`. A rollback is a shortcut repoint to a sibling
+#   shared app-install shortcut (<install>/apps/node_modules/ags-platform) is
+#   created by ags_apps_units. A rollback repoints that shortcut to a sibling
 #   version dir. The pin file records the installed version on the host.
 verify_ags_platform_version: v0.3.0
 verify_ags_platform_unit_dir: "{{ install_dir | trim }}/ags-platform/{{ verify_ags_platform_version }}"
 verify_ags_platform_pin_file: "{{ install_dir | trim }}/ags-platform/pinned"
-verify_ags_platform_shortcut: "{{ install_dir | trim }}/config/node_modules/ags-platform"
 
 # verify_ags_platform_unit_files: representative files that MUST be present in
 #   the installed unit. NOT the whole unit (that is the clone's job) — one file
@@ -699,268 +678,19 @@ verify_ags_platform_unit_files:
   - "{{ verify_ags_platform_unit_dir }}/adapters/icon-registry.ts"
   - "{{ verify_ags_platform_unit_dir }}/adapters/astal.ts"
 
-# verify_ags_apps_version / _unit_dir / _bar_dir / _pin_file / _live_bar_link /
-#   _resolution_shortcut: the AGS bar, installed as ONE versioned unit (spine
-#   AD-1/AD-17/AD-23). Mirror of the ags_apps role vars. The unit is the
-#   monorepo checkout at <install>/ags-apps/<tag>/; the bar package is its
-#   bar/ subdir (the monorepo deviation — the repo root is NOT the package).
-#   The live-bar link <install>/config/ags is a symlink pointing at the unit's
-#   bar/, so the live bar is always exactly the pinned tag — no per-file
-#   mirror can drift. A rollback is a link repoint to a sibling tag dir. The
-#   pin file records the installed tag on the host. The per-unit resolution
-#   shortcut <unit>/node_modules/ags-platform is a symlink into the pinned
-#   platform unit: esbuild realpaths the live-bar link, so the shared-ancestor
-#   shortcut is not an ancestor of the real bar tree and the bar's bare
-#   `ags-platform` imports would not resolve without it.
-verify_ags_apps_version: v0.5.0
-verify_ags_apps_platform_version: v0.3.0
-verify_ags_apps_unit_dir: "{{ install_dir | trim }}/ags-apps/{{ verify_ags_apps_version }}"
-verify_ags_apps_bar_dir: "{{ verify_ags_apps_unit_dir }}/bar"
-verify_ags_apps_pin_file: "{{ install_dir | trim }}/ags-apps/pinned"
-verify_ags_apps_live_bar_link: "{{ install_dir | trim }}/config/ags"
-verify_ags_apps_resolution_shortcut: "{{ verify_ags_apps_unit_dir }}/node_modules/ags-platform"
+# verify_gui_tools_app_files: per-file GUI app sources placed by gui_tools.
+#   EMPTY: gui_tools no longer places AGS app sources (the only AGS installer,
+#   ags_apps_units, links immutable app tags). The criterion task passes on an
+#   empty list; a future per-file app appends here and to gui_tools_config_dirs.
 
-# verify_ags_apps_unit_files: representative files that MUST be present in
-#   the installed unit's bar/. NOT the whole bar (that is the clone's job) —
-#   one file per concern: the composition-root entry, the stylesheet, the
-#   overlay coordinator, the shell + a widget, the repo-default layout, the
-#   capability manifest, the shared validators, and the strict install-gate
-#   CLI the compositor_configs role runs. A missing unit file is a bar that
-#   cannot bundle (or a gate that cannot run).
-verify_ags_apps_unit_files:
-  - "{{ verify_ags_apps_bar_dir }}/app.tsx"
-  - "{{ verify_ags_apps_bar_dir }}/style.css"
-  - "{{ verify_ags_apps_bar_dir }}/overlays.ts"
-  - "{{ verify_ags_apps_bar_dir }}/bar/Bar.tsx"
-  - "{{ verify_ags_apps_bar_dir }}/bar/widgets/workspaces.tsx"
-  - "{{ verify_ags_apps_bar_dir }}/bar/layout.default.ts"
-  - "{{ verify_ags_apps_bar_dir }}/bar/registry.ts"
-  - "{{ verify_ags_apps_bar_dir }}/bar/bar-manifest.ts"
-  - "{{ verify_ags_apps_bar_dir }}/bar/validate.ts"
-  - "{{ verify_ags_apps_bar_dir }}/bar/validate-cli.ts"
-
-# verify_ags_apps_hypr_pano_dir / _live_pano_link / _hypr_pano_files: the
-#   LEGACY clipboard overlay deployment (ags-apps-bar-first slice 3). The
-#   live-pano link <install>/config/ags-hypr-pano is checked only while the old
-#   `hypr-pano` app id remains in the legacy owner set. After the clipboard
-#   pilot flips to `owner: standalone`, ags_apps_units owns the
-#   <install>/config/ags-clipboard -> <install>/apps/clipboard/<tag> link and
-#   the `_verify_standalone.yml` mirror verifies it; this legacy block is
-#   skipped because `hypr-pano` is no longer in the list.
-verify_ags_apps_hypr_pano_dir: "{{ verify_ags_apps_unit_dir }}/hypr-pano"
-verify_ags_apps_live_pano_link: "{{ install_dir | trim }}/config/ags-hypr-pano"
-
-# verify_ags_apps_hypr_pano_files: representative files that MUST be present in
-#   the installed unit's hypr-pano/. NOT the whole app (that is the clone's job)
-#   — one file per concern: the composition-root entry, the stylesheet, the
-#   overlay window and its item card/preview, and the pure clipboard
-#   types/history modules the window imports. A missing file is an overlay that
-#   cannot bundle.
-verify_ags_apps_hypr_pano_files:
-  - "{{ verify_ags_apps_hypr_pano_dir }}/app.tsx"
-  - "{{ verify_ags_apps_hypr_pano_dir }}/style.css"
-  - "{{ verify_ags_apps_hypr_pano_dir }}/ui/PanoWindow.tsx"
-  - "{{ verify_ags_apps_hypr_pano_dir }}/ui/ItemCard.tsx"
-  - "{{ verify_ags_apps_hypr_pano_dir }}/ui/Preview.tsx"
-  - "{{ verify_ags_apps_hypr_pano_dir }}/lib/clipboard-types.ts"
-  - "{{ verify_ags_apps_hypr_pano_dir }}/lib/history.ts"
-
-# verify_ags_apps_notifications_dir / _live_notifications_link /
-#   _notifications_files: the notification overlay, deployed WHOLE like the bar
-#   and hypr-pano (slice 4). The live-notifications link
-#   <install>/config/ags-notifications is a symlink into the unit's
-#   notifications/ dir, so the live daemon is always exactly the pinned tag — no
-#   per-file mirror can drift. Mirror of the ags_apps role vars. The
-#   ~/.config/ags-notifications symlink (config_links) and the gui_tools
-#   always-on AGS-instance launch / autostart.lua are unchanged: they resolve
-#   through this link. It owns org.freedesktop.Notifications for the session.
-verify_ags_apps_notifications_dir: "{{ verify_ags_apps_unit_dir }}/notifications"
-verify_ags_apps_live_notifications_link: "{{ install_dir | trim }}/config/ags-notifications"
-
-# verify_ags_apps_notifications_files: representative files that MUST be present
-#   in the installed unit's notifications/. NOT the whole app (that is the
-#   clone's job) — one file per concern: the composition-root entry, the
-#   stylesheet, the overlay window, and the pure card-model module the window
-#   renders through. A missing file is a daemon that cannot bundle (so nothing
-#   owns org.freedesktop.Notifications).
-verify_ags_apps_notifications_files:
-  - "{{ verify_ags_apps_notifications_dir }}/app.tsx"
-  - "{{ verify_ags_apps_notifications_dir }}/style.css"
-  - "{{ verify_ags_apps_notifications_dir }}/ui/NotificationsWindow.tsx"
-  - "{{ verify_ags_apps_notifications_dir }}/lib/card-model.ts"
-
-# verify_ags_apps_capture_tool_dir / _capture_tool_backend / _capture_tool_bin_link
-#   / _live_capture_link / _capture_tool_files: the capture-tool app, deployed
-#   WHOLE like the bar/hypr-pano/notifications (slice 5). The live-capture link
-#   <install>/config/ags-capture is a symlink into the unit's capture-tool/ dir,
-#   so the live GUI is always exactly the pinned tag — no per-file mirror can
-#   drift. Mirror of the ags_apps role vars. The ~/.config/ags-capture symlink
-#   (config_links) and the `capture-ui` launcher / autostart.lua are unchanged:
-#   they resolve through this link. From ags-apps v0.4.0 the Python backend ships
-#   in the unit too, and the ags_apps role links it into the user bin dir, so the
-#   installed CLI is also pinned to the same tag. The backend is deliberately NOT
-#   in _capture_tool_files (those are regular GUI sources; the CLI is a symlink
-#   asserted separately).
-verify_ags_apps_capture_tool_dir: "{{ verify_ags_apps_unit_dir }}/capture-tool"
-verify_ags_apps_capture_tool_backend: "{{ verify_ags_apps_capture_tool_dir }}/bin/capture-tool"
-verify_ags_apps_capture_tool_bin_link: "{{ verify_cli_bin_dir | trim }}/capture-tool"
-verify_ags_apps_live_capture_link: "{{ install_dir | trim }}/config/ags-capture"
-
-# verify_ags_apps_capture_tool_files: representative files that MUST be present
-#   in the installed unit's capture-tool/. NOT the whole app (that is the clone's
-#   job) — one file per concern: the composition-root entry, the stylesheet, the
-#   classic-layout shell, the pure settings domain, the single request->argv
-#   translator (the file that carries the --size/--audio vocabulary), a port and
-#   an adapter. A missing file is a capture panel that cannot bundle. NOTE: the
-#   pinned unit's capture-tool has NO lib/icon-registry.ts — it consumes
-#   the platform icon registry through `ags-platform` instead, so no such file is
-#   asserted here.
-verify_ags_apps_capture_tool_files:
-  - "{{ verify_ags_apps_capture_tool_dir }}/app.tsx"
-  - "{{ verify_ags_apps_capture_tool_dir }}/style.css"
-  - "{{ verify_ags_apps_capture_tool_dir }}/ui/classic/ClassicWindow.tsx"
-  - "{{ verify_ags_apps_capture_tool_dir }}/domain/settings.ts"
-  - "{{ verify_ags_apps_capture_tool_dir }}/domain/cli-args.ts"
-  - "{{ verify_ags_apps_capture_tool_dir }}/ports/capture-ports.ts"
-  - "{{ verify_ags_apps_capture_tool_dir }}/adapters/exec-capture-launcher.ts"
-
-# verify_ags_apps_wallpaper_selector_dir / _live_wallpaper_selector_link /
-#   _wallpaper_selector_files: the wallpaper selector, deployed WHOLE like the
-#   bar/hypr-pano/notifications/capture-tool (slice 6). The
-#   live-wallpaper-selector link <install>/config/ags-wallpaper-selector is a
-#   symlink into the unit's wallpaper-selector/ dir, so the live selector is
-#   always exactly the pinned tag — no per-file mirror can drift. Mirror of the
-#   ags_apps role vars. The ~/.config/ags-wallpaper-selector symlink
-#   (config_links) and the `wallpaper-selector-ui` launcher / autostart.lua are
-#   unchanged: they resolve through this link. The selector is a whole package —
-#   unlike capture-tool nothing stays in-repo.
-verify_ags_apps_wallpaper_selector_dir: "{{ verify_ags_apps_unit_dir }}/wallpaper-selector"
-verify_ags_apps_live_wallpaper_selector_link: "{{ install_dir | trim }}/config/ags-wallpaper-selector"
-
-# verify_ags_apps_wallpaper_selector_files: representative files that MUST be
-#   present in the installed unit's wallpaper-selector/. NOT the whole app (that
-#   is the clone's job) — one file per concern: the composition-root entry, the
-#   stylesheet, the selector window, and the pure lib modules the window imports
-#   (the wallpaper model, the scan walk, the thumbnail cache and the apply /
-#   contrast helpers). A missing file is a selector that cannot bundle. NOTE: the
-#   pinned unit's wallpaper-selector has NO lib/icon-registry.ts,
-#   lib/event-bus*.ts or lib/theme.ts — it consumes the platform icon registry and
-#   theme adapter through `ags-platform` instead, so no such files are asserted.
-verify_ags_apps_wallpaper_selector_files:
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/app.tsx"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/style.css"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/ui/WallpaperSelectorWindow.tsx"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/lib/model.ts"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/lib/scan.ts"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/lib/thumbnails.ts"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/lib/apply.ts"
-  - "{{ verify_ags_apps_wallpaper_selector_dir }}/lib/contrast.ts"
-
-# verify_ags_apps_icme_dir / _live_icme_link / _icme_files: the icon color
-#   mapping editor, deployed WHOLE like the bar/hypr-pano/notifications/
-#   capture-tool/wallpaper-selector (slice 7). The live-icme link
-#   <install>/config/ags-icme is a symlink into the unit's icme/ dir, so the live
-#   editor is always exactly the pinned tag — no per-file mirror can drift.
-#   Mirror of the ags_apps role vars. The ~/.config/ags-icme symlink
-#   (config_links) and the `icon-color-mapping-editor` launcher are unchanged:
-#   they resolve through this link. icme is a whole package — unlike capture-tool
-#   nothing stays in-repo.
-verify_ags_apps_icme_dir: "{{ verify_ags_apps_unit_dir }}/icme"
-verify_ags_apps_live_icme_link: "{{ install_dir | trim }}/config/ags-icme"
-
-# verify_ags_apps_icme_files: representative files that MUST be present in the
-#   installed unit's icme/. NOT the whole app (that is the clone's job) — one
-#   file per concern: the composition-root entry, the stylesheet, the editor
-#   window and templates tab, the pure model/substitution/SVG/inputs modules, and
-#   the event publisher seam (`icme-saved.ts` + the vendored generated contract it
-#   publishes through). A missing file is an editor that cannot bundle (or an
-#   event seam that silently stops publishing). NOTE: the pinned unit's icme has
-#   no lib/event-contract.ts, lib/event-bus.ts or lib/event-bus-core.ts — it
-#   consumes the platform event client through `ags-platform` and vendors the
-#   generated contract under lib/generated/ instead.
-verify_ags_apps_icme_files:
-  - "{{ verify_ags_apps_icme_dir }}/app.tsx"
-  - "{{ verify_ags_apps_icme_dir }}/style.css"
-  - "{{ verify_ags_apps_icme_dir }}/ui/EditorWindow.tsx"
-  - "{{ verify_ags_apps_icme_dir }}/ui/TemplatesTab.tsx"
-  - "{{ verify_ags_apps_icme_dir }}/lib/model.ts"
-  - "{{ verify_ags_apps_icme_dir }}/lib/inputs.ts"
-  - "{{ verify_ags_apps_icme_dir }}/lib/substitute.ts"
-  - "{{ verify_ags_apps_icme_dir }}/lib/svg.ts"
-  - "{{ verify_ags_apps_icme_dir }}/lib/icme-saved.ts"
-  - "{{ verify_ags_apps_icme_dir }}/lib/generated/contract.ts"
-
-# verify_ags_apps_btop_studio_dir / _live_btop_studio_link / _btop_studio_files:
-#   the btop Theme Studio, deployed WHOLE like the bar/hypr-pano/notifications/
-#   capture-tool/wallpaper-selector/icme (slice 8). The live-btop-studio link
-#   <install>/config/ags-btop-studio is a symlink into the unit's
-#   btop-theme-studio/ dir, so the live studio is always exactly the pinned tag —
-#   no per-file mirror can drift. Mirror of the ags_apps role vars. The
-#   ~/.config/ags-btop-studio symlink (config_links) and the
-#   `btop-theme-studio` launcher/keybind are unchanged: they resolve through this
-#   link. The studio is a whole package — nothing stays in-repo, including the
-#   live-preview engine (live/btop_live.py), which the app runs from this tree.
-verify_ags_apps_btop_studio_dir: "{{ verify_ags_apps_unit_dir }}/btop-theme-studio"
-verify_ags_apps_live_btop_studio_link: "{{ install_dir | trim }}/config/ags-btop-studio"
-
-# verify_ags_apps_btop_studio_files: representative files that MUST be present in
-#   the installed unit's btop-theme-studio/. NOT the whole app (that is the
-#   clone's job) — one file per concern: the composition-root entry, the
-#   stylesheet, the studio window, the pure theme-key/btop-conf/key-map/
-#   schematic/theme-model/preview/targets modules, the generated key→widget
-#   artifact the window imports, and the Python live-preview engine. A missing
-#   file is a studio that cannot bundle (or a live preview that cannot render).
-#   NOTE: the pinned unit's studio consumes the platform theme adapter through
-#   `ags-platform`, so it carries no lib/theme.ts.
-verify_ags_apps_btop_studio_files:
-  - "{{ verify_ags_apps_btop_studio_dir }}/app.tsx"
-  - "{{ verify_ags_apps_btop_studio_dir }}/style.css"
-  - "{{ verify_ags_apps_btop_studio_dir }}/ui/StudioWindow.tsx"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/theme-keys.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/btop-conf.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/key-map.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/key-widgets.generated.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/schematic.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/theme-model.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/preview.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/lib/targets.ts"
-  - "{{ verify_ags_apps_btop_studio_dir }}/live/btop_live.py"
-
-# verify_gui_tools_app_files: the standalone GUI tool app files that must be
-#   present in the spine (criterion 7, extended to the gui_tools role). EMPTY
-#   since slice 8: the last per-file app (btop Theme Studio) moved into the
-#   ags-apps unit, so gui_tools places nothing per file. The criterion task
-#   passes on an empty list (0 == 0); a future per-file app appends here and to
-#   gui_tools_config_dirs.
-#   NOTE: the capture-tool AGS GUI is deliberately NOT mirrored per file here
-#   anymore (slice 5). It moved into the ags-apps unit and deploys WHOLE via
-#   the live-capture link; its sources are asserted as a UNIT below
-#   (verify_ags_apps_capture_tool_files). Keeping a stale per-file mirror here
-#   would assert files the bridge no longer deploys. The bar's old
-#   ags/capture/* paths are likewise absent (the legacy subtree is retired).
-#   NOTE: the wallpaper selector is deliberately NOT mirrored per file here
-#   anymore (slice 6). It moved into the ags-apps unit and deploys WHOLE via the
-#   live-wallpaper-selector link; its sources are asserted as a UNIT below
-#   (verify_ags_apps_wallpaper_selector_files).
-#   NOTE: the icon color mapping editor is deliberately NOT mirrored per file
-#   here anymore (slice 7). It moved into the ags-apps unit and deploys WHOLE via
-#   the live-icme link; its sources (including the event publisher seam) are
-#   asserted as a UNIT below (verify_ags_apps_icme_files).
-#   NOTE: the btop Theme Studio is deliberately NOT mirrored per file here
-#   anymore (slice 8). It moved into the ags-apps unit and deploys WHOLE via the
-#   live-btop-studio link; its sources (including the live/btop_live.py engine)
-#   are asserted as a UNIT below (verify_ags_apps_btop_studio_files).
-#   NO gui_tools per-file app remains: the list is intentionally EMPTY, and the
-#   criterion task passes on an empty list (0 == 0). A future per-file app only
-#   needs to be appended here.
 verify_gui_tools_app_files: []
 
 # verify_consumer_symlinks: the R2 consumer-path symlinks the runtime
 #   seeder owns (criterion 7, Epic 4 current-only). The AGS fragment is
-#   colors.css → current/colors.gtk.css (renamed on link, same convention
-#   as the old copy the compositor_configs role used to place). Checked
-#   WITHOUT following (islnk + raw target contains /current/) so a stale
-#   provisioning COPY fails the gate. <install>/config/hypr/colors.conf
+#   colors.css → current/colors.gtk.css. The bar TAG carries colors.css as a
+#   symlink to the runtime-owned pointer (AD-37); verify reads it THROUGH the
+#   <install>/config/ags link. Checked WITHOUT following (islnk + raw target
+#   contains /current/) so a stale provisioning COPY fails the gate. <install>/config/hypr/colors.conf
 #   is deliberately absent (nothing sources it — verified: no reference
 #   under the assets configs/hypr/*.lua).
 verify_consumer_symlinks:
@@ -1026,13 +756,6 @@ verify_zsh_legacy_template_path: "{{ install_dir | trim }}/config/zsh/.zshrc.j2"
 verify_managed_link_dirs:
   - hypr
   - hyprpaper
-  - ags
-  - ags-capture
-  - ags-icme
-  - ags-clipboard
-  - ags-wallpaper-selector
-  - ags-notifications
-  - ags-btop-studio
   - nvim
   - starship
   - wlogout
@@ -1114,12 +837,10 @@ verify_managed_link_spine_prefix: "{{ install_dir | trim }}/config"
 #   Trim lock.
 verify_itr_list_target: "{{ install_dir | trim }}/icon-mappings/icons.yaml"
 
-# ── Generic per-app AGS topology (REQ-008 / AD-31/32/37) ─────────────────────
-# verify mirrors the standalone installer: read the ONE composition app list
-# and program tuple, then assert only the surfaces each owner declares. The
-# legacy sections above remain the host-side mirror for owner: legacy; the
-# generic section below covers owner: standalone. With today's all-legacy list
-# every standalone task skips (dormant), exactly like the installer role.
+# ── Standalone per-app AGS topology (REQ-008 / AD-31/32/37) ──────────────────
+# verify mirrors the ONLY AGS installer: read the ONE composition app list and
+# program tuple, then assert every app's declared ownership surfaces. The
+# legacy monorepo mirror is retired with the `ags_apps` role.
 verify_ags_apps_units_apps_file: "{{ manifests_dir | trim }}/apps.yaml"
 verify_ags_apps_units_tuple_file: "{{ manifests_dir | trim }}/program-tuple.yaml"
 verify_ags_apps_units_install_root: "{{ install_dir | trim }}/apps"

@@ -4,8 +4,8 @@
 # verifies it (done-criteria 1-10).
 #
 # Dependency order rationale (plan §11 step 7, story 2.12 AC 4, Epic 4):
-#   packages → power_options → cli_tools → filesystem → assets →
-#   ags_platform → ags_apps → ags_apps_units → compositor_configs → gui_tools → config_copies → settings → zsh_tools → zsh_config →
+#   packages → power_options → cli_tools → filesystem → assets → ags_platform →
+#   gui_tools → ags_apps_units → compositor_configs → config_copies → settings → zsh_tools → zsh_config →
 #   wlogout_config → kitty_config → btop_config → config_links → runtime-seed → display_manager →
 #   gloview-plugin → verify
 # `packages` first (it installs the system packages everything else assumes),
@@ -66,25 +66,25 @@
 - import_playbook: runtime-clipboard.yaml
 - import_playbook: filesystem.yaml
 - import_playbook: assets.yaml
-# Units first, then the configs that consume them: the ags_platform role
-# installs the platform unit and creates the shared-ancestor shortcut under
-# <install>/config/node_modules; the ags_apps role installs the bar unit,
-# creates the per-unit resolution shortcut, and deploys the unit's bar/ as
-# the live <install>/config/ags link. compositor_configs runs AFTER both, so
-# it can generate icons.json THROUGH the live-bar link into the unit tree and
-# run the unit's own `ags-bar-validate` CLI as the strict install gate. The
-# bar's apps resolve the shortcuts at session start, not during provisioning.
+# AGS units, then the configs that consume them. The ags_platform role installs
+# the platform unit and the shared-ancestor shortcut under
+# <install>/config/node_modules; ags_apps_units is the ONLY AGS app installer:
+# it installs every app at <install>/apps/<installDir>/<tag>/, creates the one
+# <install>/apps/node_modules/ags-platform shortcut, and owns each app's
+# config/spine/XDG/bin/launcher surfaces plus the always-on starts. There is no
+# legacy monorepo import anymore.
+#
+# gui-tools runs BEFORE ags-apps-units: it stops and masks dunst, so the
+# always-on `notifications` instance can own org.freedesktop.Notifications when
+# the installer starts it. It owns no AGS app surfaces.
+#
+# compositor_configs runs after the installer because it consumes the deployed
+# spine (hypr/hyprpaper) — not the AGS bar: every app tag carries its own
+# sources and the platform-produced icons.json (AD-37).
 - import_playbook: ags-platform.yaml
-- import_playbook: ags-apps.yaml
-# The generic per-app role reads the same composition app list and acts only on
-# `owner: standalone`; the legacy role above acts only on `owner: legacy`.
-# With the current all-legacy list this import is a no-op. On a cutover it
-# quiesces, installs <install>/apps/<installDir>/<tag>/, repoints the links and
-# starts through the shared launch lock before compositor_configs consumes the
-# live bar link.
+- import_playbook: gui-tools.yaml
 - import_playbook: ags-apps-units.yaml
 - import_playbook: compositor-configs.yaml
-- import_playbook: gui-tools.yaml
 - import_playbook: config-copies.yaml
 - import_playbook: settings.yaml
 - import_playbook: zsh-tools.yaml

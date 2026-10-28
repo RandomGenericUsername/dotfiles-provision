@@ -214,18 +214,6 @@ def _skeleton_task() -> dict[str, object]:
     return matches[0]
 
 
-#: The bar unit's source repo. The live bar is the pinned external `ags-apps`
-#: unit (slice 2), so the in-repo `dotfiles/config/ags` bridge is retired. The
-#: execution tests below run compositor-configs.yaml STANDALONE and must seed
-#: the unit's bar package by hand; they source it from a local `ags-apps`
-#: checkout (override with $AGS_APPS_REPO). Mirrors `contract-pin-check.py`'s
-#: sibling-checkout handling: when the checkout is absent the tests that need
-#: the real unit SKIP rather than fail (this suite is dev-only; CI has none).
-_AGS_APPS_REPO = Path(
-    os.environ.get("AGS_APPS_REPO", "/home/inumaki/Development/dotfiles/ags-apps")
-)
-
-
 def _seed_assets_configs(install: Path) -> None:
     """Materialize the pinned assets `configs/` class the skeletons render from.
 
@@ -249,7 +237,7 @@ def _seed_assets_configs(install: Path) -> None:
 
 
 #: The seeded `desktop/` corpus: file -> (Exec line, TryExec, requires, optional).
-#: The Exec/TryExec/requires/optional values mirror `dotfiles-assets@v0.6.1`'s
+#: The Exec/TryExec/requires/optional values mirror `dotfiles-assets@v0.6.2`'s
 #: `desktop/desktop.yaml` and entries. The fixtures are what THIS role reads; the
 #: corpus's own `make validate-desktop` proves the real bytes (S4 layer 1), so a
 #: fixture here is a role input, not a second copy of the contract.
@@ -376,8 +364,6 @@ def _run_compositor_playbook(
     ansible_playbook = shutil.which("ansible-playbook")
     if ansible_playbook is None:
         pytest.skip("ansible-playbook not installed; skipping execution test")
-    if shutil.which("node") is None:
-        pytest.skip("node not on PATH — the strict bar gate runs validate-cli.ts via node")
     home = tmp / "home"
     xdg = tmp / "xdg"
     install = tmp / "install"
@@ -403,7 +389,6 @@ def _run_compositor_playbook(
             "DOTFILES_ASSETS_ICONS_YAML to an assets checkout"
         )
     shutil.copy(repo_icons, icon_mappings / "icons.yaml")
-    _preseed_bar_unit(install)
 
     env = dict(os.environ)
     env["HOME"] = str(home)
@@ -425,49 +410,6 @@ def _run_compositor_playbook(
         env=env,
     )
     return result, home, install
-
-
-def _preseed_bar_unit(install: Path) -> Path:
-    """Seed the pinned bar unit exactly as the ags_apps role deploys it.
-
-    Bootstrap order (ags-apps.yaml before compositor-configs.yaml) guarantees
-    the live-bar link into the pinned unit exists before this role generates
-    icons.json through it and gates on the unit's CLI. Execution tests that
-    run compositor-configs.yaml STANDALONE must build that state by hand: the
-    unit's bar package is copied from a local `ags-apps` checkout (the bar
-    deploys WHOLE from there now — the in-repo bridge is retired), the pin is
-    recorded, and <install>/config/ags links at the unit's bar/. `node_modules`
-    and `@girs` are skipped: the strict-gate CLI is pure (`node:*` + the bar's
-    own pure modules), so neither the 49 MB GJS typings nor the dev platform
-    shortcut is needed.
-    """
-    src = _AGS_APPS_REPO / "bar"
-    if not (src / "bar" / "validate-cli.ts").is_file():
-        pytest.skip(
-            f"ags-apps bar unit not found at {src} (set AGS_APPS_REPO); the "
-            "strict bar gate needs the unit's validate-cli.ts"
-        )
-    bar = install / "ags-apps" / "v0.4.0" / "bar"
-    shutil.copytree(
-        src,
-        bar,
-        ignore=shutil.ignore_patterns("node_modules", "@girs", ".git"),
-    )
-    (install / "ags-apps" / "pinned").write_text("v0.4.0\n")
-    (install / "config").mkdir(parents=True, exist_ok=True)
-    (install / "config" / "ags").symlink_to(bar, target_is_directory=True)
-    # The capture-tool AGS GUI deploys WHOLE the same way (slice 5): the unit's
-    # capture-tool/ subdir is linked as <install>/config/ags-capture, and the
-    # role's capture icons.json is generated THROUGH that link (mirror of the
-    # bar's icons.json). A standalone compositor-configs run must build that state
-    # by hand, exactly as it does for the bar.
-    capture = install / "ags-apps" / "v0.4.0" / "capture-tool"
-    capture.mkdir(parents=True, exist_ok=True)
-    (capture / "app.tsx").write_text("export {}\n")
-    (install / "config" / "ags-capture").symlink_to(
-        capture, target_is_directory=True
-    )
-    return bar
 
 
 class TestCompositorConfigsRoleTree:
@@ -566,7 +508,7 @@ class TestCompositorConfigsTasks:
         files = list(data["compositor_configs_skeleton_files"])
         # capture tool files are NOT part of the compositor_configs skeletons
         # either: the app (GUI + Python backend) lives entirely in the pinned
-        # ags-apps unit and deploys via the ags_apps role's live-capture link.
+        # ags-apps unit and deploys via ags_apps_units' live-capture link.
         # (The pre-hexagonal views + controllers were deleted by
         # refactor-capture-tool-hexagonal, task 1.4.)
         # EXACT count, deliberately. 65 on master, 66 once the battery panel's
@@ -675,12 +617,12 @@ class TestCompositorConfigsTasks:
         for file_ in data["compositor_configs_skeleton_files"]:
             assert "/ags/" not in str(file_["source"]), (
                 f"stale bridge entry {file_['source']!r}: the bar deploys whole "
-                "via the ags_apps unit symlink"
+                "via the standalone app tag link"
             )
 
     def test_no_ags_config_dirs_remain(self) -> None:
         """Slice 2: the role no longer ensures the live-bar `ags` dir — it is
-        owned by the ags_apps role as a symlink. Slice 5 retired the
+        owned by ags_apps_units as a link. The role retired the
         `ags-capture` dir the same way (the ags_apps live-capture link owns it).
         What remains in compositor_configs_config_dirs are the compositor dirs
         (hypr/hyprpaper/rofi), never an AGS app dir: the sibling AGS apps deploy
@@ -1021,185 +963,6 @@ class TestDesktopDeployContract:
         )
 
 
-class TestBarValidateGate:
-    """Task 2.1: `ags-bar-validate` wired into provisioning as a STRICT gate.
-
-    The gate runs the DEPLOYED validator over the DEPLOYED icons artifact and
-    fails the install on any rule error — no `failed_when: false`, no
-    `ignore_errors`. Version drift is a WARNING (task 2.3: warn and degrade,
-    never crash), so only errors fail. There is no `bar.json` in the repo
-    today (no user/runtime layout override exists), so the gate passes no
-    `--layout` and validates the repo-default layout floor."""
-
-    _GATE_NAME = "Validate the deployed bar artifacts (strict install gate)"
-
-    def _gate(self) -> dict[str, object]:
-        task = next((t for t in _load_tasks() if t.get("name") == self._GATE_NAME), None)
-        assert task is not None, "missing the strict bar-validate gate task"
-        return task
-
-    def test_gate_runs_the_deployed_validator_over_the_deployed_artifact(
-        self,
-    ) -> None:
-        """The gate must invoke the DEPLOYED `validate-cli.ts` against the
-        DEPLOYED icons.json (the file the bar reads), with the role's OWNED
-        schema version as the expectation — never the repo source, never a
-        hardcoded version. The validator path is the realpath the resolution
-        task produced (see test_gate_resolves_the_validator_real_path): the
-        live bar is a symlink and node would otherwise no-op the CLI's
-        `invokedAsMain` guard."""
-        task = self._gate()
-        assert _module_key(task) == "ansible.builtin.command", (
-            "the gate must run the validator via ansible.builtin.command (no shell)"
-        )
-        cmd = _module_text(task)
-        assert "compositor_configs_bar_validate_cli" in cmd, (
-            "the gate must run the realpath-resolved validator (node realpaths "
-            "the module URL but not argv[1], so the symlink path would no-op "
-            "the CLI and pass the gate without validating anything)"
-        )
-        assert "compositor_configs_icon_manifest_dest" in cmd, (
-            "the gate must validate the DEPLOYED icons.json (the file the bar reads)"
-        )
-        assert "compositor_configs_icon_manifest_schema_version" in cmd, (
-            "the gate must pass the role's OWNED schema version (single owner)"
-        )
-        assert "--layout" not in cmd, (
-            "no bar.json exists in the repo today — the gate validates the "
-            "repo-default layout floor, it must not invent a layout path"
-        )
-
-    def test_gate_resolves_the_validator_real_path(self) -> None:
-        """The live bar is a symlink; node realpaths `import.meta.url` but
-        leaves `process.argv[1]` as given, so the deployed CLI's
-        `invokedAsMain` guard is FALSE through the link and the strict gate
-        silently exits 0. The role must resolve the real path (`readlink -f`)
-        and gate on that instead — never the symlink path."""
-        task = next(
-            (
-                t
-                for t in _load_tasks()
-                if t.get("name") == "Resolve the deployed bar validator's real path"
-            ),
-            None,
-        )
-        assert task is not None, "missing the validator realpath resolution task"
-        assert _module_key(task) == "ansible.builtin.command"
-        argv = _module(task).get("argv")
-        assert isinstance(argv, list), (
-            "the resolution must use argv (no shell string splitting)"
-        )
-        assert [str(a) for a in argv][:2] == ["readlink", "-f"], (
-            "the task must resolve the symlink with `readlink -f`"
-        )
-        assert any(
-            str(a).endswith("/ags/bar/validate-cli.ts") for a in argv
-        ), "the task must resolve the deployed CLI through the live-bar link"
-        assert task.get("changed_when") is False, "resolution writes nothing"
-        assert "not ansible_check_mode" in str(task.get("when", "")), (
-            "the deployed file does not exist yet under --check"
-        )
-
-    def test_gate_is_strict(self) -> None:
-        """STRICT means ansible's default failure semantics: a non-zero
-        validator exit fails the install. Any `failed_when: false`,
-        `ignore_errors`, or swallowing `failed_when` would make a bad artifact
-        a green install."""
-        task = self._gate()
-        assert "failed_when" not in task, "the strict gate must not set failed_when"
-        assert "ignore_errors" not in task, "the strict gate must not set ignore_errors"
-
-    def test_gate_writes_nothing_is_check_gated_and_unprivileged(self) -> None:
-        """The gate is a read-only probe: `changed_when: false` (never counts
-        as changed), `when: not ansible_check_mode` (the deployed files it
-        reads do not exist yet under --check), and no become (user-scoped
-        role, like every other task here)."""
-        task = self._gate()
-        assert task.get("changed_when") is False, "the gate must not report changed"
-        assert "not ansible_check_mode" in str(task.get("when", "")), (
-            "the gate must be skipped under --check"
-        )
-        assert "become" not in task, "the strict gate must not use become"
-
-    def test_gate_runs_after_generation(self) -> None:
-        """Ordering: the gate reads the GENERATED icons.json and the UNIT's
-        validate-cli.ts (deployed by the ags_apps role BEFORE this role runs
-        in bootstrap order — slice 2 retired the per-file CLI placement), so
-        it must run after BOTH icons.json generations. A gate placed earlier
-        would validate a missing icons.json."""
-        names = [str(t.get("name", "")) for t in _load_tasks()]
-        gate = names.index(self._GATE_NAME)
-        assert gate > names.index("Generate AGS JSON manifest from icon mappings")
-        assert gate > names.index("Generate capture AGS JSON manifest from icon mappings")
-
-    def test_gate_fails_the_install_on_a_bad_icons_artifact(self) -> None:
-        """Acceptance (task 2.1): a bad icons.json FAILS the install. Runs the
-        real playbook with an icons.yaml declaring no group the bar reads, so
-        the generated icons.json violates `missing-icon-key` and the strict
-        gate aborts the run. The unit's CLI is pre-seeded exactly as the
-        ags_apps role deploys it (live-bar link into the pinned unit —
-        bootstrap order guarantees the unit is installed first)."""
-        ansible_playbook = shutil.which("ansible-playbook")
-        if ansible_playbook is None:
-            pytest.skip("ansible-playbook not installed; skipping execution test")
-        if shutil.which("node") is None:
-            pytest.skip("node not on PATH — the strict bar gate runs validate-cli.ts via node")
-        playbook = _ANSIBLE_DIR / "playbooks" / "compositor-configs.yaml"
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp) / "home"
-            xdg = Path(tmp) / "xdg"
-            install = Path(tmp) / "install"
-            home.mkdir()
-            xdg.mkdir()
-            install.mkdir()
-            # S2: the skeletons render FROM the pinned assets configs class; the
-            # gate failure below must come from icons.json, not a missing source.
-            _seed_assets_configs(install)
-            # S4: the desktop entries + helper script are corpus data too, and
-            # layer 2 resolves their declared binaries from PATH.
-            _seed_assets_desktop(install)
-            (home / ".local" / "bin").mkdir(parents=True)
-            _desktop_bin_stubs(home / ".local" / "bin")
-            icon_mappings = install / "icon-mappings"
-            icon_mappings.mkdir(parents=True)
-            (icon_mappings / "icons.yaml").write_text("test-group: {}\n")
-            # The unit's CLI is what the strict gate runs: pre-seed the live
-            # bar exactly as the ags_apps role deploys it.
-            _preseed_bar_unit(install)
-
-            env = dict(os.environ)
-            env["HOME"] = str(home)
-            env["XDG_CONFIG_HOME"] = str(xdg)
-            env["XDG_DATA_HOME"] = str(home / ".local" / "share")
-            # S4 layer 2: the declared desktop binaries resolve from this stub dir.
-            env["PATH"] = f"{home / '.local' / 'bin'}:{os.environ.get('PATH', '')}"
-            env["ANSIBLE_CONFIG"] = str(_ANSIBLE_DIR / "ansible.cfg")
-            result = subprocess.run(
-                [
-                    ansible_playbook,
-                    str(playbook),
-                    "-e",
-                    f"install_dir={install}",
-                    "-e",
-                    f"manifests_dir={manifests_dir()}",
-                ],
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-            combined = result.stdout + result.stderr
-            assert result.returncode != 0, (
-                "a bad icons.json must fail the install (strict gate)\n" + combined[-4000:]
-            )
-            assert self._GATE_NAME in combined, (
-                "the failure must come from the strict bar gate\n" + combined[-4000:]
-            )
-            assert "missing-icon-key" in combined, (
-                "the gate must surface the validator's missing-icon-key error\n"
-                + combined[-4000:]
-            )
-
-
 class TestCompositorConfigsVars:
     _REQUIRED_KEYS = {
         "compositor_configs_assets_pinned_tag",
@@ -1371,8 +1134,6 @@ class TestCompositorConfigsPlaybook:
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")
-        if shutil.which("node") is None:
-            pytest.skip("node not on PATH — the strict bar gate runs validate-cli.ts via node")
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"
             xdg = Path(tmp) / "xdg"
@@ -1388,13 +1149,10 @@ class TestCompositorConfigsPlaybook:
             # ansible's copy module does not create the bin dest parent.
             (home / ".local" / "bin").mkdir(parents=True)
             _desktop_bin_stubs(home / ".local" / "bin")
-            # Assets-role outputs this role consumes (inputs, not generated):
-            # the icon manifest source for icons.json generation. Seeded from
-            # the REAL authored icons.yaml — the strict bar gate (task 2.1)
-            # validates the generated icons.json against the manifest
-            # declarations, so the historical `test-group: {}` stub (which
-            # declares no group the bar reads) would fail the install by
-            # design. A real install always carries the full authored map.
+            # Assets-role output this role consumes (input, not generated):
+            # the icon mapping is still verified by the desktop contract; the
+            # role no longer generates an AGS icons.json (AD-37: the platform
+            # owns the one produced artifact).
             icon_mappings = install / "icon-mappings"
             icon_mappings.mkdir(parents=True)
             repo_icons = _authored_icons_yaml()
@@ -1405,11 +1163,6 @@ class TestCompositorConfigsPlaybook:
                     "DOTFILES_ASSETS_ICONS_YAML to an assets checkout"
                 )
             shutil.copy(repo_icons, icon_mappings / "icons.yaml")
-            # Bootstrap order: the ags_apps role deploys the live bar BEFORE
-            # this role runs (icons.json generates through the link and the
-            # strict gate runs the unit's CLI).
-            unit_bar = _preseed_bar_unit(install)
-
             env = dict(os.environ)
             env["HOME"] = str(home)
             env["XDG_CONFIG_HOME"] = str(xdg)
@@ -1432,15 +1185,6 @@ class TestCompositorConfigsPlaybook:
             )
             assert result.returncode == 0, result.stdout + result.stderr
 
-            # The live bar is the unit, not a per-file copy: the link resolves
-            # into the pinned unit and the generated icons.json lands through
-            # it. The remaining per-file skeletons are the non-bar set only.
-            live = install / "config" / "ags"
-            assert live.is_symlink(), "the live bar must be a symlink"
-            assert live.resolve() == unit_bar.resolve(), (
-                "the live bar must point at the pinned unit's bar/"
-            )
-
             expected_skeletons = [
                 install / "config" / "hypr" / "hyprland.lua",
                 install / "config" / "hypr" / "keybindings.lua",
@@ -1453,11 +1197,6 @@ class TestCompositorConfigsPlaybook:
                 install / "config" / "hypr" / "cursor.lua",
                 install / "config" / "hypr" / "env-variables.lua",
                 install / "config" / "hyprpaper" / "hyprpaper.conf",
-                # Slice 2: the bar deploys whole via the live-bar symlink — no
-                # per-file bar entry is placed. The GENERATED icons.json lands
-                # through the link into the pinned unit (asserted is-file
-                # through the symlink, exactly as the strict gate reads it).
-                install / "config" / "ags" / "icons.json",
             ]
             for path in expected_skeletons:
                 assert path.is_file(), f"skeleton {path} was never placed (silent no-op?)"
@@ -1474,9 +1213,9 @@ class TestCompositorConfigsPlaybook:
             assert not (install / "config" / "hypr" / "colors.conf").exists(), (
                 "Epic 4: the role must NOT place a hypr/colors.conf fragment"
             )
-            assert not (install / "config" / "ags" / "colors.css").exists(), (
-                "Epic 4: the role must NOT place an ags/colors.css fragment "
-                "(the runtime seeder owns the R2 consumer symlink)"
+            assert not (install / "config" / "ags").exists(), (
+                "the role must not create an AGS app surface "
+                "(ags_apps_units owns every config/ags* path)"
             )
 
             hypr_content = (install / "config" / "hypr" / "hyprland.lua").read_text()
@@ -1552,102 +1291,3 @@ class TestCompositorConfigsPlaybook:
                 assert (applications / deployed_name).is_file(), (
                     f"{deployed_name} must still deploy when another entry is skipped"
                 )
-
-    def test_playbook_leaves_palette_paths_untouched(self) -> None:
-        """Epic 4 migration contract: the role is hands-off palette paths.
-        On a machine where the runtime owns the palette, an R2 symlink at
-        <install>/config/ags/colors.css must survive re-provisioning
-        UNCHANGED (islnk, same target). A stale pre-Epic-4 COPY is likewise
-        left byte-identical (the role neither creates, updates, nor removes
-        palette content — migration happens via the next `wallpaper set`,
-        which replaces copies with R2 symlinks)."""
-        ansible_playbook = shutil.which("ansible-playbook")
-        if ansible_playbook is None:
-            pytest.skip("ansible-playbook not installed; skipping execution test")
-        if shutil.which("node") is None:
-            pytest.skip("node not on PATH — the strict bar gate runs validate-cli.ts via node")
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp) / "home"
-            xdg = Path(tmp) / "xdg"
-            install = Path(tmp) / "install"
-            state = Path(tmp) / "state"
-            home.mkdir()
-            xdg.mkdir()
-            install.mkdir()
-            # S2: the skeletons render FROM the pinned assets configs class.
-            _seed_assets_configs(install)
-            # S4: the desktop entries + helper script are corpus data too, and
-            # layer 2 resolves their declared binaries from PATH.
-            _seed_assets_desktop(install)
-            # ansible's copy module does not create the bin dest parent.
-            (home / ".local" / "bin").mkdir(parents=True)
-            _desktop_bin_stubs(home / ".local" / "bin")
-            # Assets-role outputs this role consumes (inputs, not generated).
-            # Seeded from the REAL authored icons.yaml: the strict bar gate
-            # (task 2.1) validates the generated icons.json, so the stub would
-            # fail this run by design (see the gate-failure test below).
-            icon_mappings = install / "icon-mappings"
-            icon_mappings.mkdir(parents=True)
-            repo_icons = _authored_icons_yaml()
-            if repo_icons is None:
-                pytest.skip(
-                    "authored icons.yaml not found: provision the spine "
-                    "(DOTFILES_INSTALL_SPINE / XDG_DATA_HOME) or set "
-                    "DOTFILES_ASSETS_ICONS_YAML to an assets checkout"
-                )
-            shutil.copy(repo_icons, icon_mappings / "icons.yaml")
-
-            # Bootstrap order: the live bar link exists before this role
-            # runs (see _preseed_bar_unit). The runtime R2 colors.css pointer
-            # lands THROUGH the link — inside the fixture unit, exactly as on
-            # a host the ags_apps role upgraded.
-            _preseed_bar_unit(install)
-            current = state / "dotfiles" / "current"
-            current.mkdir(parents=True)
-            (current / "colors.gtk.css").write_text("@define-color color_00 #111111;\n")
-            ags_colors = install / "config" / "ags" / "colors.css"
-            runtime_target = current / "colors.gtk.css"
-            ags_colors.symlink_to(runtime_target)
-            # Stale pre-Epic-4 copy the role must not touch either way.
-            stale_copy = install / "config" / "hypr" / "colors.conf"
-            stale_copy.parent.mkdir(parents=True)
-            stale_copy.write_text("$background = 0x000000\n")
-
-            env = dict(os.environ)
-            env["HOME"] = str(home)
-            env["XDG_CONFIG_HOME"] = str(xdg)
-            env["XDG_STATE_HOME"] = str(state)
-            env["XDG_DATA_HOME"] = str(home / ".local" / "share")
-            # S4 layer 2: the declared desktop binaries resolve from this stub dir.
-            env["PATH"] = f"{home / '.local' / 'bin'}:{os.environ.get('PATH', '')}"
-            env["ANSIBLE_CONFIG"] = str(_ANSIBLE_DIR / "ansible.cfg")
-            result = subprocess.run(
-                [
-                    ansible_playbook,
-                    str(self._PATH),
-                    "-e",
-                    f"install_dir={install}",
-                    "-e",
-                    f"manifests_dir={manifests_dir()}",
-                ],
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-            assert result.returncode == 0, result.stdout + result.stderr
-
-            assert ags_colors.is_symlink(), (
-                "the runtime R2 symlink must survive re-provisioning untouched"
-            )
-            assert os.readlink(ags_colors) == str(runtime_target), (
-                "the runtime symlink target must be unchanged after re-provisioning"
-            )
-            assert (current / "colors.gtk.css").read_text() == (
-                "@define-color color_00 #111111;\n"
-            ), "the state-owned palette file must be untouched (provisioning never writes under state_root)"
-            assert stale_copy.is_file() and not stale_copy.is_symlink(), (
-                "a stale pre-Epic-4 copy is left byte-identical (migration "
-                "happens via the next `wallpaper set`, not provisioning)"
-            )
-            assert "$background = 0x000000" in stale_copy.read_text()
-
