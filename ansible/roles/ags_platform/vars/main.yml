@@ -1,24 +1,21 @@
-# ags-platform role vars — install the AGS platform as ONE versioned unit and
-# expose it to every AGS config by a shared-ancestor bare specifier.
+# ags-platform role vars — install the AGS platform as ONE versioned unit.
 #
-# Spine AD-17 (distribution: one unit, shared ancestor) and AD-23 (fresh host:
-# provisioning installs the pinned framework unit and creates the shortcut).
-# AD-20 sequenced the migration: the platform was extracted IN-PLACE in
-# dotfiles-v3 first (extract-platform-in-place), then published; THIS role is
-# the consumption step that replaces the per-file enumeration with a single
+# Spine AD-17 (distribution: one unit) and AD-23 (fresh host: provisioning
+# installs the pinned framework unit). AD-20 sequenced the migration: the
+# platform was extracted IN-PLACE in dotfiles-v3 first, then published; THIS
+# role is the consumption step that replaces per-file enumeration with a single
 # versioned install.
 #
-# WHY A SHORTCUT, NOT A PER-FILE COPY. AGS (v3.1.0) embeds esbuild, which
+# WHY ONE UNIT + ONE APP-INSTALL ANCESTOR. AGS (v3.1.0) embeds esbuild, which
 # resolves a bare specifier (`import { x } from "ags-platform"`) from
 # `node_modules/`; `ags`/`gnim` are built-in aliases, a third-party package is
-# not. Provisioning installs the unit ONCE at a shared ancestor on every app's
-# resolution path — `<install>/config/node_modules/ags-platform` — so
-# `config/ags` AND every `config/ags-*` find it without a per-app copy. esbuild
-# realpaths the symlink, so the shortcut resolves from the real config tree.
+# not. This role installs the unit once; `ags_apps_units` creates the ONE
+# shared `<install>/apps/node_modules/ags-platform` shortcut that every
+# immutable app tag resolves through (AD-31/AD-37). esbuild realpaths the app
+# link, so the shortcut resolves from the real app tree.
 #
-# The version is a DIRECTORY (`<install>/ags-platform/<version>/`) and the
-# shortcut points at it, so a rollback is a shortcut repoint to a sibling
-# version dir (AD-23).
+# The version is a DIRECTORY (`<install>/ags-platform/<version>/`) so a rollback
+# points the shared shortcut at a sibling version dir (AD-23).
 
 # ags_platform_repo_url: the PUBLIC published repo. Cloned over anonymous HTTPS
 #   (no credentials) — unlike the private repos AD-23 fetches with `gh`.
@@ -51,16 +48,6 @@ ags_platform_unit_marker: "{{ ags_platform_unit_dir }}/index.ts"
 #   reads it to know what is deployed.
 ags_platform_pin_file: "{{ ags_platform_install_root }}/pinned"
 
-# ags_platform_spine_config_dir: the config-in-spine root (<install>/config/),
-#   the SHARED ANCESTOR of every AGS config dir. Identical derivation to
-#   compositor_configs_spine_config_dir / gui_tools_spine_config_dir.
-ags_platform_spine_config_dir: "{{ install_dir | trim }}/config"
-
-# ags_platform_shortcut_dir: the node_modules dir under the shared ancestor.
-ags_platform_shortcut_dir: "{{ ags_platform_spine_config_dir }}/node_modules"
-
-# ags_platform_shortcut: the bare-specifier shortcut itself. A symlink named
-#   `ags-platform` pointing at the pinned unit. `ags-platform` is the package
-#   NAME in the unit's package.json, so esbuild's node_modules resolution finds
-#   it by name.
-ags_platform_shortcut: "{{ ags_platform_shortcut_dir }}/ags-platform"
+# The shared `node_modules/ags-platform` resolver is NOT owned here. Apps are
+# installed at <install>/apps/<installDir>/<tag>/, so the only correct ancestor
+# is <install>/apps/node_modules — created by ags_apps_units (AD-31/AD-37).

@@ -279,21 +279,20 @@ class TestFilesystemVars:
         )
 
     def test_spine_dirs_exclude_the_ags_live_links(self) -> None:
-        """ags-apps-bar-first (AD-1/AD-17/AD-23): <install>/config/ags and
-        <install>/config/ags-capture are the ags_apps role's live SYMLINKS (-> the
-        pinned unit's bar/ and capture-tool/), NOT filesystem-owned dirs. The role
-        must not list them: verify's criterion-1 isdir assert counts every
-        filesystem_spine_dirs entry as a DIR, and a symlinked config/ags made that
-        assert false on a real bootstrap (the regression this locks). Slice 5
-        retired config/ags-capture for the same reason."""
+        """<install>/config/ags and <install>/config/ags-capture are
+        ags_apps_units' live SYMLINKS (-> the immutable app tags), NOT
+        filesystem-owned dirs. The role must not list them: verify's
+        criterion-1 isdir assert counts every filesystem_spine_dirs entry as a
+        DIR, and a symlinked config/ags made that assert false on a real
+        bootstrap (the regression this locks)."""
         data = _vars()
         spine = [str(item) for item in data["filesystem_spine_dirs"]]
         assert "config/ags" not in spine, (
-            "config/ags is the ags_apps live-bar symlink, not a filesystem dir — "
+            "config/ags is the AGS installer's live bar link, not a filesystem dir — "
             f"got {spine}"
         )
         assert "config/ags-capture" not in spine, (
-            "config/ags-capture is the ags_apps live-capture symlink (slice 5), "
+            "config/ags-capture is the AGS installer's live capture link, "
             f"not a filesystem dir — got {spine}"
         )
 
@@ -306,15 +305,16 @@ class TestFilesystemVars:
             item == "generated" or item.startswith("generated/") for item in spine
         ), f"spine dirs must not contain generated/ entries; got {spine}"
 
-    def test_compositor_dirs_exactly_three_under_xdg_config_home(self) -> None:
-        """AC 3: the compositor dirs are exactly hypr/hyprpaper/ags under
-        the XDG config home — nothing more."""
+    def test_compositor_dirs_are_exactly_hypr_and_hyprpaper(self) -> None:
+        """AC 3: the filesystem-owned compositor dirs are exactly
+        hypr/hyprpaper under the XDG config home. `ags` is not here: every AGS
+        app's XDG link is created by ags_apps_units, and a pre-created real dir
+        would block the link."""
         data = _vars()
         compositor = [str(item) for item in data["filesystem_compositor_dirs"]]
         assert compositor == [
             "{{ filesystem_xdg_config_home }}/hypr",
             "{{ filesystem_xdg_config_home }}/hyprpaper",
-            "{{ filesystem_xdg_config_home }}/ags",
         ]
 
     def test_xdg_homes_honor_env_with_default(self) -> None:

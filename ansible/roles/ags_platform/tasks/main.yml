@@ -1,6 +1,8 @@
 # ags-platform role tasks (spine AD-17/AD-23) — install the AGS platform as one
-# versioned unit and create the shared-ancestor `node_modules/ags-platform`
-# shortcut every AGS config resolves the bare specifier through.
+# versioned unit. The ONLY AGS app installer, `ags_apps_units`, creates the one
+# shared `<install>/apps/node_modules/ags-platform` shortcut that app tags
+# resolve through; this role owns the immutable unit and its pin, not an app
+# resolver path.
 #
 # Design (dedicated role — single responsibility: provision the platform unit):
 # - The FIRST task is the fail-loud install_dir seam assert, copied verbatim
@@ -17,10 +19,6 @@
 #   wanted). Removal is idempotent (absent -> no change) and runs after a clone.
 # - The pin is RECORDED in a one-line file (ags_platform_pin_file) so the
 #   installed version is observable on the host and assertable by `verify`.
-# - The shortcut is a symlink at the SHARED ANCESTOR (<install>/config/
-#   node_modules/ags-platform) so config/ags and every config/ags-* resolve the
-#   bare specifier. `force: true` makes a rollback (repoint to another version)
-#   a single converged run.
 # - User-scoped privilege context: NO become (everything lands under the user's
 #   install_dir).
 # - Distro-agnostic: git clone is identical on Arch and Debian-family.
@@ -72,17 +70,4 @@
     content: "{{ ags_platform_version }}\n"
     dest: "{{ ags_platform_pin_file }}"
     mode: "0644"
-    force: true
-
-- name: Ensure the shared-ancestor node_modules dir exists
-  ansible.builtin.file:
-    path: "{{ ags_platform_shortcut_dir }}"
-    state: directory
-    mode: "0755"
-
-- name: Point the shared-ancestor shortcut at the pinned unit
-  ansible.builtin.file:
-    src: "{{ ags_platform_unit_dir }}"
-    dest: "{{ ags_platform_shortcut }}"
-    state: link
     force: true

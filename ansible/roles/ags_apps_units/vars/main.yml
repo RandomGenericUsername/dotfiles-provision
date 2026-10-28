@@ -1,12 +1,14 @@
-# ags_apps_units role vars — the generic per-app AGS install topology
+# ags_apps_units role vars — the ONLY per-app AGS install topology
 # (spine AD-31/AD-32/AD-37).
 #
 # The role is DATA-DRIVEN. It reads the composition's single app list
 # (`<manifests_dir>/apps.yaml`) and program tuple
-# (`<manifests_dir>/program-tuple.yaml`) and acts ONLY on entries whose
-# `owner` is `standalone`. With the current all-legacy list it is a no-op:
-# the old `ags_apps` monorepo role remains the only owner. A cutover flips one
-# entry's owner in the composition, and exactly one role then acts on it.
+# (`<manifests_dir>/program-tuple.yaml`). The final topology is
+# all-standalone: every entry is `owner: standalone` and this role is the one
+# installer/owner of its install, config, spine, XDG, bin, launcher and
+# autostart surfaces. The old `ags_apps` monorepo role/pin is retired, and a
+# legacy entry fails the contract assert in tasks/main.yml (it would have no
+# installer at all).
 #
 # INSTALL SHAPE (AD-31): <install>/apps/<installDir>/<tag>/. Every app unit is
 # immutable after install (AD-37): this role clones the tag, removes the
@@ -52,8 +54,8 @@ ags_apps_units_platform_install_root: "{{ install_dir | trim }}/ags-platform"
 ags_apps_units_platform_unit_dir: "{{ ags_apps_units_platform_install_root }}/{{ ags_apps_units_tuple['ags-platform'] }}"
 
 # ags_apps_units_platform_shortcut: the ONE shared ancestor shortcut
-#   (<install>/apps/node_modules/ags-platform). AD-31: only standalone installs
-#   use this ancestor; the legacy monorepo keeps its per-unit shortcut.
+#   (<install>/apps/node_modules/ags-platform). Every standalone app resolves
+#   through this ancestor; there is no per-unit shortcut anymore.
 ags_apps_units_platform_shortcut_dir: "{{ ags_apps_units_install_root }}/node_modules"
 ags_apps_units_platform_shortcut: "{{ ags_apps_units_platform_shortcut_dir }}/ags-platform"
 

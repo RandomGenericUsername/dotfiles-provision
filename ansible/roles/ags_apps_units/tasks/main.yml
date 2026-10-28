@@ -1,11 +1,14 @@
-# ags_apps_units role tasks — generic per-app AGS install/cutover (AD-31/32/37).
+# ags_apps_units role tasks — the ONLY AGS app installer (AD-31/32/37).
 #
-# Read the single composition app list + program tuple, validate the one-owner
-# partition, then act ONLY on `owner: standalone` entries. The current
-# all-legacy list makes every mutation task skip; the old `ags_apps` role is
-# the only owner. A cutover flips one entry's owner in the composition.
+# The final topology is all-standalone: every AGS app is its own immutable tag
+# under <install>/apps/<installDir>/<tag>, resolving the ONE shared
+# <install>/apps/node_modules/ags-platform shortcut. The retired `ags_apps`
+# monorepo role/pin no longer exists and no other role creates an AGS app
+# install, config, spine, XDG, bin, launcher or autostart surface. A composition
+# entry that still says `owner: legacy` fails loud here instead of silently
+# shipping an app with no owner.
 #
-# Order is the AD-32 epoch for each standalone app:
+# Order is the AD-32 epoch for each app:
 #   quiesce (confirmed quit, no bus name) -> install immutable tag ->
 #   repoint links -> start through the shared launch lock -> verify identity,
 #   handler and every ownership surface. A failure runs the rollback block:
@@ -60,12 +63,10 @@
       - ags_apps_units_apps_document.apps | rejectattr('xdgLink', 'defined') | list | length == 0
       - ags_apps_units_apps_document.apps | rejectattr('launch', 'defined') | list | length == 0
       - ags_apps_units_apps_document.apps | rejectattr('cutoverId', 'defined') | list | length == 0
-      - ags_apps_units_apps_document.apps | map(attribute='owner') | unique | list | difference(['legacy', 'standalone']) | length == 0
+      - ags_apps_units_apps_document.apps | map(attribute='owner') | unique | list | difference(['standalone']) | length == 0
       - ags_apps_units_apps_document.apps | map(attribute='launch') | unique | list | difference(['always', 'on-demand']) | length == 0
-      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | rejectattr('repo', 'defined') | list | length == 0
-      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | rejectattr('tag', 'defined') | list | length == 0
-      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | selectattr('repo', 'defined') | list | length == 0
-      - ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | selectattr('tag', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('repo', 'defined') | list | length == 0
+      - ags_apps_units_apps_document.apps | rejectattr('tag', 'defined') | list | length == 0
       - >-
         ags_apps_units_apps_document.apps | map(attribute='app') | unique | list | length
         == ags_apps_units_apps_document.apps | length
@@ -100,9 +101,11 @@
         == ['bar']
     fail_msg: >-
       the composition app list at {{ ags_apps_units_apps_file }} violates the
-      install-list contract (required fields, one owner, unique
-      app/installDir/instance/config/spine/XDG surfaces, launcher/bin
-      uniqueness, one bar palette pointer).
+      all-standalone install-list contract: every entry must be
+      owner=standalone with repo/tag, the identity surfaces must be unique,
+      launchers/bin links must not collide, and exactly the bar owns the
+      palette pointer. `owner: legacy` is retired — the old `ags_apps` role no
+      longer exists, so a legacy entry would have no installer (AD-32).
 
 - name: Assert every app-list scalar is one lowercase path segment or a tag
   ansible.builtin.assert:
@@ -139,14 +142,13 @@
         ags_apps_units_apps_document.apps | map(attribute='configLink') | list
         == ags_apps_units_apps_document.apps | map(attribute='configDir') | list
       - >-
-        ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone')
-        | map(attribute='tag')
+        ags_apps_units_apps_document.apps | map(attribute='tag')
         | select('match', '^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') | list | length
-        == ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | list | length
+        == ags_apps_units_apps_document.apps | length
     fail_msg: >-
       every app-list identity field must be exactly one lowercase path
-      segment, configLink must equal configDir, and every standalone tag must
-      be an immutable vX.Y.Z annotated tag.
+      segment, configLink must equal configDir, and every tag must be an
+      immutable vX.Y.Z annotated tag.
 
 - name: Assert the program tuple names exactly the three program tags
   ansible.builtin.assert:
@@ -161,49 +163,34 @@
       the program tuple at {{ ags_apps_units_tuple_file }} must be schemaVersion
       1 and exactly the ags-platform/contracts/dotfiles-assets semver tags.
 
-- name: Partition the app list by the single owner field
+- name: Partition the app list (every entry is standalone)
   ansible.builtin.set_fact:
-    ags_apps_units_legacy_apps: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | list }}"
-    ags_apps_units_standalone_apps: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | list }}"
-    ags_apps_units_legacy_names: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
-    ags_apps_units_standalone_names: "{{ ags_apps_units_apps_document.apps | selectattr('owner', 'equalto', 'standalone') | map(attribute='app') | list }}"
-
-- name: Assert every app has exactly one owner
-  ansible.builtin.assert:
-    that:
-      - ags_apps_units_legacy_apps | length + ags_apps_units_standalone_apps | length == ags_apps_units_apps_document.apps | length
-      - ags_apps_units_legacy_names | intersect(ags_apps_units_standalone_names) | length == 0
-    fail_msg: >-
-      the app list must assign every app exactly one owner (legacy XOR
-      standalone); overlapping/missing owners would let zero or two roles act.
-
-- name: Report the dormant owner split when no app is standalone
-  ansible.builtin.debug:
-    msg: >-
-      ags_apps_units is dormant: all {{ ags_apps_units_legacy_apps | length }}
-      app entries are owner=legacy; the ags_apps monorepo role remains the only
-      owner. No per-app install/repoint/start actions run.
-  when: ags_apps_units_standalone_apps | length == 0
+    ags_apps_units_apps: "{{ ags_apps_units_apps_document.apps }}"
+    ags_apps_units_always_on_names: >-
+      {{ ags_apps_units_apps_document.apps
+         | selectattr('launch', 'equalto', 'always')
+         | map(attribute='app') | list }}
+    ags_apps_units_on_demand_names: >-
+      {{ ags_apps_units_apps_document.apps
+         | selectattr('launch', 'equalto', 'on-demand')
+         | map(attribute='app') | list }}
 
 - name: Ensure the per-app install root exists
   ansible.builtin.file:
     path: "{{ ags_apps_units_install_root }}"
     state: directory
     mode: "0755"
-  when: ags_apps_units_standalone_apps | length > 0
 
 - name: Ensure the shared platform shortcut dir exists
   ansible.builtin.file:
     path: "{{ ags_apps_units_platform_shortcut_dir }}"
     state: directory
     mode: "0755"
-  when: ags_apps_units_standalone_apps | length > 0
 
 - name: Check the tuple's ags-platform unit is installed
   ansible.builtin.stat:
     path: "{{ ags_apps_units_platform_unit_dir }}/index.ts"
   register: ags_apps_units_platform_unit_check
-  when: ags_apps_units_standalone_apps | length > 0
 
 - name: Assert the tuple's ags-platform unit is installed before linking it
   ansible.builtin.assert:
@@ -216,7 +203,6 @@
       can resolve `ags-platform` (AD-31/AD-34). Re-pin the platform role's
       ags_platform_version to the tuple tag as part of the adoption release —
       never silently point the shared shortcut at a missing unit.
-  when: ags_apps_units_standalone_apps | length > 0
 
 - name: Point the one shared apps/node_modules shortcut at the tuple platform unit
   ansible.builtin.file:
@@ -224,12 +210,10 @@
     dest: "{{ ags_apps_units_platform_shortcut }}"
     state: link
     force: true
-  when: ags_apps_units_standalone_apps | length > 0
 
 - name: Install, repoint, start and verify each standalone app
   ansible.builtin.include_tasks: _one.yml
-  loop: "{{ ags_apps_units_standalone_apps }}"
+  loop: "{{ ags_apps_units_apps }}"
   loop_control:
     loop_var: app
     label: "{{ app.app }}"
-  when: ags_apps_units_standalone_apps | length > 0

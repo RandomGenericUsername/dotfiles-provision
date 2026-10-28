@@ -29,18 +29,18 @@
       --composition-root; direct runs pass -e manifests_dir=... -e
       composition_root=...
 
-- name: Read the composition app list for legacy launcher ownership
-  ansible.builtin.set_fact:
-    cli_tools_composition_apps: "{{ lookup('file', cli_tools_manifests_dir | trim ~ '/apps.yaml') | from_yaml }}"
+# AGS app launchers are NOT installed here anymore. The final topology is
+# all-standalone: ags_apps_units renders every `launcher` declared in the one
+# composition app list (capture-ui, clipboard-ui, wallpaper-selector-ui,
+# icon-color-mapping-editor, btop-theme-studio) from its generic launcher
+# template, which keeps the warm toggle / request surface and routes every cold
+# start through the shared launch lock. Keeping a second cli_tools copy would
+# create two owners for the same command.
 
-- name: Partition the app list for the launcher owner filter
-  ansible.builtin.set_fact:
-    cli_tools_legacy_app_names: "{{ cli_tools_composition_apps.apps | selectattr('owner', 'equalto', 'legacy') | map(attribute='app') | list }}"
-
-# The shared launch-lock wrapper. Every provisioned `ags run` path (these
-# launchers, gui_tools' start-if-down, the ags_apps_units installer) invokes
-# it; `ags request`/`toggle` do not bundle and stay unlocked. Installed here
-# because cli_tools owns the user bin dir and runs before every launcher.
+# The shared launch-lock wrapper. Every provisioned `ags run` path (the
+# ags_apps_units launcher template and installer start/rollback) invokes it;
+# `ags request`/`toggle` do not bundle and stay unlocked. Installed here
+# because cli_tools owns the user bin dir and runs before the AGS installer.
 - name: Install the shared AGS launch-lock wrapper
   ansible.builtin.copy:
     src: ags-run-locked
@@ -61,10 +61,10 @@
       (bootstrap.sh pre-seeds it; Story 3.1)
   when: not ansible_check_mode
 
-# capture-tool is NOT installed here: from ags-apps v0.4.0 its Python backend
-# ships inside the pinned unit (capture-tool/bin/capture-tool), and the ags_apps
-# role installs the bin-dir symlink after cloning the unit. This role runs BEFORE
-# ags-apps on the bootstrap chain, so it could not install or assert it anyway.
+# capture-tool is NOT installed here: its Python backend ships inside the
+# standalone capture tag (bin/capture-tool), and ags_apps_units installs the
+# bin-dir symlink after cloning that tag. This role runs before the AGS
+# installer on the bootstrap chain, so it could not install or assert it anyway.
 
 - name: Install the Hyprland session plugin activator
   ansible.builtin.copy:
@@ -72,56 +72,6 @@
     dest: "{{ cli_tools_bin_dir }}/gloview-activate"
     mode: "0755"
     remote_src: true
-
-- name: Install the icon color mapping editor launcher (repo-aware template)
-  ansible.builtin.template:
-    src: icon-color-mapping-editor.j2
-    dest: "{{ cli_tools_bin_dir }}/icon-color-mapping-editor"
-    mode: "0755"
-  when: "'icme' in cli_tools_legacy_app_names"
-
-# The btop Theme Studio has the same "bundles TS at startup" lifecycle and the
-# same toggle/start-if-down contract as icme: provisioning quits the instance
-# after placing updated sources, and the SUPER+B bind restarts it on demand.
-- name: Install the btop Theme Studio launcher (repo-aware template)
-  ansible.builtin.template:
-    src: btop-theme-studio.j2
-    dest: "{{ cli_tools_bin_dir }}/btop-theme-studio"
-    mode: "0755"
-  when: "'btop-theme-studio' in cli_tools_legacy_app_names"
-
-# The capture UI is a standalone AGS instance with the same "bundles TS at
-# startup" lifecycle as icme. Provisioning (gui_tools role) quits it after
-# placing updated sources; this start-if-down/toggle launcher is what the
-# SUPER+PRINT keybind now calls, so a quit instance is restarted on demand
-# instead of leaving the keybind a silent no-op until the next login.
-- name: Install the capture tool UI launcher (toggle/start-if-down template)
-  ansible.builtin.template:
-    src: capture-ui.j2
-    dest: "{{ cli_tools_bin_dir }}/capture-ui"
-    mode: "0755"
-  when: "'capture' in cli_tools_legacy_app_names"
-
-# The clipboard-history overlay has the same "bundles TS at startup" lifecycle;
-# its keybind entrypoint must restart a quit instance on demand (SUPER+V). The
-# app-list entry is `clipboard` (instance/configDir/launcher/autostart all use
-# that name), so a future `owner: standalone` flip removes it from the legacy
-# set and this task skips — `ags_apps_units` renders the launcher then.
-- name: Install the clipboard-history overlay launcher (toggle/start-if-down template)
-  ansible.builtin.template:
-    src: clipboard-ui.j2
-    dest: "{{ cli_tools_bin_dir }}/clipboard-ui"
-    mode: "0755"
-  when: "'clipboard' in cli_tools_legacy_app_names"
-
-# The wallpaper selector has the same "bundles TS at startup" lifecycle; its
-# keybind entrypoint must restart a quit instance on demand (SUPER+W toggles).
-- name: Install the wallpaper selector launcher (toggle/start-if-down template)
-  ansible.builtin.template:
-    src: wallpaper-selector-ui.j2
-    dest: "{{ cli_tools_bin_dir }}/wallpaper-selector-ui"
-    mode: "0755"
-  when: "'wallpaper-selector' in cli_tools_legacy_app_names"
 
 # rofi is not an AGS instance, but the same "one keybind entrypoint" contract
 # applies: SUPER+D must toggle it closed as well as open, and the bind must not
@@ -136,13 +86,13 @@
 # ── Pinned external checkouts (spine AD-10) ──
 # A repo entry is addressed as {name, repo, tag}: shallow-clone the tag into
 # <install>/cli-tools/<name>/<tag>/, drop the clone's .git (it is deployed as
-# a source tree, not a working copy — exactly the ags_apps unit discipline),
+# a source tree, not a working copy — exactly the ags_apps_units app-tag discipline),
 # record the tag in <install>/cli-tools/<name>/pinned, then install the tool
 # FROM that checkout. Installing from the checkout (not a `git+…@tag` URL) is
 # what makes PEP 610 record a tag-bearing path, and it is the shape `verify`
 # asserts (checkout path contains the tag, pin file equals it).
 #
-# Check-mode discipline mirrors ags_apps: the stat probes run under --check,
+# Check-mode discipline mirrors ags_apps_units: the stat probes run under --check,
 # every clone/remove/install is gated `when: not ansible_check_mode`, and the
 # pin-file `copy` supports check mode (it reports would-change, never writes).
 # The checkout-root `file` task also supports check mode and creates nothing

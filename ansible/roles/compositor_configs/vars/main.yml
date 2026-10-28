@@ -43,7 +43,7 @@
 #   `assets.tag` (AD-6/AD-11). Trim lock: the checkout path consumes the same
 #   validated {{ install_dir | trim }} value the fail-loud first-task assert
 #   enforces.
-compositor_configs_assets_pinned_tag: v0.6.1
+compositor_configs_assets_pinned_tag: v0.6.2
 compositor_configs_assets_configs_dir: "{{ install_dir | trim }}/assets/{{ compositor_configs_assets_pinned_tag }}/configs"
 compositor_configs_assets_desktop_dir: "{{ install_dir | trim }}/assets/{{ compositor_configs_assets_pinned_tag }}/desktop"
 
@@ -100,7 +100,7 @@ compositor_configs_state_current_dir: "{{ compositor_configs_xdg_state_home | tr
 #   {{ install_dir | trim }} value the fail-loud first-task assert enforces.
 compositor_configs_spine_config_dir: "{{ install_dir | trim }}/config"
 
-# compositor_configs_config_dirs: the three compositor config dirs under the
+# compositor_configs_config_dirs: the compositor config dirs under the
 #   config-in-spine home. Re-ensured as directories before the copies (copy does
 #   NOT create dest parents for file sources); the filesystem role (2.5)
 #   already created them on the bootstrap chain, this keeps the role
@@ -109,17 +109,11 @@ compositor_configs_spine_config_dir: "{{ install_dir | trim }}/config"
 compositor_configs_config_dirs:
   - "{{ compositor_configs_spine_config_dir }}/hypr"
   - "{{ compositor_configs_spine_config_dir }}/hyprpaper"
-  # NOTE: there is deliberately NO `ags` dir here anymore. The bar is no
-  # longer placed per file into the bar tree; the `ags_apps` role installs it
-  # as ONE versioned unit at <install>/ags-apps/<tag>/ and deploys the unit's
-  # bar/ subdir as the live <install>/config/ags symlink (spine AD-17). The
-  # role ensures the spine config root itself; `template` does NOT create
-  # dest parents, so the remaining entries below are still re-ensured here.
-  # NOTE: there is likewise NO `ags-capture` dir here anymore. The capture-tool
-  # GUI moved into the same unit (slice 5) and the `ags_apps` role deploys the
-  # unit's capture-tool/ subdir as the live <install>/config/ags-capture symlink,
-  # so this role must not claim it as a dir. Its icons.json is still generated
-  # THROUGH that link (compositor_configs_capture_icon_manifest_dest).
+  # NOTE: there is deliberately NO AGS app dir here. Every AGS app is an
+  # immutable standalone tag installed by `ags_apps_units`, whose spine/XDG
+  # links are the app's only config surfaces (AD-31/AD-37). `template` does
+  # NOT create dest parents, so the remaining entries below are still
+  # re-ensured here.
   - "{{ compositor_configs_spine_config_dir }}/rofi"
   - "{{ compositor_configs_spine_config_dir }}/rofi/launcher"
 # compositor_configs_skeleton_files: the skeleton FILES (AC 2), one entry per
@@ -204,32 +198,3 @@ compositor_configs_desktop_entries:
   - { name: copilot, file: copilot.desktop, dest: "{{ compositor_configs_xdg_data_home }}/applications/copilot.desktop" }
   - { name: codex, file: codex.desktop, dest: "{{ compositor_configs_xdg_data_home }}/applications/codex.desktop" }
 
-# The icon mappings are authored once under icon-mappings and converted to the
-# JSON shape consumed by AGS during provisioning.
-compositor_configs_icon_manifest_source: "{{ install_dir | trim }}/icon-mappings/icons.yaml"
-compositor_configs_icon_manifest_dest: "{{ compositor_configs_spine_config_dir }}/ags/icons.json"
-# The capture AGS instance resolves icons through the same registry contract
-# as the bar, so it needs the same generated manifest beside its own sources.
-# Same decoded content as the bar manifest, second destination only. Slice 5:
-# <install>/config/ags-capture is now the ags_apps live-capture SYMLINK into the
-# unit's capture-tool/, so this copy lands in <unit>/capture-tool/icons.json —
-# exactly like the bar manifest lands in <unit>/bar/icons.json through the
-# live-bar link. The ags_apps role (ags-apps.yaml) runs first, so the link
-# exists by the time this role generates the manifest.
-compositor_configs_capture_icon_manifest_dest: "{{ compositor_configs_spine_config_dir }}/ags-capture/icons.json"
-# compositor_configs_icon_manifest_schema_version: the schema version stamped
-#   into the generated manifest (spine AD-16/AD-21 — one artifact, one shape,
-#   each artifact carrying its own `schemaVersion`). The authored icons.yaml
-#   stays a PURE group map (the icon-template renderer iterates every top-level
-#   key as a group, so a reserved key there would be read as a group and fail
-#   validation); the version is stamped at generation instead.
-#
-#   ONE OWNER: the role stamps THIS variable into the generated manifest (via
-#   `to_nice_json`) and the install gate passes it as `--expect-schema-version`,
-#   so the generated and deployed artifacts cannot disagree on the shape. (The
-#   `icons-json-drift` gate that also read this variable was retired with the
-#   in-repo bar bridge and now lives in `ags-apps`, whose committed
-#   `bar/icons.json` is the only committed manifest.) Bump this when the
-#   manifest shape changes; a stale committed manifest in `ags-apps` then fails
-#   its own drift gate until it is regenerated.
-compositor_configs_icon_manifest_schema_version: 1
