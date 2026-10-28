@@ -184,3 +184,70 @@ Local-only release; nothing pushed or published.
   no gate fetches either tag.
 - No app cutover, no `dotfiles-v3` change, no `hypr-pano` rename and no runtime
   pin move; `dotfiles-runtime` stays `v0.2.3`.
+
+## Follow-up closeout — clipboard cutover preparation (v0.1.20)
+
+Local-only release; nothing pushed or published. This prepares the engine for
+the first real per-app cutover without flipping the composition or provisioning
+the host.
+
+| Item | Value |
+| --- | --- |
+| Implementation commit | `ea44d91` — `feat(REQ-008): prepare the clipboard launcher and config cutover` |
+| Test-fixture fix | `9ba06d7` — `test(REQ-008): seed the clipboard spine dir for the verify fixture` |
+| Release commit | `c8f55c8` — `chore(release): prepare the clipboard cutover; v0.1.20` |
+| Merge/tag commit | `b31f2f3` — merge `ticket/REQ-008-ags-app-install-topology`; tagged |
+| Annotated tag | local `v0.1.20`, tag object `323a077`, peeled commit `b31f2f3` |
+| Engine version | `0.1.20` in `pyproject.toml`, `src/provisioning/__init__.py`, `uv.lock`; CHANGELOG `[0.1.20]` |
+
+### Cutover support landed
+
+- `cli_tools` renders **`clipboard-ui`** (was `hypr-pano-ui`): instance
+  `clipboard`, window `clipboard-window`, dir `~/.config/ags-clipboard`, log
+  `~/.local/state/ags/clipboard.log`, cold start
+  `ags-run-locked --expect-instance clipboard`, warm `ags request toggle`.
+  The install task keys on `'clipboard' in cli_tools_legacy_app_names`, so the
+  legacy launcher disappears as soon as the app list says standalone.
+- `gui_tools` carries the on-demand `clipboard` instance (was `hypr-pano`).
+- `config_links` exposes `ags-clipboard` (was `ags-hypr-pano`); the legacy-owner
+  filter drops that basename when the app list says standalone.
+- `verify` asserts `clipboard-ui` and the `ags-clipboard` managed link.
+- New fixture `tests/fixtures/ags-apps/app-list/clipboard.apps.yaml` models the
+  v3 follow-up entry and drives a real `ansible-playbook` cutover test: install
+  `<install>/apps/clipboard/<tag>`, spine link `<install>/config/ags-clipboard`,
+  XDG link `~/.config/ags-clipboard`, locked `clipboard-ui` launcher, and the
+  assets-owned `clipboard` autostart identity exactly once. The test also
+  asserts the legacy `ags-hypr-pano`/`hypr-pano-ui` surfaces are not created.
+- The old `ags_apps` monorepo role still filters `owner: legacy`; its legacy
+  live-pano link is gated on the old `hypr-pano` id, so a `clipboard`
+  standalone entry is never touched by the old role.
+
+### Gates
+
+- `make gates` → exit 0. Fast suite: **1037 passed, 3 skipped, 54 deselected**
+  (20m33s); hermetic: **1004 passed, 36 skipped, 54 deselected** (16m47s);
+  `ruff check`, `uv lock --check`, `docs-check` all pass.
+- `make ci-gates-parity` → PASS.
+- Targeted integration proof
+  (`test_verify_passes_on_a_provisioned_machine`) → **1 passed** with the
+  clipboard-managed link seeded.
+- `make build` → sdist + wheel `0.1.20`; wheel-contents check PASS.
+
+### Exact v3 follow-up (not edited here)
+
+1. **Rename and flip the app-list entry** in
+   `dotfiles-v3/dotfiles/provisioning/apps.yaml`:
+   `app: hypr-pano` → `clipboard`, `installDir: hypr-pano` → `clipboard`,
+   `owner: legacy` → `standalone` with the released `ags-clipboard` repo/tag,
+   `instance: clipboard`,
+   `configDir/configLink/spineLink/xdgLink: ags-clipboard`,
+   `launcher: clipboard-ui`, `autostart: clipboard`, `launch: on-demand`.
+2. **Bump the assets pin** to `v0.6.2` (the release whose autostart and keybind
+   already call `clipboard-ui` / `~/.config/ags-clipboard`).
+3. **Bump the engine pin** (`installer.pin` / expected engine tag) to
+   `v0.1.20`.
+4. **Apply the composition** and verify the four surfaces: `ags list` shows
+   `ags/capture/notifications/clipboard`, `SUPER+V` opens the overlay,
+   `~/.local/state/ags/clipboard.log` is written, and
+   `~/.config/ags-clipboard` resolves through
+   `<install>/config/ags-clipboard` to `<install>/apps/clipboard/<tag>`.
