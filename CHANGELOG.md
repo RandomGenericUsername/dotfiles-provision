@@ -6,6 +6,28 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-10-28
+
+### Changed
+
+- **`dotfiles-runtime` pin moves `v0.2.3` → `v0.3.0`:** the `cli_tools` role
+  installs the new runtime tag, and the `verify` mirror moves
+  `verify_runtime_version: v0.3.0` / `verify_runtime_tool_version: 0.3.0`; the
+  composition `cli-tools.yaml` fixture follows. Runtime v0.3.0 brings the
+  manifest-driven AGS palette refresh, the applied-appearance ledger, the
+  shared serialized restart/confirm lane and the clipboard namespace migration
+  (REQ-002/BUG-006), which match the final all-standalone topology this engine
+  already provisions.
+- **No other pin moves:** `ags-platform v0.3.0`, `contracts v0.3.0`,
+  `dotfiles-assets v0.6.2`, `csg v0.2.1`, `weg v0.2.0`, `itr v0.2.0` and
+  `tpr v0.1.0` are unchanged.
+
+### Notes
+
+- No host provision, no push/publish, and no `dotfiles-v3`, assets, ags-apps or
+  app-repo edits. The composition follow-up is the engine pin `v0.1.23` plus
+  its `cli-tools` runtime entry at `v0.3.0`.
+
 ## [0.1.22] - 2026-10-28
 
 ### Added
