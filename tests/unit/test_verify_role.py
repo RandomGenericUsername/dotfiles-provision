@@ -4679,6 +4679,11 @@ def _build_provisioned_layout(
         "config/color-scheme-generator/templates",
         "config/hypr",
         "config/hyprpaper",
+        # The clipboard cutover moves the managed basename from ags-hypr-pano to
+        # ags-clipboard. The fixture still models the pre-flip all-legacy list,
+        # so config_links creates this spine dir; after the flip ags_apps_units
+        # repoints it at <install>/apps/clipboard/<tag>`.
+        "config/ags-clipboard",
         # config/ags is the ags_apps live-bar SYMLINK (<install>/config/ags ->
         # the pinned unit's bar/), config/ags-capture is the live-capture SYMLINK
         # (-> the unit's capture-tool/) and config/ags-wallpaper-selector is the
