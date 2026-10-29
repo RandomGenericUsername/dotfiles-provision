@@ -2211,11 +2211,11 @@ class TestVerifyVars:
     def test_tpr_pin_and_all_three_images_are_asserted_by_execution(self) -> None:
         """REQ-010: tpr's checkout, pin record, package version and all three
         tag-qualified images (base + matugen/native) must be asserted by
-        execution. tpr v0.1.0 prints no contract token, so the executable
+        execution. tpr v0.4.0 prints no contract token, so the executable
         handshake is the exact package version; the recorded
         `verify_tpr_contract_version` is 0.4.0."""
         data = _vars()
-        assert str(data["verify_tpr_version"]) == "v0.1.0"
+        assert str(data["verify_tpr_version"]) == "v0.4.0"
         assert str(data["verify_tpr_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/tpr/"
             "{{ verify_tpr_version }}"
@@ -3939,7 +3939,7 @@ def _write_stub_binaries(home: Path) -> Path:
             "exit 0\n"
         )
         stub.chmod(0o755)
-    # tpr v0.1.0's `--version` prints ONLY the package version (no contract
+    # tpr v0.4.0's `--version` prints ONLY the package version (no contract
     # token); verify asserts it equals the tag minus `v`.
     tpr_stub = bin_dir / "tpr"
     tpr_stub.write_text(
@@ -4196,7 +4196,7 @@ def _build_provisioned_layout(
         ("csg", "verify_csg_version"),
         ("weg", "verify_weg_version"),
         ("itr", "verify_itr_version"),
-        ("theme-producer", "verify_tpr_version"),
+        ("tpr", "verify_tpr_version"),
         ("dotfiles-runtime", "verify_runtime_version"),
     ):
         cli_version = str(verify_vars[version_key])

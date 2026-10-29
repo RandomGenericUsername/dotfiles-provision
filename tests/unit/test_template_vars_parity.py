@@ -284,7 +284,7 @@ class TestPinMirrorsMatchTheManifest:
 
 
 class TestTprPinMirrors:
-    """REQ-010: tpr v0.1.0 has the same multi-leg pin shape as csg — the role
+    """REQ-010: tpr v0.4.0 has the same multi-leg pin shape as csg — the role
     mirror, the fixture CLI entry, the assets catalog source, the settings
     image tag and the verify mirror must all agree."""
 
@@ -296,8 +296,8 @@ class TestTprPinMirrors:
         assert isinstance(loaded, dict)
         return loaded
 
-    def test_all_tpr_mirrors_are_v0_1_0(self) -> None:
-        expected = "v0.1.0"
+    def test_all_tpr_mirrors_are_v0_4_0(self) -> None:
+        expected = "v0.4.0"
         cli_manifest = yaml.safe_load((manifests_dir() / "cli-tools.yaml").read_text())
         fixture_tpr = next(
             entry for entry in cli_manifest["entries"] if entry.get("name") == "tpr"

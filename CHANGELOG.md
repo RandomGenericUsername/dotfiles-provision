@@ -6,6 +6,33 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-10-28
+
+### Changed
+
+- **`tpr` pin moves `v0.1.0` → `v0.4.0`:** every theme-producer mirror moves in
+  one commit — the `cli_tools` role and the composition fixture
+  (`cli-tools.yaml`), `settings_tpr_image_tag` (the rendered
+  `tpr-settings.toml` `[container] image_tag`), `assets_tpr_pinned_tag` (and
+  the derived `tpr-templates` source in `assets.yaml`), and `verify_tpr_version`
+  with its three engine-qualified image references (`tpr-base-*`,
+  `tpr-matugen-*`, `tpr-native-*`). Theme-producer v0.4.0 brings the
+  configurable scheme policy (`scheme-smart`, profiles `balanced`/`vivid`/
+  `muted`/`source-faithful`), smart projection mode (source-luminance
+  light/dark selection) and the legacy token compatibility aliases
+  (`color_background`/`color_foreground`/`color_cursor`, zero-padded
+  `color00..15`).
+- **No other pin moves:** `csg v0.2.1`, `weg v0.2.0`, `itr v0.2.0`,
+  `dotfiles-runtime v0.3.0`, `dotfiles-assets v0.6.2`, ags-apps/ags-platform and
+  the tpr engine choice (`csg` remains the shipped default producer) are
+  unchanged.
+
+### Notes
+
+- No host provision, no tag/push, and no `dotfiles-v3`, assets or app-repo
+  edits. Consumers pick up the new pin by moving their engine pin to
+  `v0.1.25`.
+
 ## [0.1.24] - 2026-10-28
 
 ### Fixed

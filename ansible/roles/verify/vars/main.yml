@@ -390,7 +390,7 @@ verify_csg_image_references:
 #   --image-tag), and the rendered settings carry image_prefix "tpr" + the same
 #   pin, so a `latest`-only or previous-pin image fails here.
 #
-#   CONTRACT TOKEN: tpr v0.1.0's `--version` prints only the package version;
+#   CONTRACT TOKEN: tpr v0.4.0's `--version` prints only the package version;
 #   unlike csg/weg/itr it has no `contract <x>` token, so there is nothing
 #   dynamic to grep. `verify_tpr_contract_version` records the invocation
 #   contract generation this consumer expects (contracts v0.4.0) and is locked
@@ -398,7 +398,7 @@ verify_csg_image_references:
 #   version + images. The checkout dir is the cli_tools entry `name` (`tpr`),
 #   i.e. <install>/cli-tools/tpr/<tag>; the `theme-producer` name is the
 #   deployed config dir, not this source checkout.
-verify_tpr_version: v0.1.0
+verify_tpr_version: v0.4.0
 verify_tpr_checkout: "{{ verify_cli_tools_checkout_root }}/tpr/{{ verify_tpr_version }}"
 verify_tpr_pin_file: "{{ verify_cli_tools_checkout_root }}/tpr/pinned"
 verify_tpr_contract_version: 0.4.0
