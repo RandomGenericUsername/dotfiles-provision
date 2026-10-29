@@ -1,27 +1,22 @@
 ---
 id: REQ-011
-title: "Pin theme-producer v0.2.0 (prefer/fallback, lightness, light mode)"
+title: "Pin theme-producer v0.4.0 (scheme policy + smart mode + compat)"
 kind: requirement
-status: proposed
+status: in-progress
 lane: 1
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: none
+worktree: .worktrees/REQ-011/
+branch: ticket/REQ-011-tpr-v020-pin
 ---
 
 # Pin theme-producer v0.2.0
 
-> **HOLD (2026-10-28).** Do NOT touch the provisioning engine for tpr until the AGS app work is
-> finished and the user gives an explicit green. The theme producer is being tested standalone.
-> The engine v0.1.24 already contains tpr support from an earlier slice; leave it unpinned in
-> `dotfiles-v3`. Re-open this ticket only when the user asks.
-
 
 ## Requirement
 
-Move every tpr pin mirror from `v0.1.0` to `v0.2.0`; nothing else changes.
+Move every tpr pin mirror from `v0.1.0` to `v0.4.0`; nothing else changes.
 
 - `cli_tools` vars + fixture manifest entry.
 - `settings_tpr_image_tag` + rendered settings.
@@ -29,17 +24,17 @@ Move every tpr pin mirror from `v0.1.0` to `v0.2.0`; nothing else changes.
 - `verify_tpr_version` + the three image references.
 - Any test literal that asserts the tpr tag.
 
-v0.2.0 adds the source preferences, lightness controls and light-mode projections; the image tags
-are `v0.2.0`. Keep csg/weg/itr/runtime pins unchanged.
+v0.4.0 adds source preferences, lightness controls, light-mode projections, smart mode and the
+scheme policy; the image tags are `v0.4.0`. Keep csg/weg/itr/runtime pins unchanged.
 
 ## Acceptance
 
-- [ ] All tpr mirrors are `v0.2.0`; no tpr `v0.1.0` literal remains.
+- [ ] All tpr mirrors are `v0.4.0`; no tpr `v0.1.0`/`v0.2.0` literal remains.
 - [ ] `make test` (or the targeted pin/role suites) green; a full gate run recorded.
-- [ ] Engine version 0.1.23 in `pyproject.toml`/`src/provisioning/__init__.py` and `CHANGELOG.md`.
+- [ ] Engine version 0.1.25 in `pyproject.toml`/`src/provisioning/__init__.py` and `CHANGELOG.md`.
 - [ ] No dotfiles-v3 edits; no default producer flip.
 
 ## Evidence
 
-- theme-producer `v0.2.0` tag pushed.
-- Engine `v0.1.22` tpr pin surfaces.
+- theme-producer `v0.4.0` tag pushed.
+- Engine `v0.1.24` tpr pin surfaces.
