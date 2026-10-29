@@ -114,7 +114,7 @@ settings_csg_image_tag: v0.2.1
 #   fails if the manifest, this var and `roles/verify`'s `verify_tpr_version`
 #   drift. The cli_tools role builds tpr's images at exactly this tag (its
 #   build passes the pin as `THEME__CONTAINER__IMAGE_TAG`, the same value).
-settings_tpr_image_tag: v0.1.0
+settings_tpr_image_tag: v0.4.0
 
 # settings_files: the rendered settings files, one entry per tool.
 #   `template` is the .j2 filename resolved by the template module relative to

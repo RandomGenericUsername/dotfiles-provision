@@ -911,7 +911,7 @@
   when: not ansible_check_mode
 
 # REQ-010: `tpr` follows the same execution-asserted pin as csg, with THREE
-# images (base + the matugen/native engines). tpr v0.1.0 has no `contract <x>`
+# images (base + the matugen/native engines). tpr v0.4.0 has no `contract <x>`
 # token in `--version`, so the assertion is the exact package version (the tag
 # without its leading `v`) plus the tag-qualified image set. The rendered
 # settings carry `image_prefix = "tpr"` and the same pin, so a missing image or
@@ -972,7 +972,7 @@
       and ALL THREE images ({{ verify_tpr_image_references | join(', ') }})
       present — base plus matugen/native at the pin (AD-7: the image tag IS the
       pin, never `latest`). The invocation-contract generation this consumer
-      expects is {{ verify_tpr_contract_version }} (tpr v0.1.0 prints no
+      expects is {{ verify_tpr_contract_version }} (tpr v0.4.0 prints no
       contract token). Observed:
       rc={{ verify_tpr_version_check.rc | default('n/a', true) }},
       stdout={{ verify_tpr_version_check.stdout | default('', true) | trim }},

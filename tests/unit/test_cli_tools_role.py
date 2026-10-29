@@ -594,7 +594,7 @@ class TestCliToolsImageBuildTasks:
             "weg's install verb takes --image-tag; csg and tpr do not, so they "
             "must be built through the env transport"
         )
-        expected_tags = {"csg": "v0.2.1", "weg": "v0.2.0", "tpr": "v0.1.0"}
+        expected_tags = {"csg": "v0.2.1", "weg": "v0.2.0", "tpr": "v0.4.0"}
         for entry in _cli_tools_image_builds():
             assert entry.get("tag") == expected_tags[str(entry.get("name"))], (
                 f"{entry.get('name')} image tag must be the pinned repo tag"
@@ -985,7 +985,7 @@ class TestCliToolsPinnedCheckout:
         assert pinned[3]["repo"] == (
             "https://github.com/RandomGenericUsername/theme-producer"
         )
-        assert pinned[3]["tag"] == "v0.1.0"
+        assert pinned[3]["tag"] == "v0.4.0"
         assert pinned[4]["repo"] == (
             "https://github.com/RandomGenericUsername/dotfiles-runtime"
         )
@@ -1150,7 +1150,7 @@ class TestCliToolsVars:
             "image builds must be exactly the container-mode CLIs"
         )
         by_name = {str(b["name"]): b for b in builds}
-        expected_tags = {"csg": "v0.2.1", "weg": "v0.2.0", "tpr": "v0.1.0"}
+        expected_tags = {"csg": "v0.2.1", "weg": "v0.2.0", "tpr": "v0.4.0"}
         for name in ("csg", "weg", "tpr"):
             assert by_name[name].get("repo") and by_name[name].get("tag") == expected_tags[name], (
                 f"{name} is pinned — its build context is the tag-qualified "
