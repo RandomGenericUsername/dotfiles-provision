@@ -2,13 +2,13 @@
 id: REQ-011
 title: "Pin theme-producer v0.4.0 (scheme policy + smart mode + compat)"
 kind: requirement
-status: in-progress
+status: done
 lane: 1
 links:
   openspec: none
   bmad: none
 worktree: .worktrees/REQ-011/
-branch: ticket/REQ-011-tpr-v020-pin
+branch: ticket/REQ-011-tpr-v040-pin
 ---
 
 # Pin theme-producer v0.2.0
