@@ -26,6 +26,10 @@
 
 - [REQ-011-tpr-v020-pin](./REQ-011-tpr-v020-pin/ticket.md) — Pin theme-producer v0.4.0 | `done` | tag: v0.1.25
 
+## Requirements
+
+- [REQ-012-runtime-v040-pin](./REQ-012-runtime-v040-pin/ticket.md) — Pin dotfiles-runtime v0.4.0 (producer seam) | `in-progress` | worktree: .worktrees/REQ-012/ | branch: ticket/REQ-012-runtime-v040-pin
+
 ## Ops tasks
 
 - [OPS-001-bootstrap-order-tpr-path](./OPS-001-bootstrap-order-tpr-path/ticket.md) — Fix bootstrap order and the tpr checkout path | `done` | worktree none, branch main | tag: v0.1.24
