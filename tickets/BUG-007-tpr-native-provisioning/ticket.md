@@ -2,14 +2,14 @@
 id: BUG-007
 title: "tpr native engine is not provisioned: bootstrap is green, first tpr wallpaper set fails"
 kind: bug
-status: proposed
+status: in-progress
 lane: 2
 severity: high
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: none
+worktree: .worktrees/REQ-013/
+branch: ticket/REQ-013-bootstrap-producer-and-rofi
 repro: "Bootstrap with RUNTIME_PALETTE_PRODUCER=tpr, then run `RUNTIME__PALETTE__PRODUCER=tpr RUNTIME__PALETTE__TPR_ENGINE=native dotfiles-runtime wallpaper set <image>` on the fresh host. It fails with EngineUnavailableError because tpr-native is not on PATH."
 observed: "2026-10-29: after bootstrap, `tpr list-engines` reported native available=false; the first tpr set failed with `engine 'native' is not available on this host`; after manually installing the prebuilt theme-producer `native/target/release/tpr-native` (0.1.0) to ~/.local/bin, the same set succeeded and produced the tpr cache entry."
 expected: "A bootstrap that selects tpr/native installs or otherwise provides a usable native engine, and `verify` fails if a selected producer cannot generate a palette."
@@ -104,6 +104,29 @@ does not extract or install the helper.
    accepting rc 1 and leaving a broken first wallpaper set.
 
 Do not make the manual `~/.local/bin` copy the only supported path.
+
+## Triage decision (2026-10-29)
+
+The proper fix is **container mode**, not a host `tpr-native` extraction.
+`tpr-native-podman:v0.4.0` already contains both `tpr` and `tpr-native`; the
+adapter was overriding the provisioned `[runtime].mode = "container"` with
+`local`. A container-mode prototype produced the same eight artifacts as the
+verified local tpr entry. This keeps the “host never installs backend binaries”
+contract and removes the manual `~/.local/bin` copy.
+
+Implementation split:
+
+- `dotfiles-runtime` REQ-005 — stop forcing local, pin the spine templates dir,
+  use container native; release runtime.
+- `dotfiles-runtime` REQ-004 — producer config (also fixes the seed env
+  mismatch); release runtime.
+- `dotfiles-provision` — render `config/dotfiles-runtime/producer.json`, remove
+  env.d/unit producer authority, remove the native-helper requirement, add a
+  real bounded tpr generate in verify when the selected producer is tpr, and
+  bump the runtime pin.
+- runtime-seed no longer needs producer env; see BUG-008.
+- BUG-006 remains separate: the rofi pre/post-seed exposure and missing verify
+  consumer link are independent of the native engine.
 
 ## Done-when
 

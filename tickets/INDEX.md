@@ -17,8 +17,9 @@
 - [BUG-003-consume-ags-apps-v042/ticket.md](./BUG-003-consume-ags-apps-v042/ticket.md) — consume ags-apps v0.4.2 (color thumbnails) + release v0.1.12 | severity: low | `done` | worktree .worktrees/BUG-003, branch ticket/BUG-003-consume-ags-apps-v042
 - [BUG-004-sddm-wayland-greeter/ticket.md](./BUG-004-sddm-wayland-greeter/ticket.md) — SDDM Wayland greeter has no compositor (90 s session bounce) | severity: high | `done` | worktree .worktrees/BUG-004, branch ticket/BUG-004-sddm-wayland-greeter | tag: v0.1.13
 - [BUG-005-sddm-logout-greeter-crash/ticket.md](./BUG-005-sddm-logout-greeter-crash/ticket.md) — Logout leaves a black VT; sddm-helper exits 1 and the greeter never restarts (5-login acceptance blocked) | severity: high | `done` | worktree .worktrees/BUG-005, branch ticket/BUG-005-sddm-logout-greeter-crash | resolved in assets v0.6.1 (engine v0.1.16, PIN-0115); 3/5 formal acceptance, user-waived
-- [BUG-006-rofi-post-bootstrap-colors](./BUG-006-rofi-post-bootstrap-colors/ticket.md) — Rofi cannot launch after bootstrap until the first wallpaper set creates colors.rasi | severity: high | `proposed` | investigation; no worktree
-- [BUG-007-tpr-native-provisioning](./BUG-007-tpr-native-provisioning/ticket.md) — tpr native engine is not provisioned: bootstrap is green, first tpr wallpaper set fails | severity: high | `proposed` | investigation; no worktree
+- [BUG-006-rofi-post-bootstrap-colors](./BUG-006-rofi-post-bootstrap-colors/ticket.md) — Rofi cannot launch after bootstrap until the first wallpaper set creates colors.rasi | severity: high | `in-progress` | worktree .worktrees/REQ-013, branch ticket/REQ-013-bootstrap-producer-and-rofi
+- [BUG-008-runtime-seed-producer-env](./BUG-008-runtime-seed-producer-env/ticket.md) — runtime-seed ignores the configured palette producer (single/double underscore mismatch) | severity: high | `in-progress` | worktree .worktrees/REQ-013, branch ticket/REQ-013-bootstrap-producer-and-rofi
+- [BUG-007-tpr-native-provisioning](./BUG-007-tpr-native-provisioning/ticket.md) — tpr native engine is not provisioned: bootstrap is green, first tpr wallpaper set fails | severity: high | `in-progress` | worktree .worktrees/REQ-013, branch ticket/REQ-013-bootstrap-producer-and-rofi | decided: container mode
 
 ## Requirements
 

@@ -2,14 +2,14 @@
 id: BUG-006
 title: "Rofi cannot launch after bootstrap until the first wallpaper set creates colors.rasi"
 kind: bug
-status: proposed
+status: in-progress
 lane: 2
 severity: high
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: none
+worktree: .worktrees/REQ-013/
+branch: ticket/REQ-013-bootstrap-producer-and-rofi
 repro: "Fresh bootstrap, then launch rofi before a wallpaper set has created ~/.config/rofi/colors.rasi; rofi exits with a theme parse error. Removing the symlink reproduces it on the live host."
 observed: "2026-10-29 after the tpr/bootstrap cutover the user launched rofi and it failed; no screenshot was captured. The runtime-generated consumer symlink ~/.config/rofi/colors.rasi was recreated at 17:58:30 by a later wallpaper set, after which rofi works. Controlled repro: with the symlink removed, rofi reports `Failed to open theme: .../colors.rasi`, `No such file or directory`, and unresolved color01/color04/background/foreground variables; with it restored, rofi opens (timeout 124, empty stderr)."
 expected: "After `bootstrap.sh` returns, every provisioned launcher exposes a usable palette: rofi opens with no theme parse error, even before the user manually switches wallpaper."
@@ -115,6 +115,37 @@ minimum fix:
 - [ ] The fix is owned by `dotfiles-provision`; any rofi fallback change is
   cross-linked to `dotfiles-assets`, and any consumer-link change to
   `dotfiles-runtime`.
+
+## Triage findings / decided fix (2026-10-29)
+
+The failure is a real pre-seed exposure window plus a missing gate:
+
+- `config_links` includes `rofi` and runs **before** `runtime-seed`; rofi’s
+  `launcher/config.rasi:1` hard-imports `colors.rasi`, which runtime-seed owns.
+- `verify_consumer_symlinks` currently asserts only the AGS link, not rofi (or
+  gtk/btop), so a missing rofi palette link can pass verify.
+- runtime-seed accepts rc 1 and only asserts rc; it does not prove fresh state
+  or consumer links.
+
+Proper fix (owner `dotfiles-provision`; runtime remains the config/link owner):
+
+1. Split `config_links` into pre-seed settings links (`hypr`, `hyprpaper`,
+   `nvim`, `starship`, `wlogout`, `zsh`, `kitty`, `color-scheme-generator`,
+   `weg`, `itr`, `theme-producer`) and post-seed palette-consumer links
+   (`gtk-3.0`, `gtk-4.0`, `rofi`, `btop`). Bootstrap order:
+   config-links → runtime-seed → config-links-post-seed → display-manager →
+   verify.
+   Do not move the whole seed before config-links; the CLIs discover their
+   settings through `~/.config/<tool>`.
+2. runtime-seed: capture pre-state; after the set assert `current.json`
+   advanced, the rofi link resolves, and all runtime consumer links exist.
+   Accept rc 1 only when a fresh state/complete link set was produced; otherwise
+   fail with the missing path.
+3. verify: add rofi (and preferably gtk-3.0, gtk-4.0, btop) to
+   `verify_consumer_symlinks`; assert the link is a symlink resolving under
+   `dotfiles/current`.
+4. A rofi fallback in assets is optional defense-in-depth only; it cannot
+   replace the link/seed assertions.
 
 ## Cross-references
 
