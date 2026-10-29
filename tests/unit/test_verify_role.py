@@ -1987,8 +1987,8 @@ class TestVerifyVars:
         so verify uses the `version` subcommand and asserts the exact tool
         version (the tag without its leading `v`)."""
         data = _vars()
-        assert str(data["verify_runtime_version"]) == "v0.3.0"
-        assert str(data["verify_runtime_tool_version"]) == "0.3.0"
+        assert str(data["verify_runtime_version"]) == "v0.4.0"
+        assert str(data["verify_runtime_tool_version"]) == "0.4.0"
         assert str(data["verify_runtime_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/"
             "{{ verify_runtime_version }}"
@@ -2656,15 +2656,15 @@ class TestVerifyAgsPinMirror:
 class TestVerifyRuntimePinMirror:
     """REQ-009: the runtime pin is one version across role, verify and fixture.
 
-    v0.3.0 reports an absent optional intent root as `optional_absent` instead
-    of degrading watch health (BUG-005). The installer pin, its hand-maintained
-    verify mirror and the fixture manifest are separate literals, so this guard
-    fails while any leg still says v0.2.2. `verify_runtime_tool_version` is the
-    tag without its leading `v` — the runtime's `version` subcommand prints
-    package metadata, not the tag.
+    v0.4.0 adds the palette producer seam (`TprAdapter`, `THEME__` allowlist,
+    producer fingerprint in the cache key, `RUNTIME__PALETTE__PRODUCER` default
+    `csg`). The installer pin, its hand-maintained verify mirror and the fixture
+    manifest are separate literals, so this guard fails while any leg still says
+    v0.3.0. `verify_runtime_tool_version` is the tag without its leading `v` —
+    the runtime's `version` subcommand prints package metadata, not the tag.
     """
 
-    def test_engine_consumes_runtime_v0_3_0(self) -> None:
+    def test_engine_consumes_runtime_v0_4_0(self) -> None:
         verify_vars = _vars()
         cli_tools_vars = _sibling_vars("cli_tools")
         runtime = next(
@@ -2672,17 +2672,17 @@ class TestVerifyRuntimePinMirror:
             for entry in cli_tools_vars["cli_tools"]
             if entry["name"] == "dotfiles-runtime"
         )
-        assert runtime["tag"] == "v0.3.0", (
-            "the cli_tools role must install dotfiles-runtime v0.3.0 "
-            f"(manifest refresh + clipboard migration); got {runtime['tag']!r}"
+        assert runtime["tag"] == "v0.4.0", (
+            "the cli_tools role must install dotfiles-runtime v0.4.0 "
+            f"(palette producer seam); got {runtime['tag']!r}"
         )
-        assert verify_vars["verify_runtime_version"] == "v0.3.0", (
-            "verify_runtime_version must mirror the role pin v0.3.0; got "
+        assert verify_vars["verify_runtime_version"] == "v0.4.0", (
+            "verify_runtime_version must mirror the role pin v0.4.0; got "
             f"{verify_vars['verify_runtime_version']!r}"
         )
-        assert verify_vars["verify_runtime_tool_version"] == "0.3.0", (
+        assert verify_vars["verify_runtime_tool_version"] == "0.4.0", (
             "verify_runtime_tool_version must be the tag without its leading "
-            f"'v' (0.3.0); got {verify_vars['verify_runtime_tool_version']!r}"
+            f"'v' (0.4.0); got {verify_vars['verify_runtime_tool_version']!r}"
         )
         fixture = yaml.safe_load(
             (
@@ -2697,9 +2697,9 @@ class TestVerifyRuntimePinMirror:
             for entry in fixture["entries"]
             if entry["name"] == "dotfiles-runtime"
         )
-        assert fixture_runtime["tag"] == "v0.3.0", (
+        assert fixture_runtime["tag"] == "v0.4.0", (
             "the fixture cli-tools.yaml runtime tag must mirror the role pin "
-            f"v0.3.0; got {fixture_runtime['tag']!r}"
+            f"v0.4.0; got {fixture_runtime['tag']!r}"
         )
 
     def test_tool_version_is_the_tag_without_its_prefix(self) -> None:

@@ -6,6 +6,26 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-10-29
+
+### Changed
+
+- **`dotfiles-runtime` pin moves `v0.3.0` → `v0.4.0`:** the `cli_tools` role and
+  the composition fixture (`cli-tools.yaml`) install the new runtime tag, and
+  the `verify` mirror moves `verify_runtime_version: v0.4.0` /
+  `verify_runtime_tool_version: 0.4.0`. Runtime v0.4.0 adds the palette producer
+  seam (`TprAdapter`, the `THEME__` allowlist, the producer fingerprint in the
+  cache key and `RUNTIME__PALETTE__PRODUCER` defaulting to `csg`). The engine
+  only consumes the tag; no producer is activated here.
+- **No other pin moves:** `csg v0.2.1`, `weg v0.2.0`, `itr v0.2.0`,
+  `tpr v0.4.0`, `dotfiles-assets v0.6.2`, ags-apps/ags-platform and the tpr
+  engine choice (`csg` remains the shipped default producer) are unchanged.
+
+### Notes
+
+- No host provision, no tag/push, and no `dotfiles-v3`, assets or app-repo
+  edits. Consumers pick up the new pin by moving their engine pin to `v0.1.26`.
+
 ## [0.1.25] - 2026-10-28
 
 ### Changed
