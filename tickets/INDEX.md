@@ -28,7 +28,7 @@
 
 ## Requirements
 
-- [REQ-012-runtime-v040-pin](./REQ-012-runtime-v040-pin/ticket.md) — Pin dotfiles-runtime v0.4.0 (producer seam) | `in-progress` | worktree: .worktrees/REQ-012/ | branch: ticket/REQ-012-runtime-v040-pin
+- [REQ-012-runtime-v040-pin](./REQ-012-runtime-v040-pin/ticket.md) — Pin dotfiles-runtime v0.4.0 (producer seam) | `done` | tag: v0.1.26
 
 ## Ops tasks
 

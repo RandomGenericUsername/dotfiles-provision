@@ -2,7 +2,7 @@
 id: REQ-012
 title: "Pin dotfiles-runtime v0.4.0 (producer seam)"
 kind: requirement
-status: in-progress
+status: done
 lane: 1
 links:
   openspec: none
