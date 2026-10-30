@@ -2,7 +2,7 @@
 id: BUG-007
 title: "tpr native engine is not provisioned: bootstrap is green, first tpr wallpaper set fails"
 kind: bug
-status: in-progress
+status: done
 lane: 2
 severity: high
 links:
@@ -147,3 +147,12 @@ Implementation split:
   set; a failed tpr runtime-seed is a candidate cause.
 - `dotfiles-runtime` REQ-003 — producer seam; `TprAdapter` local mode.
 - `theme-producer` native engine packaging/`tpr install` behavior.
+
+## Closeout evidence (2026-10-30)
+
+- Engine `v0.1.27` deployed; `producer.json` is tpr/native/container; no
+  environment.d producer file and no unit Environment= producer.
+- The manual `~/.local/bin/tpr-native` was removed; tpr still generated through
+  the pinned native image (selector-CWD set succeeded).
+- Verify/bootstrap completed green; the tpr container smoke is in the verify
+  path.

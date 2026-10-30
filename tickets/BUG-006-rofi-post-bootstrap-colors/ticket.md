@@ -2,7 +2,7 @@
 id: BUG-006
 title: "Rofi cannot launch after bootstrap until the first wallpaper set creates colors.rasi"
 kind: bug
-status: in-progress
+status: done
 lane: 2
 severity: high
 links:
@@ -153,3 +153,11 @@ Proper fix (owner `dotfiles-provision`; runtime remains the config/link owner):
   cause of a failed tpr runtime-seed.
 - `dotfiles-runtime` consumer-symlink seeding (`wallpaper set` / `reconcile`).
 - `dotfiles-assets` rofi `launcher/config.rasi` hard import.
+
+## Closeout evidence (2026-10-30)
+
+- Bootstrap completed with the post-seed config-links phase; rofi
+  `colors.rasi` exists and resolves to the current palette (created 07:56:42).
+- `rofi -config ~/.config/rofi/launcher/config.rasi -show drun` opened with rc
+  124 (timeout after open) and empty stderr, immediately after bootstrap.
+- No manual ``ln -s``/wallpaper set was used to create the link.

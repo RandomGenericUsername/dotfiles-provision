@@ -2,7 +2,7 @@
 id: BUG-008
 title: "runtime-seed ignores the configured palette producer (single/double underscore mismatch)"
 kind: bug
-status: in-progress
+status: done
 lane: 2
 severity: high
 links:
@@ -61,3 +61,11 @@ runtime-owned config file read by every composition root:
 - `dotfiles-runtime` REQ-004 — producer config reader.
 - `dotfiles-provision` BUG-007 — tpr container/verify/pin changes.
 - `dotfiles-provision` BUG-006 — rofi pre/post-seed exposure.
+
+## Closeout evidence (2026-10-30)
+
+- Bootstrap produced the tpr producer config and a tpr palette (`01c9360b…`)
+  during runtime-seed; the old single/double underscore env was not used.
+- `inspect producer` with ambient `RUNTIME__PALETTE__PRODUCER=csg` reports the
+  config as authoritative and the env as ignored.
+- Seed/tests prove config-before-seed and no producer env injection.
