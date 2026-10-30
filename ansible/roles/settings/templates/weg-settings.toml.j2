@@ -27,7 +27,8 @@ mode = "container"
 [container]
 engine = "{{ container_runtime_engine }}"
 image_name = "weg"
-# AD-7: the tag is the pinned repo tag (settings_weg_image_tag, mirror of the
-# cli-tools manifest `weg.tag`) — never "latest".
+# AD-7: the tag is the pinned repo tag (settings_weg_image_tag, derived from the
+# `cli_tools_tags.weg` fact the cli_tools role publishes from the cli-tools
+# manifest `weg.tag`) — never "latest".
 image_tag = "{{ settings_weg_image_tag }}"
 image_registry = ""

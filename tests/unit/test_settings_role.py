@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.support import manifests_dir
+from tests.support import cli_tool_tags, manifests_dir, render_pin
 
 
 def _find_ansible_dir() -> Path:
@@ -653,6 +653,7 @@ class TestSettingsPlaybook:
                         *extra,
                         "-e",
                         f"install_dir={install}",
+                        *_cli_tags_extra_vars(),
                     ],
                     capture_output=True,
                     text=True,
@@ -719,7 +720,9 @@ class TestSettingsPlaybook:
             assert tpr["generation"]["engine"] == "native"
             assert tpr["runtime"]["mode"] == "container"
             assert tpr["container"]["image_prefix"] == "tpr"
-            assert tpr["container"]["image_tag"] == _vars()["settings_tpr_image_tag"]
+            assert tpr["container"]["image_tag"] == render_pin(
+                _vars()["settings_tpr_image_tag"]
+            )
             assert tpr["container"]["timeout_seconds"] == 300
             assert tpr["container"]["memory_limit"] == "512m"
 
@@ -776,7 +779,14 @@ class TestSettingsPlaybook:
             if env_engine is not None:
                 env["DOTFILES_CONTAINER_ENGINE"] = env_engine
             result = subprocess.run(
-                [ansible_playbook, str(self._PATH), "-e", f"install_dir={install}", *extra],
+                [
+                    ansible_playbook,
+                    str(self._PATH),
+                    "-e",
+                    f"install_dir={install}",
+                    *_cli_tags_extra_vars(),
+                    *extra,
+                ],
                 capture_output=True,
                 text=True,
                 env=env,
@@ -838,6 +848,7 @@ class TestSettingsPlaybook:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    *_cli_tags_extra_vars(),
                 ],
                 capture_output=True,
                 text=True,
@@ -884,6 +895,7 @@ class TestSettingsPlaybook:
                     str(self._PATH),
                     "-e",
                     f"install_dir={install}",
+                    *_cli_tags_extra_vars(),
                 ],
                 capture_output=True,
                 text=True,
@@ -918,6 +930,18 @@ class TestSettingsPlaybook:
                     + "\nstderr:\n"
                     + gate.stderr
                 )
+
+
+def _cli_tags_extra_vars() -> list[str]:
+    """The `cli_tools_tags` fact a real bootstrap already has by settings time.
+
+    REQ-014: the image-tag vars derive from that fact, so a direct
+    `settings.yaml` run (as these execution tests do) supplies it the same way
+    the `cli_tools` role would — from the composition manifest.
+    """
+    import json
+
+    return ["-e", json.dumps({"cli_tools_tags": cli_tool_tags()})]
 
 
 def _test_env(**overrides: str) -> dict[str, str]:
@@ -982,10 +1006,12 @@ class TestSettingsImageTag:
 
     def test_image_tag_mirrors_the_manifest_pin(self) -> None:
         data = _vars()
-        assert data["settings_weg_image_tag"] == self._manifest_weg_tag(), (
-            "settings_weg_image_tag must mirror the `weg` tag in "
-            "dotfiles/provisioning/cli-tools.yaml (AD-7/AD-10/AD-11)"
+        assert str(data["settings_weg_image_tag"]) == "{{ cli_tools_tags.weg }}", (
+            "settings_weg_image_tag must DERIVE from the cli_tools_tags fact "
+            "the cli_tools role publishes from "
+            f"dotfiles/provisioning/cli-tools.yaml; got {data['settings_weg_image_tag']!r}"
         )
+        assert render_pin(data["settings_weg_image_tag"]) == self._manifest_weg_tag()
         template = (_TEMPLATES_DIR / "weg-settings.toml.j2").read_text()
         assert 'image_tag = "{{ settings_weg_image_tag }}"' in template, (
             "the WEG template must render the pin, not a literal"
@@ -999,9 +1025,11 @@ class TestSettingsImageTag:
             (_ANSIBLE_DIR / "roles" / "verify" / "vars" / "main.yml").read_text()
         )
         assert verify_vars["verify_weg_version"] == _vars()["settings_weg_image_tag"], (
-            "verify_weg_version must mirror the rendered image tag — verify "
-            "asserts the image exists at exactly that tag (AD-11)"
+            "verify_weg_version must derive from the same cli_tools_tags fact as "
+            "the rendered image tag — verify asserts the image exists at exactly "
+            "that tag (AD-11)"
         )
+        assert render_pin(verify_vars["verify_weg_version"]) == self._manifest_weg_tag()
         assert "verify_weg_version" in str(verify_vars["verify_weg_image_reference"]), (
             "the image reference verify probes must be derived from the pin"
         )
@@ -1034,6 +1062,7 @@ class TestSettingsImageTag:
                         str(self._PLAYBOOK),
                         "-e",
                         f"install_dir={install}",
+                        *_cli_tags_extra_vars(),
                         "-e",
                         f"settings_weg_image_tag={tag}",
                     ],
@@ -1070,10 +1099,12 @@ class TestSettingsCsgImageTag:
 
     def test_image_tag_mirrors_the_manifest_pin(self) -> None:
         data = _vars()
-        assert data["settings_csg_image_tag"] == self._manifest_csg_tag(), (
-            "settings_csg_image_tag must mirror the `csg` tag in "
-            "dotfiles/provisioning/cli-tools.yaml (AD-7/AD-10/AD-11)"
+        assert str(data["settings_csg_image_tag"]) == "{{ cli_tools_tags.csg }}", (
+            "settings_csg_image_tag must DERIVE from the cli_tools_tags fact "
+            "the cli_tools role publishes from "
+            f"dotfiles/provisioning/cli-tools.yaml; got {data['settings_csg_image_tag']!r}"
         )
+        assert render_pin(data["settings_csg_image_tag"]) == self._manifest_csg_tag()
         template = (_TEMPLATES_DIR / "csg-settings.toml.j2").read_text()
         assert 'image_tag = "{{ settings_csg_image_tag }}"' in template, (
             "the CSG template must render the pin, not a literal"
@@ -1087,10 +1118,11 @@ class TestSettingsCsgImageTag:
             (_ANSIBLE_DIR / "roles" / "verify" / "vars" / "main.yml").read_text()
         )
         assert verify_vars["verify_csg_version"] == _vars()["settings_csg_image_tag"], (
-            "verify_csg_version must mirror the rendered image tag — verify "
-            "asserts csg's base + backend images exist at exactly that tag "
-            "(AD-11)"
+            "verify_csg_version must derive from the same cli_tools_tags fact as "
+            "the rendered image tag — verify asserts csg's base + backend images "
+            "exist at exactly that tag (AD-11)"
         )
+        assert render_pin(verify_vars["verify_csg_version"]) == self._manifest_csg_tag()
         references = " ".join(str(r) for r in verify_vars["verify_csg_image_references"])
         assert "verify_csg_version" in references, (
             "every csg image reference verify probes must be derived from the pin"
@@ -1125,6 +1157,7 @@ class TestSettingsCsgImageTag:
                         str(self._PLAYBOOK),
                         "-e",
                         f"install_dir={install}",
+                        *_cli_tags_extra_vars(),
                         "-e",
                         f"settings_csg_image_tag={tag}",
                     ],
@@ -1161,10 +1194,12 @@ class TestSettingsTprImageTag:
 
     def test_image_tag_mirrors_the_manifest_pin(self) -> None:
         data = _vars()
-        assert data["settings_tpr_image_tag"] == self._manifest_tpr_tag(), (
-            "settings_tpr_image_tag must mirror the `tpr` tag in "
-            "dotfiles/provisioning/cli-tools.yaml (AD-7/AD-10/AD-11)"
+        assert str(data["settings_tpr_image_tag"]) == "{{ cli_tools_tags.tpr }}", (
+            "settings_tpr_image_tag must DERIVE from the cli_tools_tags fact "
+            "the cli_tools role publishes from "
+            f"dotfiles/provisioning/cli-tools.yaml; got {data['settings_tpr_image_tag']!r}"
         )
+        assert render_pin(data["settings_tpr_image_tag"]) == self._manifest_tpr_tag()
         template = (_TEMPLATES_DIR / "tpr-settings.toml.j2").read_text()
         assert 'image_tag = "{{ settings_tpr_image_tag }}"' in template, (
             "the TPR template must render the pin, not a literal"
@@ -1178,9 +1213,11 @@ class TestSettingsTprImageTag:
             (_ANSIBLE_DIR / "roles" / "verify" / "vars" / "main.yml").read_text()
         )
         assert verify_vars["verify_tpr_version"] == _vars()["settings_tpr_image_tag"], (
-            "verify_tpr_version must mirror the rendered image tag — verify "
-            "asserts tpr's base + engine images exist at exactly that tag (AD-11)"
+            "verify_tpr_version must derive from the same cli_tools_tags fact as "
+            "the rendered image tag — verify asserts tpr's base + engine images "
+            "exist at exactly that tag (AD-11)"
         )
+        assert render_pin(verify_vars["verify_tpr_version"]) == self._manifest_tpr_tag()
         references = " ".join(str(r) for r in verify_vars["verify_tpr_image_references"])
         assert "verify_tpr_version" in references, (
             "every tpr image reference verify probes must be derived from the pin"
@@ -1214,6 +1251,7 @@ class TestSettingsTprImageTag:
                         str(self._PLAYBOOK),
                         "-e",
                         f"install_dir={install}",
+                        *_cli_tags_extra_vars(),
                         "-e",
                         f"settings_tpr_image_tag={tag}",
                     ],

@@ -116,7 +116,7 @@ cli_tools_image_tag_env_keys:
   tpr: THEME__CONTAINER__IMAGE_TAG
 
 # Context transport: csg's install verb takes the pinned checkout on argv
-# (`--context`), but tpr v0.4.0's install verb has NO --context option — it
+# (`--context`), but tpr's install verb has NO --context option — it
 # resolves the build context through oci_runtime, whose explicit override for
 # tpr is THEME_PRODUCER_SOURCE_ROOT. This map names the tools whose checkout is
 # passed by env instead of argv; the env-tag build loop is split on it so the

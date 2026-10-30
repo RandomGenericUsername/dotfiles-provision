@@ -54,11 +54,59 @@ def composition_file(*parts: str) -> Path:
     return composition_root().joinpath(*parts)
 
 
+def cli_tool_tags() -> dict[str, str]:
+    """Return the composition's ``cli_tools_tags`` fact (name → tag).
+
+    The ``cli_tools`` role resolves this mapping from
+    ``dotfiles/provisioning/cli-tools.yaml`` and publishes it with ``set_fact``
+    for the later bootstrap roles (REQ-014). Tests use the same composition
+    manifest the role reads, so a fixture tag bump flows through every
+    derivation assertion without a second edit.
+    """
+    import yaml
+
+    loaded = yaml.safe_load(manifest("cli-tools.yaml").read_text())
+    entries = loaded.get("entries") or []
+    return {
+        str(entry["name"]): str(entry["tag"])
+        for entry in entries
+        if entry.get("tag") is not None
+    }
+
+
+def render_pin(expression: object, *, tags: dict[str, str] | None = None, **context: object) -> str:
+    """Render a role-var Jinja expression with a sample ``cli_tools_tags``.
+
+    Role vars that used to carry a literal pin now read
+    ``{{ cli_tools_tags.<name> }}`` (REQ-014). Asserting the raw string proves
+    the source; rendering it with the composition's tags (or an explicit
+    ``tags=`` sample) proves the resolved value a bootstrap would see.
+    ``context`` supplies any other variable the expression references (e.g.
+    ``install_dir``). ``regex_replace`` is Ansible's filter, not Jinja's, so it
+    is registered here.
+    """
+    import re
+
+    from jinja2 import Environment, StrictUndefined
+
+    env = Environment(undefined=StrictUndefined, keep_trailing_newline=True)
+    env.filters["regex_replace"] = lambda value, pattern, repl: re.sub(
+        pattern, repl, str(value)
+    )
+    values: dict[str, object] = {
+        "cli_tools_tags": cli_tool_tags() if tags is None else dict(tags),
+    }
+    values.update(context)
+    return env.from_string(str(expression)).render(**values)
+
+
 __all__ = [
     "ENGINE_ROOT",
     "FIXTURE_COMPOSITION",
+    "cli_tool_tags",
     "composition_file",
     "composition_root",
     "manifest",
     "manifests_dir",
+    "render_pin",
 ]

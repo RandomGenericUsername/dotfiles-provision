@@ -24,5 +24,10 @@
 - name: Render per-tool settings files
   hosts: localhost
   gather_facts: true
+  # REQ-014: the image tags derive from the `cli_tools_tags` fact; a standalone
+  # run (no prior cli_tools play) resolves it from the manifest.
+  pre_tasks:
+    - name: Publish the CLI pin tags when the cli_tools fact is absent
+      ansible.builtin.import_tasks: _publish_cli_tool_tags.yml
   roles:
     - settings

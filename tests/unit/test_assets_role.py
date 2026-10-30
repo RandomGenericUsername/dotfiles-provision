@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from provisioning.domain.enums import AssetKind
-from tests.support import composition_root
+from tests.support import composition_root, render_pin
 
 
 def _find_ansible_dir() -> Path:
@@ -723,6 +723,8 @@ class TestAssetsVars:
             )
             text = text.replace("{{ assets_csg_pinned_tag }}", "<tag>")
             text = text.replace("{{ assets_tpr_pinned_tag }}", "<tag>")
+            text = text.replace("{{ cli_tools_tags.csg }}", "<tag>")
+            text = text.replace("{{ cli_tools_tags.tpr }}", "<tag>")
             text = text.replace("{{ assets_pinned_tag }}", "<tag>")
             text = text.replace("{{ install_dir | trim }}", "<install>")
             text = text.replace(str(data["assets_pinned_tag"]), "<tag>")
@@ -736,9 +738,13 @@ class TestAssetsVars:
             if kind is not AssetKind.WALLPAPER and kind is not AssetKind.WEG_EFFECTS
         }
         csg_manifest_source = str(manifest["csg-templates"]["source"])
-        csg_pin = csg_manifest_source.split("/cli-tools/csg/")[1].split("/", 1)[0]
+        csg_pin = render_pin(
+            csg_manifest_source.split("/cli-tools/csg/")[1].split("/", 1)[0]
+        )
         tpr_manifest_source = str(manifest["tpr-templates"]["source"])
-        tpr_pin = tpr_manifest_source.split("/cli-tools/tpr/")[1].split("/", 1)[0]
+        tpr_pin = render_pin(
+            tpr_manifest_source.split("/cli-tools/tpr/")[1].split("/", 1)[0]
+        )
         for entry in copies:
             manifest_entry = manifest[entry["name"]]
             assert entry["kind"] == manifest_entry["kind"], (
@@ -759,13 +765,21 @@ class TestAssetsVars:
                 "config-in-spine relocation for csg-templates)"
             )
 
-        assert str(data["assets_csg_pinned_tag"]) == csg_pin, (
-            "assets_csg_pinned_tag must mirror the manifest csg pin — the "
-            "csg-templates source is derived from it (spine AD-10/AD-11)"
+        assert str(data["assets_csg_pinned_tag"]) == "{{ cli_tools_tags.csg }}", (
+            "assets_csg_pinned_tag must DERIVE from the cli_tools_tags fact — "
+            "the csg-templates source is derived from it (spine AD-10/AD-11)"
         )
-        assert str(data["assets_tpr_pinned_tag"]) == tpr_pin, (
-            "assets_tpr_pinned_tag must mirror the manifest tpr pin — the "
-            "tpr-templates source is derived from it (spine AD-10/AD-11)"
+        assert render_pin(data["assets_csg_pinned_tag"]) == csg_pin, (
+            "rendering the derived csg pin must equal the tag in the manifest "
+            f"source ({csg_pin!r})"
+        )
+        assert str(data["assets_tpr_pinned_tag"]) == "{{ cli_tools_tags.tpr }}", (
+            "assets_tpr_pinned_tag must DERIVE from the cli_tools_tags fact — "
+            "the tpr-templates source is derived from it (spine AD-10/AD-11)"
+        )
+        assert render_pin(data["assets_tpr_pinned_tag"]) == tpr_pin, (
+            "rendering the derived tpr pin must equal the tag in the manifest "
+            f"source ({tpr_pin!r})"
         )
 
         assert _normalize(
@@ -812,14 +826,20 @@ class TestAssetsVars:
         csg_cli = next(e for e in cli_manifest["entries"] if e.get("name") == "csg")
         pin = str(csg_cli["tag"])
 
-        assert str(data["assets_csg_pinned_tag"]) == pin, (
-            "the assets role must mirror the csg pin from the CLI manifest"
+        assert str(data["assets_csg_pinned_tag"]) == "{{ cli_tools_tags.csg }}", (
+            "the assets role must derive the csg pin from the cli_tools_tags "
+            f"fact; got {data['assets_csg_pinned_tag']!r}"
+        )
+        assert render_pin(data["assets_csg_pinned_tag"]) == pin, (
+            "rendering the derived csg pin must equal the CLI manifest pin"
         )
 
         install = "/tmp/opencode/assets-pin-check"
-        source = str(data["assets_csg_templates_source"])
-        source = source.replace("{{ install_dir | trim }}", install)
-        source = source.replace("{{ assets_csg_pinned_tag }}", str(data["assets_csg_pinned_tag"]))
+        source = render_pin(
+            data["assets_csg_templates_source"],
+            install_dir=install,
+            assets_csg_pinned_tag=render_pin(data["assets_csg_pinned_tag"]),
+        )
         assert source == (
             f"{install}/cli-tools/csg/{pin}/src/color_scheme_generator/defaults/templates"
         ), f"resolved csg-templates source is wrong: {source!r}"
@@ -879,14 +899,20 @@ class TestAssetsVars:
         tpr_cli = next(e for e in cli_manifest["entries"] if e.get("name") == "tpr")
         pin = str(tpr_cli["tag"])
 
-        assert str(data["assets_tpr_pinned_tag"]) == pin, (
-            "the assets role must mirror the tpr pin from the CLI manifest"
+        assert str(data["assets_tpr_pinned_tag"]) == "{{ cli_tools_tags.tpr }}", (
+            "the assets role must derive the tpr pin from the cli_tools_tags "
+            f"fact; got {data['assets_tpr_pinned_tag']!r}"
+        )
+        assert render_pin(data["assets_tpr_pinned_tag"]) == pin, (
+            "rendering the derived tpr pin must equal the CLI manifest pin"
         )
 
         install = "/tmp/opencode/assets-tpr-pin-check"
-        source = str(data["assets_tpr_templates_source"])
-        source = source.replace("{{ install_dir | trim }}", install)
-        source = source.replace("{{ assets_tpr_pinned_tag }}", str(data["assets_tpr_pinned_tag"]))
+        source = render_pin(
+            data["assets_tpr_templates_source"],
+            install_dir=install,
+            assets_tpr_pinned_tag=render_pin(data["assets_tpr_pinned_tag"]),
+        )
         assert source == (
             f"{install}/cli-tools/tpr/{pin}/src/theme_producer/defaults/templates"
         ), f"resolved tpr-templates source is wrong: {source!r}"

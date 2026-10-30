@@ -1,0 +1,20 @@
+# REQ-014: every CLI pin in this engine derives from `cli_tools_tags`, the
+# name→tag fact the `cli_tools` role publishes after reading the composition's
+# `cli-tools.yaml`. `bootstrap.yaml` imports cli-tools first, so the fact always
+# exists by the time the assets/settings/verify plays run — the `when` below is
+# false and this pre-task is a no-op.
+#
+# The per-role playbooks are ALSO runnable on their own (`dotfiles-provision
+# verify`, `ansible-playbook ansible/playbooks/settings.yaml -e install_dir=...`).
+# In that case there is no prior cli_tools play, so this task resolves the same
+# mapping FROM THE COMPOSITION MANIFEST rather than a hardcoded pin. It reads the
+# manifest the seam already points at (`manifests_dir` is one of the four locked
+# extra-vars); it never writes anything and never overrides an existing fact, so
+# the single source of truth stays the composition manifest.
+- name: Publish the CLI pin tags when the cli_tools fact is absent
+  ansible.builtin.set_fact:
+    cli_tools_tags: >-
+      {{ (lookup('file', (manifests_dir | trim) ~ '/cli-tools.yaml') | from_yaml).entries
+         | selectattr('tag', 'defined')
+         | items2dict(key_name='name', value_name='tag') }}
+  when: cli_tools_tags is not defined

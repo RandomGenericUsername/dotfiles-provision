@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.support import composition_root, manifests_dir
+from tests.support import cli_tool_tags, composition_root, manifests_dir, render_pin
 
 
 def _find_ansible_dir() -> Path:
@@ -1975,28 +1975,38 @@ class TestVerifyVars:
         ]
 
     def test_itr_pin_mirrors_the_manifest(self) -> None:
-        """AD-11: verify carries INDEPENDENT literal pins mirroring the
-        composition manifest the role reads, so a wrong-tag install cannot hide
-        behind a green `command -v`. The checkout path shape is
+        """AD-11/REQ-014: verify no longer carries independent literal pins —
+        every CLI leg derives from `cli_tools_tags`, the fact the `cli_tools`
+        role publishes from the composition manifest, so a wrong-tag install
+        cannot hide behind a green `command -v` and a composition pin bump
+        moves verify with it. The checkout path shape is
         <install>/cli-tools/<name>/<tag> (AD-10), the pin record sits next to
-        the checkout, and the contract token equals the `contracts` tag
-        dotfiles pins."""
+        the checkout, and the contract token equals the tag without its `v`."""
         data = _vars()
+        tags = cli_tool_tags()
         assert (
             str(data["verify_cli_tools_checkout_root"])
             == "{{ install_dir | trim }}/cli-tools"
         )
-        assert str(data["verify_itr_version"]) == "v0.2.0"
+        assert str(data["verify_itr_version"]) == "{{ cli_tools_tags.itr }}", (
+            "verify_itr_version must DERIVE from the cli_tools_tags fact, not "
+            f"carry a literal; got {data['verify_itr_version']!r}"
+        )
+        assert render_pin(data["verify_itr_version"]) == tags["itr"]
         assert str(data["verify_itr_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/itr/{{ verify_itr_version }}"
         )
         assert str(data["verify_itr_pin_file"]) == (
             "{{ verify_cli_tools_checkout_root }}/itr/pinned"
         )
-        assert str(data["verify_itr_contract_version"]) == "0.2.0"
+        assert "cli_tools_tags" in str(data["verify_itr_contract_version"])
+        assert render_pin(data["verify_itr_contract_version"]) == tags["itr"].removeprefix(
+            "v"
+        )
 
-        # REQ-014: the role reads this manifest at run time; it no longer owns
-        # a copy of the pins. Verify's independent literals must still match it.
+        # REQ-014: the role reads this manifest at run time; the fact the later
+        # roles consume is exactly its name→tag mapping. Rendering the derived
+        # vars with that fact must reproduce the manifest pins.
         manifest = yaml.safe_load(
             (_REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
         )
@@ -2006,12 +2016,12 @@ class TestVerifyVars:
             if "repo" in entry or "tag" in entry
         ]
         assert [(entry["name"], entry["tag"]) for entry in pinned] == [
-            ("csg", str(data["verify_csg_version"])),
-            ("weg", str(data["verify_weg_version"])),
-            ("itr", str(data["verify_itr_version"])),
-            ("tpr", str(data["verify_tpr_version"])),
-            ("dotfiles-runtime", str(data["verify_runtime_version"])),
-        ], "verify_*_version must equal the manifest pins the role installs"
+            ("csg", render_pin(data["verify_csg_version"])),
+            ("weg", render_pin(data["verify_weg_version"])),
+            ("itr", render_pin(data["verify_itr_version"])),
+            ("tpr", render_pin(data["verify_tpr_version"])),
+            ("dotfiles-runtime", render_pin(data["verify_runtime_version"])),
+        ], "rendered verify_*_version must equal the manifest pins the role installs"
         role_vars = _sibling_vars("cli_tools")
         assert str(role_vars["cli_tools_checkout_root"]) == str(
             data["verify_cli_tools_checkout_root"]
@@ -2020,10 +2030,18 @@ class TestVerifyVars:
     def test_runtime_pin_is_asserted_by_execution(self) -> None:
         """REQ-002: the runtime has no `--version` flag and no contract token,
         so verify uses the `version` subcommand and asserts the exact tool
-        version (the tag without its leading `v`)."""
+        version (the tag without its leading `v`, derived from
+        `cli_tools_tags['dotfiles-runtime']`)."""
         data = _vars()
-        assert str(data["verify_runtime_version"]) == "v0.4.1"
-        assert str(data["verify_runtime_tool_version"]) == "0.4.1"
+        tags = cli_tool_tags()
+        assert str(data["verify_runtime_version"]) == (
+            "{{ cli_tools_tags['dotfiles-runtime'] }}"
+        ), "verify_runtime_version must DERIVE from the cli_tools_tags fact"
+        assert render_pin(data["verify_runtime_version"]) == tags["dotfiles-runtime"]
+        assert "cli_tools_tags" in str(data["verify_runtime_tool_version"])
+        assert render_pin(data["verify_runtime_tool_version"]) == tags[
+            "dotfiles-runtime"
+        ].removeprefix("v")
         assert str(data["verify_runtime_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/"
             "{{ verify_runtime_version }}"
@@ -2069,14 +2087,21 @@ class TestVerifyVars:
         `latest`. `engine image inspect` (shared by podman and docker) exits
         nonzero for a missing tag, so an image left at the old pin fails."""
         data = _vars()
-        assert str(data["verify_weg_version"]) == "v0.2.0"
+        tags = cli_tool_tags()
+        assert str(data["verify_weg_version"]) == "{{ cli_tools_tags.weg }}", (
+            "verify_weg_version must DERIVE from the cli_tools_tags fact"
+        )
+        assert render_pin(data["verify_weg_version"]) == tags["weg"]
         assert str(data["verify_weg_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/weg/{{ verify_weg_version }}"
         )
         assert str(data["verify_weg_pin_file"]) == (
             "{{ verify_cli_tools_checkout_root }}/weg/pinned"
         )
-        assert str(data["verify_weg_contract_version"]) == "0.2.0"
+        assert "cli_tools_tags" in str(data["verify_weg_contract_version"])
+        assert render_pin(data["verify_weg_contract_version"]) == tags["weg"].removeprefix(
+            "v"
+        )
         assert str(data["verify_weg_image_name"]) == "weg"
         reference = str(data["verify_weg_image_reference"])
         assert "container_runtime_engine" in reference, (
@@ -2141,8 +2166,8 @@ class TestVerifyVars:
         settings_vars = yaml.safe_load(
             (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
         )
-        assert str(_vars()["verify_weg_version"]) == str(weg["tag"])
-        assert str(settings_vars["settings_weg_image_tag"]) == str(weg["tag"])
+        assert render_pin(_vars()["verify_weg_version"]) == str(weg["tag"])
+        assert render_pin(settings_vars["settings_weg_image_tag"]) == str(weg["tag"])
 
     def test_csg_pin_and_all_four_images_are_asserted_by_execution(self) -> None:
         """AD-7/AD-11 for csg: the checkout, pin record, contract token AND all
@@ -2151,14 +2176,24 @@ class TestVerifyVars:
         missing tag, so an image left at `latest` (the pre-S6 shape) or at the
         previous pin fails the gate."""
         data = _vars()
-        assert str(data["verify_csg_version"]) == "v0.2.2"
+        tags = cli_tool_tags()
+        assert str(data["verify_csg_version"]) == "{{ cli_tools_tags.csg }}", (
+            "verify_csg_version must DERIVE from the cli_tools_tags fact"
+        )
+        assert render_pin(data["verify_csg_version"]) == tags["csg"]
         assert str(data["verify_csg_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
         )
         assert str(data["verify_csg_pin_file"]) == (
             "{{ verify_cli_tools_checkout_root }}/csg/pinned"
         )
-        assert str(data["verify_csg_contract_version"]) == "0.2.0"
+        # csg's contract token is its own generation (it prints
+        # `<package-version> contract 0.2.0`), NOT the tag without `v` — the
+        # one pin that intentionally stays literal.
+        assert str(data["verify_csg_contract_version"]) == "0.2.0", (
+            "csg's contract generation is independent of the package tag; see "
+            "the task's `contract <x>` grep"
+        )
         assert str(data["verify_csg_image_prefix"]) == "csg"
         references = [str(r) for r in data["verify_csg_image_references"]]
         assert len(references) == 4, (
@@ -2234,17 +2269,21 @@ class TestVerifyVars:
         settings_vars = yaml.safe_load(
             (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
         )
-        assert str(_vars()["verify_csg_version"]) == str(csg["tag"])
-        assert str(settings_vars["settings_csg_image_tag"]) == str(csg["tag"])
+        assert render_pin(_vars()["verify_csg_version"]) == str(csg["tag"])
+        assert render_pin(settings_vars["settings_csg_image_tag"]) == str(csg["tag"])
 
     def test_tpr_pin_and_all_three_images_are_asserted_by_execution(self) -> None:
         """REQ-010: tpr's checkout, pin record, package version and all three
         tag-qualified images (base + matugen/native) must be asserted by
-        execution. tpr v0.4.0 prints no contract token, so the executable
-        handshake is the exact package version; the recorded
-        `verify_tpr_contract_version` is 0.4.0."""
+        execution. tpr prints no contract token, so the executable handshake is
+        the exact package version; the recorded `verify_tpr_contract_version`
+        derives as the tag without its leading `v`."""
         data = _vars()
-        assert str(data["verify_tpr_version"]) == "v0.4.0"
+        tags = cli_tool_tags()
+        assert str(data["verify_tpr_version"]) == "{{ cli_tools_tags.tpr }}", (
+            "verify_tpr_version must DERIVE from the cli_tools_tags fact"
+        )
+        assert render_pin(data["verify_tpr_version"]) == tags["tpr"]
         assert str(data["verify_tpr_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/tpr/"
             "{{ verify_tpr_version }}"
@@ -2252,9 +2291,12 @@ class TestVerifyVars:
         assert str(data["verify_tpr_pin_file"]) == (
             "{{ verify_cli_tools_checkout_root }}/tpr/pinned"
         )
-        assert str(data["verify_tpr_contract_version"]) == "0.4.0", (
-            "tpr is validated against the v0.4.0 invocation contract"
+        assert "cli_tools_tags" in str(data["verify_tpr_contract_version"]), (
+            "tpr's recorded invocation contract must derive from its pin"
         )
+        assert render_pin(data["verify_tpr_contract_version"]) == tags[
+            "tpr"
+        ].removeprefix("v")
         assert str(data["verify_tpr_image_prefix"]) == "tpr"
         references = [str(r) for r in data["verify_tpr_image_references"]]
         assert len(references) == 3, (
@@ -2356,8 +2398,8 @@ class TestVerifyVars:
         settings_vars = yaml.safe_load(
             (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
         )
-        assert str(_vars()["verify_tpr_version"]) == str(tpr["tag"])
-        assert str(settings_vars["settings_tpr_image_tag"]) == str(tpr["tag"])
+        assert render_pin(_vars()["verify_tpr_version"]) == str(tpr["tag"])
+        assert render_pin(settings_vars["settings_tpr_image_tag"]) == str(tpr["tag"])
 
     def test_notifd_binding_packages_pin_libastal_notifd(self) -> None:
         """Implementation gate (capture-notifications): verify pins the
@@ -2785,18 +2827,25 @@ class TestVerifyRuntimePinMirror:
             "the cli-tools manifest must pin dotfiles-runtime v0.4.1 "
             f"(producer config + tpr container runtime); got {runtime['tag']!r}"
         )
-        assert verify_vars["verify_runtime_version"] == "v0.4.1", (
-            "verify_runtime_version must mirror the manifest pin v0.4.1; got "
+        assert verify_vars["verify_runtime_version"] == (
+            "{{ cli_tools_tags['dotfiles-runtime'] }}"
+        ), (
+            "verify_runtime_version must derive from the cli_tools_tags fact "
+            f"(manifest pin {runtime['tag']}); got "
             f"{verify_vars['verify_runtime_version']!r}"
         )
-        assert verify_vars["verify_runtime_tool_version"] == "0.4.1", (
-            "verify_runtime_tool_version must be the tag without its leading "
+        assert render_pin(verify_vars["verify_runtime_version"]) == "v0.4.1", (
+            "the derived runtime pin must resolve to the manifest pin v0.4.1; got "
+            f"{render_pin(verify_vars['verify_runtime_version'])!r}"
+        )
+        assert render_pin(verify_vars["verify_runtime_tool_version"]) == "0.4.1", (
+            "verify_runtime_tool_version must render the tag without its leading "
             f"'v' (0.4.1); got {verify_vars['verify_runtime_tool_version']!r}"
         )
 
     def test_tool_version_is_the_tag_without_its_prefix(self) -> None:
         verify_vars = _vars()
-        assert str(verify_vars["verify_runtime_tool_version"]) == str(
+        assert render_pin(verify_vars["verify_runtime_tool_version"]) == render_pin(
             verify_vars["verify_runtime_version"]
         ).removeprefix("v")
 
@@ -3207,6 +3256,7 @@ class TestVerifyRuntime:
                         f"install_dir={install}",
                         "-e",
                         f"manifests_dir={manifests_dir()}",
+                        *_cli_tags_extra_vars(),
                         *_display_manager_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
@@ -3316,6 +3366,7 @@ class TestVerifyRuntime:
                         f"install_dir={install}",
                         "-e",
                         f"manifests_dir={manifests_dir()}",
+                        *_cli_tags_extra_vars(),
                         "--start-at-task",
                         "Check deployed desktop entries exist",
                     ],
@@ -3367,6 +3418,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     "--start-at-task",
                     "Check deployed desktop entries exist",
                 ],
@@ -3412,7 +3464,7 @@ class TestVerifyRuntime:
             # real gate). `--version` still reports the pinned contract so the
             # earlier AD-11 handshake passes and the failure is attributable to
             # the parse gate, not to a stale-CLI assertion.
-            contract = str(_vars()["verify_weg_contract_version"])
+            contract = render_pin(_vars()["verify_weg_contract_version"])
             (bin_dir / "weg").write_text(
                 "#!/bin/sh\n"
                 'if [ "$1" = "--version" ]; then\n'
@@ -3438,6 +3490,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3519,6 +3572,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3589,6 +3643,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3654,6 +3709,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3717,6 +3773,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3774,6 +3831,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3827,6 +3885,7 @@ class TestVerifyRuntime:
                         f"install_dir={install}",
                         "-e",
                         f"manifests_dir={manifests_dir()}",
+                        *_cli_tags_extra_vars(),
                         *_display_manager_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
@@ -3886,6 +3945,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -3928,6 +3988,7 @@ class TestVerifyRuntime:
                     f"install_dir={install}",
                     "-e",
                     f"manifests_dir={manifests_dir()}",
+                    *_cli_tags_extra_vars(),
                     *_display_manager_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
@@ -4028,6 +4089,16 @@ def _display_manager_extra_vars(tmp: Path) -> list[str]:
     ]
 
 
+def _cli_tags_extra_vars() -> list[str]:
+    """The `cli_tools_tags` fact a real bootstrap already has by verify time.
+
+    REQ-014: verify derives every CLI pin from that fact, so a direct
+    `verify.yaml` run (as these execution tests do) must supply it the same way
+    the `cli_tools` role would — from the composition manifest.
+    """
+    return ["-e", json.dumps({"cli_tools_tags": cli_tool_tags()})]
+
+
 def _test_env(**overrides: str) -> dict[str, str]:
     """A scrubbed env for playbook subprocesses (review findings 2026-08-12 and
     2026-08-13): drop ambient ANSIBLE_* vars (a developer's ANSIBLE_INVENTORY /
@@ -4073,7 +4144,7 @@ def _write_stub_binaries(home: Path) -> Path:
     # `--version` stdout. The generic exit-0 stub above cannot satisfy that.
     verify_vars = _vars()
     for cli_name in ("csg", "weg", "itr"):
-        contract = str(verify_vars[f"verify_{cli_name}_contract_version"])
+        contract = render_pin(verify_vars[f"verify_{cli_name}_contract_version"])
         stub = bin_dir / cli_name
         stub.write_text(
             "#!/bin/sh\n"
@@ -4081,12 +4152,13 @@ def _write_stub_binaries(home: Path) -> Path:
             "exit 0\n"
         )
         stub.chmod(0o755)
-    # tpr v0.4.0's `--version` prints ONLY the package version (no contract
-    # token); verify asserts it equals the tag minus `v`.
+    # tpr's `--version` prints ONLY the package version (no contract token);
+    # verify asserts it equals the tag minus `v`, derived from cli_tools_tags.
     tpr_stub = bin_dir / "tpr"
     tpr_stub.write_text(
         "#!/bin/sh\n"
-        f'if [ "$1" = "--version" ]; then echo "{verify_vars["verify_tpr_version"][1:]}"; exit 0; fi\n'
+        f'if [ "$1" = "--version" ]; then echo "'
+        f'{render_pin(verify_vars["verify_tpr_version"]).removeprefix("v")}"; exit 0; fi\n'
         "exit 0\n"
     )
     tpr_stub.chmod(0o755)
@@ -4095,7 +4167,8 @@ def _write_stub_binaries(home: Path) -> Path:
     runtime_stub = bin_dir / "dotfiles-runtime"
     runtime_stub.write_text(
         "#!/bin/sh\n"
-        f'if [ "$1" = "version" ]; then echo "{verify_vars["verify_runtime_tool_version"]}"; exit 0; fi\n'
+        f'if [ "$1" = "version" ]; then echo "'
+        f'{render_pin(verify_vars["verify_runtime_tool_version"])}"; exit 0; fi\n'
         "exit 0\n"
     )
     runtime_stub.chmod(0o755)
@@ -4346,7 +4419,7 @@ def _build_provisioned_layout(
         ("tpr", "verify_tpr_version"),
         ("dotfiles-runtime", "verify_runtime_version"),
     ):
-        cli_version = str(verify_vars[version_key])
+        cli_version = render_pin(verify_vars[version_key])
         (install / "cli-tools" / cli_name / cli_version).mkdir(parents=True, exist_ok=True)
         (install / "cli-tools" / cli_name / "pinned").write_text(f"{cli_version}\n")
     template_schema_dir = install / "assets" / assets_tag / "templates" / "zsh"

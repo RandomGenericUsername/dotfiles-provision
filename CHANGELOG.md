@@ -32,6 +32,18 @@ Notable changes to the `dotfiles-provision` repo. Format follows
   `cli_tools_tags`, and malformed manifests fail with the named error. Verify,
   assets and settings pin mirrors are now checked against the manifest the role
   actually reads.
+- **Verify/assets/settings pin mirrors deleted (REQ-014):** the CLI pins those
+  roles still carried as literals (`verify_*_version`,
+  `settings_*_image_tag`, `assets_{csg,tpr}_pinned_tag`) now derive from
+  `cli_tools_tags.<name>`, the fact `cli_tools` publishes from the composition
+  manifest. A composition pin bump therefore moves the tag-qualified checkout,
+  templates source, rendered image tag and verify handshake in one edit. The
+  contract-version vars derive as the tag without its leading `v` where the
+  executable handshake compares that value (csg's contract generation stays
+  `0.2.0` — it is a separate axis from csg's package tag). The tests render each
+  derivation with a sample `cli_tools_tags` to prove the resolved paths and
+  versions come from the manifest; the assets corpus pin (`assets_pinned_tag`,
+  `v0.6.2`) is untouched.
 
 ### Notes
 

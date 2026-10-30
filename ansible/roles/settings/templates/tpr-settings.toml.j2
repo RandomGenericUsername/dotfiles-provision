@@ -19,8 +19,9 @@ mode = "container"
 [container]
 engine = "{{ container_runtime_engine }}"
 image_prefix = "tpr"
-# AD-7: the tag is the pinned repo tag (settings_tpr_image_tag, mirror of the
-# cli-tools manifest `tpr.tag`) — never "latest". The cli_tools role builds
+# AD-7: the tag is the pinned repo tag (settings_tpr_image_tag, derived from
+# the `cli_tools_tags.tpr` fact the cli_tools role publishes from the cli-tools
+# manifest `tpr.tag`) — never "latest". The cli_tools role builds
 # tpr's base + engine images at exactly this tag (THEME__CONTAINER__IMAGE_TAG).
 image_tag = "{{ settings_tpr_image_tag }}"
 timeout_seconds = 300

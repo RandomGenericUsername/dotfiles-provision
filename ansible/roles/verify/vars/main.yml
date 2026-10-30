@@ -323,28 +323,32 @@ verify_cli_tools:
   - dotfiles-runtime
 
 # verify_cli_tools_checkout_root / verify_itr_*: the pinned external CLI
-#   checkouts (spine AD-10/AD-11). `verify` carries INDEPENDENT literal pins
-#   mirroring the composition manifest `cli_tools` reads at run time (a parity
-#   test locks verify == manifest since REQ-014), so a wrong-tag install cannot
-#   hide behind a green `command -v`:
-#   - the checkout lives under the install-cli-tools root, in an itr dir named
-#     by the tag;
-#   - <install-cli-tools>/itr/pinned records exactly that tag;
+#   checkouts (spine AD-10/AD-11). REQ-014: the pins are NOT mirrored literals —
+#   every `verify_<tool>_version` reads `cli_tools_tags.<name>`, the fact the
+#   `cli_tools` role publishes from the composition manifest at run time
+#   (bootstrap order: cli_tools → filesystem → assets → … → verify). A pin bump
+#   in `dotfiles/provisioning/cli-tools.yaml` therefore moves verify with no
+#   second edit, and a wrong-tag install still cannot hide behind a green
+#   `command -v`:
+#   - the checkout lives under the install-cli-tools root, in a dir named by
+#     the tag;
+#   - <install-cli-tools>/<name>/pinned records exactly that tag;
 #   - `itr --version` reports `<package-version> contract <contract-version>`,
-#     and the contract token must equal the `contracts` tag this repo pins
-#     (AD-4: one contract tag, four consumers).
+#     and the contract token must equal the contract generation the CLI emits
+#     (AD-4: one contract tag, four consumers). For itr/weg/runtime that token
+#     is the tag without its leading `v`.
 verify_cli_tools_checkout_root: "{{ install_dir | trim }}/cli-tools"
-verify_itr_version: v0.2.0
+verify_itr_version: "{{ cli_tools_tags.itr }}"
 verify_itr_checkout: "{{ verify_cli_tools_checkout_root }}/itr/{{ verify_itr_version }}"
 verify_itr_pin_file: "{{ verify_cli_tools_checkout_root }}/itr/pinned"
-verify_itr_contract_version: 0.2.0
+verify_itr_contract_version: "{{ cli_tools_tags.itr | regex_replace('^v', '') }}"
 
 # verify_runtime_*: the same three legs for the host runtime (REQ-002/REQ-006).
 #   `dotfiles-runtime` has no `--version` flag and no contract token: the
 #   `version` subcommand prints the package version, which equals the tag
 #   without its leading `v`.
-verify_runtime_version: v0.4.1
-verify_runtime_tool_version: 0.4.1
+verify_runtime_version: "{{ cli_tools_tags['dotfiles-runtime'] }}"
+verify_runtime_tool_version: "{{ cli_tools_tags['dotfiles-runtime'] | regex_replace('^v', '') }}"
 verify_runtime_checkout: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/{{ verify_runtime_version }}"
 verify_runtime_pin_file: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/pinned"
 
@@ -367,10 +371,10 @@ verify_expected_tpr_runtime: container
 #   the rendered settings carry image_name "weg"), with `container_runtime_engine`
 #   the same DECLARED value the build used and `verify_weg_version` the pin.
 #   A `latest`-only image, or one built at the previous pin, fails this gate.
-verify_weg_version: v0.2.0
+verify_weg_version: "{{ cli_tools_tags.weg }}"
 verify_weg_checkout: "{{ verify_cli_tools_checkout_root }}/weg/{{ verify_weg_version }}"
 verify_weg_pin_file: "{{ verify_cli_tools_checkout_root }}/weg/pinned"
-verify_weg_contract_version: 0.2.0
+verify_weg_contract_version: "{{ cli_tools_tags.weg | regex_replace('^v', '') }}"
 verify_weg_image_name: weg
 verify_weg_image_reference: >-
   {{ verify_weg_image_name }}-{{ container_runtime_engine }}:{{ verify_weg_version }}
@@ -385,9 +389,14 @@ verify_weg_image_reference: >-
 #   a missing backend is a named failure, not a count. The pin is the manifest
 #   `csg.tag` (AD-7/AD-11) — never `latest`; the cli_tools role builds them at
 #   this tag by passing `COLORSCHEME__CONTAINER__IMAGE_TAG={{ pin }}`.
-verify_csg_version: v0.2.2
+verify_csg_version: "{{ cli_tools_tags.csg }}"
 verify_csg_checkout: "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
 verify_csg_pin_file: "{{ verify_cli_tools_checkout_root }}/csg/pinned"
+# The one contract pin that is NOT tag-derived: csg reports
+# `<package-version> contract 0.2.0` (v0.2.2 today), so the contract token is
+# its own generation (AD-4) and must not follow the package tag. The verify
+# task greps this exact token, so bumping it belongs to a contracts generation
+# change, not a csg pin bump.
 verify_csg_contract_version: 0.2.0
 verify_csg_image_prefix: csg
 verify_csg_image_references:
@@ -405,18 +414,19 @@ verify_csg_image_references:
 #   --image-tag), and the rendered settings carry image_prefix "tpr" + the same
 #   pin, so a `latest`-only or previous-pin image fails here.
 #
-#   CONTRACT TOKEN: tpr v0.4.0's `--version` prints only the package version;
-#   unlike csg/weg/itr it has no `contract <x>` token, so there is nothing
-#   dynamic to grep. `verify_tpr_contract_version` records the invocation
-#   contract generation this consumer expects (contracts v0.4.0) and is locked
-#   by `TestVerifyTprPinAndImages`; the executable assertions below are the
-#   version + images. The checkout dir is the cli_tools entry `name` (`tpr`),
-#   i.e. <install>/cli-tools/tpr/<tag>; the `theme-producer` name is the
-#   deployed config dir, not this source checkout.
-verify_tpr_version: v0.4.0
+#   CONTRACT TOKEN: tpr's `--version` prints only the package version; unlike
+#   csg/weg/itr it has no `contract <x>` token, so there is nothing dynamic to
+#   grep. `verify_tpr_contract_version` records the invocation-contract
+#   generation this consumer expects (the pin without its leading `v`) and is
+#   asserted to equal `verify_tpr_version | regex_replace('^v', '')` by the
+#   verify test; the executable assertions below are the version + images. The
+#   checkout dir is the cli_tools entry `name` (`tpr`), i.e.
+#   <install>/cli-tools/tpr/<tag>; the `theme-producer` name is the deployed
+#   config dir, not this source checkout.
+verify_tpr_version: "{{ cli_tools_tags.tpr }}"
 verify_tpr_checkout: "{{ verify_cli_tools_checkout_root }}/tpr/{{ verify_tpr_version }}"
 verify_tpr_pin_file: "{{ verify_cli_tools_checkout_root }}/tpr/pinned"
-verify_tpr_contract_version: 0.4.0
+verify_tpr_contract_version: "{{ cli_tools_tags.tpr | regex_replace('^v', '') }}"
 verify_tpr_image_prefix: tpr
 verify_tpr_image_references:
   - "{{ verify_tpr_image_prefix }}-base-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
