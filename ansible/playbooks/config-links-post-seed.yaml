@@ -1,0 +1,22 @@
+# Config-links post-seed playbook (BUG-006) — exposes the palette consumers.
+#
+# bootstrap order: config-links.yaml (pre-seed settings links) -> runtime-seed
+# (creates the runtime-owned colors.css/colors.rasi/btop theme pointers) ->
+# THIS playbook (gtk-3.0, gtk-4.0, rofi, btop) -> display-manager -> verify.
+#
+# Why the split: the provisioned rofi config hard-imports colors.rasi; linking
+# ~/.config/rofi before runtime-seed exposes a launcher whose palette target
+# does not exist yet (rofi exits with a theme parse error). Linking the
+# consumers only after the seed closes that exposure window. The settings links
+# must still run BEFORE the seed because the producer CLIs discover their
+# config through ~/.config/<tool>.
+#
+# User-scoped playbook: NO become (the links live under the user's config
+# home). gather_facts is REQUIRED for the role's ansible_facts.env derivations.
+- name: Link palette-consumer configs into the XDG config home (post-seed)
+  hosts: localhost
+  gather_facts: true
+  vars:
+    config_links_phase: post_seed
+  roles:
+    - config_links

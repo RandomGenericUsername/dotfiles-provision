@@ -65,6 +65,7 @@ _EXPECTED_ORDER = [
     "btop-config.yaml",
     "config-links.yaml",
     "runtime-seed.yaml",
+    "config-links-post-seed.yaml",
     "display-manager.yaml",
     "gloview-plugin.yaml",
     "verify.yaml",
@@ -81,16 +82,16 @@ class TestBootstrapPlaybook:
     _PATH = _PLAYBOOKS_DIR / "bootstrap.yaml"
 
     def test_parses_as_list_of_import_playbook_entries(self) -> None:
-        """The aggregate is a top-level list of exactly twenty-three
+        """The aggregate is a top-level list of exactly twenty-four
         `import_playbook` statements (one per per-role playbook + the
-        runtime-seed step + the gloview-plugin lifecycle + the gui-tools
-        prerequisites + the P5-1-1 runtime-daemon unit + the runtime-clipboard
-        unit + the kitty-config and btop-config renders + the ags-platform unit
-        install (AD-17/AD-23) + the one all-standalone AGS installer
-        (AD-31/AD-37))."""
+        runtime-seed step + the two BUG-006 config-links phases + the
+        gloview-plugin lifecycle + the gui-tools prerequisites + the P5-1-1
+        runtime-daemon unit + the runtime-clipboard unit + the kitty-config and
+        btop-config renders + the ags-platform unit install (AD-17/AD-23) + the
+        one all-standalone AGS installer (AD-31/AD-37))."""
         imports = _load_imports()
-        assert len(imports) == 23, (
-            f"bootstrap.yaml must import exactly 23 playbooks; found {len(imports)}"
+        assert len(imports) == 24, (
+            f"bootstrap.yaml must import exactly 24 playbooks; found {len(imports)}"
         )
         for entry in imports:
             assert "import_playbook" in entry, (
@@ -98,12 +99,13 @@ class TestBootstrapPlaybook:
             )
 
     def test_imports_in_exact_dependency_order(self) -> None:
-        """AC 4: the twenty-three imports appear in the EXACT dependency order —
+        """AC 4: the twenty-four imports appear in the EXACT dependency order —
         packages → power-options → cli-tools → runtime-daemon → runtime-clipboard → filesystem →
         assets → ags-platform → gui-tools → compositor-configs → ags-apps-units →
         config-copies → settings → zsh-tools → zsh-config → wlogout-config →
-        kitty-config → btop-config → config-links → runtime-seed →
-        display-manager → gloview-plugin → verify (Epic 4: no default-palette/icons).
+        kitty-config → btop-config → config-links (pre-seed) → runtime-seed →
+        config-links-post-seed → display-manager → gloview-plugin → verify
+        (Epic 4: no default-palette/icons; BUG-006 splits config-links).
         btop-config MUST precede config-links: the role writes
         <install>/config/btop/, the links role exposes it at ~/.config/btop.
         gui-tools MUST precede ags-apps-units so dunst is masked before the

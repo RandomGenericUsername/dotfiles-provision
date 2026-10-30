@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 import yaml
+from jinja2 import Environment, StrictUndefined
 
 from tests.support import manifests_dir
 
@@ -225,13 +226,21 @@ class TestConfigLinksTasks:
         assert "install_dir is defined" in that
         assert "install_dir | trim | length > 0" in that
 
-    def test_main_loop_over_managed_dirs_includes_link_one(self) -> None:
-        """tasks/main.yml includes _link_one.yml once, looping
-        config_links_managed_dirs — all per-entry logic lives in the include."""
+    def test_main_loop_over_phase_dirs_includes_link_one(self) -> None:
+        """tasks/main.yml includes _link_one.yml once, looping the phase-selected
+        dirs (BUG-006 split) — all per-entry logic lives in the include."""
         tasks = _load_tasks(_TASKS_MAIN)
         includes = [task for task in tasks if _module_key(task) == "ansible.builtin.include_tasks"]
         assert len(includes) == 1, f"expected exactly one include_tasks; found {len(includes)}"
-        assert "{{ config_links_managed_dirs }}" in str(includes[0].get("loop", ""))
+        assert "{{ config_links_dirs_for_phase }}" in str(includes[0].get("loop", ""))
+        phase_asserts = [
+            task
+            for task in tasks
+            if _module_key(task) == "ansible.builtin.assert"
+            and "config_links_phase" in str(_module(task).get("that", ""))
+        ]
+        assert len(phase_asserts) == 1, "expected one fail-loud phase assert"
+        assert phase_asserts[0].get("when") is None
 
     def test_backup_mv_task_is_check_gated(self) -> None:
         """Check-mode discipline: the backup mv (the only mutating command) is
@@ -411,6 +420,10 @@ class TestConfigLinksVars:
         "config_links_backup_root",
         "config_links_backup_policy",
         "config_links_managed_dirs",
+        "config_links_pre_seed_dirs",
+        "config_links_post_seed_dirs",
+        "config_links_phase",
+        "config_links_dirs_for_phase",
         "config_links_gtk_dirs",
         "config_links_gtk_import_line",
     }
@@ -438,6 +451,49 @@ class TestConfigLinksVars:
             "config_links_gtk_dirs must be a subset of config_links_managed_dirs"
         )
         assert set(gtk) == {"gtk-3.0", "gtk-4.0"}
+
+    def test_pre_and_post_seed_dirs_partition_the_managed_set(self) -> None:
+        """BUG-006: the two bootstrap phases cover every managed dir exactly
+        once, and palette consumers are POST-seed only."""
+        data = _vars()
+        managed = [str(d) for d in data["config_links_managed_dirs"]]
+        pre = [str(d) for d in data["config_links_pre_seed_dirs"]]
+        post = [str(d) for d in data["config_links_post_seed_dirs"]]
+        assert pre + post == managed, (
+            "pre_seed + post_seed must partition config_links_managed_dirs in order"
+        )
+        assert len(set(pre) & set(post)) == 0, "phases must be disjoint"
+        assert post == ["gtk-3.0", "gtk-4.0", "rofi", "btop"], (
+            "palette consumers must be linked only after runtime-seed"
+        )
+        assert "rofi" not in pre, "rofi must not be exposed before the seed"
+
+    def test_phase_selects_the_matching_dir_list(self) -> None:
+        value = str(_vars()["config_links_dirs_for_phase"])
+        env = Environment(undefined=StrictUndefined)
+        env.filters["default"] = lambda raw, fallback, *args: fallback
+        data = _vars()
+        for phase, expected_key in (
+            ("all", "config_links_managed_dirs"),
+            ("pre_seed", "config_links_pre_seed_dirs"),
+            ("post_seed", "config_links_post_seed_dirs"),
+        ):
+            rendered = env.from_string(value).render(
+                config_links_phase=phase,
+                **{k: v for k, v in data.items() if isinstance(v, list)},
+            )
+            assert yaml.safe_load(rendered) == data[expected_key], (
+                f"phase {phase} must select {expected_key}"
+            )
+
+    def test_bootstrap_playbooks_select_the_two_phases(self) -> None:
+        pre = yaml.safe_load((_ANSIBLE_DIR / "playbooks" / "config-links.yaml").read_text())
+        post = yaml.safe_load(
+            (_ANSIBLE_DIR / "playbooks" / "config-links-post-seed.yaml").read_text()
+        )
+        assert pre[0]["vars"]["config_links_phase"] == "pre_seed"
+        assert post[0]["vars"]["config_links_phase"] == "post_seed"
+        assert pre[0]["roles"] == post[0]["roles"] == ["config_links"]
 
     def test_gtk_import_line_is_the_exact_palette_import(self) -> None:
         """The import line is pinned EXACTLY — verify's grep gate asserts the
@@ -493,7 +549,16 @@ def _run_config_links(
     env: dict[str, str],
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [shutil.which("ansible-playbook"), str(_PLAYBOOK_PATH), "-e", f"install_dir={install}", "-e", f"manifests_dir={manifests_dir()}"],
+        [
+            shutil.which("ansible-playbook"),
+            str(_PLAYBOOK_PATH),
+            "-e",
+            f"install_dir={install}",
+            "-e",
+            f"manifests_dir={manifests_dir()}",
+            "-e",
+            "config_links_phase=all",
+        ],
         capture_output=True,
         text=True,
         env=env,

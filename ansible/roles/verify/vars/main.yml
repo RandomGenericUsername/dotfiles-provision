@@ -755,14 +755,20 @@ verify_gui_tools_app_files: []
 
 # verify_consumer_symlinks: the R2 consumer-path symlinks the runtime
 #   seeder owns (criterion 7, Epic 4 current-only). The AGS fragment is
-#   colors.css → current/colors.gtk.css. The bar TAG carries colors.css as a
-#   symlink to the runtime-owned pointer (AD-37); verify reads it THROUGH the
-#   <install>/config/ags link. Checked WITHOUT following (islnk + raw target
-#   contains /current/) so a stale provisioning COPY fails the gate. <install>/config/hypr/colors.conf
-#   is deliberately absent (nothing sources it — verified: no reference
-#   under the assets configs/hypr/*.lua).
+#   colors.css → current/colors.gtk.css. BUG-006 adds the launcher/palette
+#   consumers that runtime-seed now exposes only after the seed: rofi
+#   (colors.rasi), gtk-3.0/gtk-4.0 (colors.css) and btop (colors.btop.theme).
+#   Checked WITHOUT following (islnk + raw target contains /current/) so a
+#   stale provisioning COPY fails the gate, then WITH follow to prove the
+#   target actually resolves. <install>/config/hypr/colors.conf is deliberately
+#   absent (nothing sources it — verified: no reference under the assets
+#   configs/hypr/*.lua).
 verify_consumer_symlinks:
   - "{{ install_dir | trim }}/config/ags/colors.css"
+  - "{{ install_dir | trim }}/config/gtk-3.0/colors.css"
+  - "{{ install_dir | trim }}/config/gtk-4.0/colors.css"
+  - "{{ install_dir | trim }}/config/rofi/colors.rasi"
+  - "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme"
 
 # verify_config_copies_targets: mirror of the config-copies.yaml entries EXACTLY
 #   (criterion 9). config-in-spine (2026-08-16): each is now a SYMLINK at

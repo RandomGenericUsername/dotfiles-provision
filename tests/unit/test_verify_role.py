@@ -1600,6 +1600,37 @@ class TestVerifyTasks:
             )
 
 
+class TestVerifyConsumerLinks:
+    """BUG-006: verify asserts the launcher palette consumers, not just AGS."""
+
+    def test_consumer_symlinks_include_rofi_gtk_and_btop(self) -> None:
+        links = [str(link) for link in _vars()["verify_consumer_symlinks"]]
+        for expected in (
+            "config/ags/colors.css",
+            "config/gtk-3.0/colors.css",
+            "config/gtk-4.0/colors.css",
+            "config/rofi/colors.rasi",
+            "config/btop/themes/colors.btop.theme",
+        ):
+            assert any(expected in link for link in links), f"missing {expected}"
+
+    def test_consumer_symlinks_are_followed_and_must_resolve(self) -> None:
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        resolve_name = "Check R2 consumer symlinks resolve through current/"
+        assert_name = "Assert R2 consumer symlinks resolve through current/"
+        assert resolve_name in names and assert_name in names
+        assert names.index(resolve_name) < names.index(assert_name)
+        stat = tasks[names.index(resolve_name)]
+        assert _module_key(stat) == "ansible.builtin.stat"
+        assert _module(stat).get("follow") is True
+        assert str(stat.get("loop")) == "{{ verify_consumer_symlinks }}"
+        check = tasks[names.index(assert_name)]
+        that = " ".join(str(item) for item in _module(check).get("that", []))
+        assert "selectattr('stat.exists')" in that
+        assert "verify_consumer_symlinks | length" in that
+
+
 class TestVerifyVars:
     _REQUIRED_KEYS = {
         "verify_xdg_config_home",
@@ -3834,6 +3865,56 @@ class TestVerifyRuntime:
                 "recap:\n" + no_palette.stdout
             )
 
+    def test_verify_fails_when_a_rofi_palette_link_is_missing(self) -> None:
+        """BUG-006 negative lock: remove the rofi consumer link from an
+        otherwise provisioned machine and verify must fail on the exact
+        path (the pre-seed exposure window this ticket closes)."""
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            xdg = Path(tmp) / "xdg"
+            install = Path(tmp) / "install"
+            state_home = Path(tmp) / "state-home"
+            cache_home = Path(tmp) / "cache-home"
+            home.mkdir()
+            xdg.mkdir()
+            install.mkdir()
+
+            bin_dir = _write_stub_binaries(home)
+            _build_provisioned_layout(home, xdg, install, state_home, cache_home)
+            (install / "config" / "rofi" / "colors.rasi").unlink()
+
+            env = _test_env(
+                HOME=str(home),
+                XDG_CONFIG_HOME=str(xdg),
+                XDG_STATE_HOME=str(state_home),
+                XDG_CACHE_HOME=str(cache_home),
+                ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
+                PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
+            )
+            result = subprocess.run(
+                [
+                    ansible_playbook,
+                    str(self._PATH),
+                    "-e",
+                    f"install_dir={install}",
+                    "-e",
+                    f"manifests_dir={manifests_dir()}",
+                    *_display_manager_extra_vars(Path(tmp)),
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=300,
+            )
+            assert result.returncode != 0, (
+                "verify must FAIL when the rofi palette consumer link is "
+                "missing (BUG-006); recap:\n" + result.stdout
+            )
+            assert "rofi/colors.rasi" in result.stdout, result.stdout
+
     def test_verify_fails_when_not_provisioned(self) -> None:
         """Hardening: machine, not repo. Run verify.yaml against a bare temp
         HOME/XDG/install (no spine, no configs, no binaries) and assert the run
@@ -4369,12 +4450,24 @@ def _build_provisioned_layout(
         "colors.adw.css",
         "colors.sequences",
         "colors.kitty",
+        "colors.rasi",
     )
     for name in palette_names:
         (state_cache_palette / name).write_text("")
     state_current.mkdir(parents=True)
     for name in palette_names:
         (state_current / name).symlink_to(state_cache_palette / name)
+    # BUG-006 consumer pointers (the runtime seeder owns these): the post-seed
+    # config-links role exposes rofi/gtk/btop through these links, and verify
+    # asserts both the symlink and that its target resolves.
+    for rel, artifact in (
+        ("config/gtk-3.0/colors.css", "colors.gtk.css"),
+        ("config/gtk-4.0/colors.css", "colors.adw.css"),
+        ("config/rofi/colors.rasi", "colors.rasi"),
+    ):
+        pointer = install / rel
+        pointer.parent.mkdir(parents=True, exist_ok=True)
+        pointer.symlink_to(state_current / artifact)
     state_cache_icons = state_home / "dotfiles" / "cache" / "icons" / "def456"
     state_cache_icons.mkdir(parents=True)
     # The samples verify asserts (verify_icons_samples): battery-0 predates the

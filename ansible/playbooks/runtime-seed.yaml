@@ -8,11 +8,13 @@
 # artifacts — provisioning deploys inputs only (Epic 4: no
 # default_palette / icons roles; no generated/ tree).
 #
-# Placement in bootstrap.yaml: after config-links.yaml (needs the
-# ~/.config/* spine symlinks + rendered settings in place) and before
-# display-manager.yaml/verify.yaml (verify asserts current-only
-# criteria). Requires: assets (default.png), cli_tools (the installed pinned
-# dotfiles-runtime), settings (ITR/CSG/WEG settings.toml).
+# Placement in bootstrap.yaml: after config-links.yaml (the PRE-SEED settings
+# links the producer CLIs discover through ~/.config/<tool>) and before
+# config-links-post-seed.yaml/display-manager.yaml/verify.yaml. The post-seed
+# links expose rofi/gtk/btop only AFTER this step created their palette
+# pointers (BUG-006). Requires: assets (default.png), cli_tools (the installed
+# pinned dotfiles-runtime), runtime_daemon (the producer config), settings
+# (ITR/CSG/WEG settings.toml).
 #
 # User-scoped playbook: NO become (everything the runtime writes lives
 # under the user's XDG state dir; running as root would seed root's
@@ -40,6 +42,17 @@
     # renders it before this playbook; the seed reads it through the runtime.
     # NO producer env is passed here: ambient env is non-authoritative.
     runtime_seed_producer_config: "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
+    # Runtime state the seed must advance + the consumer links it must create.
+    runtime_seed_state_home: >-
+      {{ ansible_facts.env.XDG_STATE_HOME
+         | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}
+    runtime_seed_current_state: "{{ runtime_seed_state_home | trim }}/dotfiles/current.json"
+    runtime_seed_consumer_links:
+      - "{{ install_dir | trim }}/config/ags/colors.css"
+      - "{{ install_dir | trim }}/config/gtk-3.0/colors.css"
+      - "{{ install_dir | trim }}/config/gtk-4.0/colors.css"
+      - "{{ install_dir | trim }}/config/rofi/colors.rasi"
+      - "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme"
   tasks:
     - name: Assert install_dir seam is provided
       ansible.builtin.assert:
@@ -63,6 +76,15 @@
           Without it the runtime cannot resolve the selected producer.
           Re-run the runtime-daemon playbook (or bootstrap in order).
 
+    # BUG-006: capture the pre-seed state so a tolerated rc=1 is only accepted
+    # when the seed actually produced FRESH state and the complete consumer
+    # link set. rc alone is not proof.
+    - name: Capture the runtime state before seeding
+      ansible.builtin.stat:
+        path: "{{ runtime_seed_current_state }}"
+      register: runtime_seed_pre_state
+      when: not ansible_check_mode
+
     - name: Seed runtime state from default wallpaper
       ansible.builtin.command:
         argv:
@@ -75,11 +97,66 @@
       failed_when: runtime_seed_result.rc not in [0, 1]
       when: not ansible_check_mode
 
-    - name: Assert runtime seed produced current state
+    - name: Capture the runtime state after seeding
+      ansible.builtin.stat:
+        path: "{{ runtime_seed_current_state }}"
+      register: runtime_seed_post_state
+      when: not ansible_check_mode
+
+    - name: Determine whether the seed advanced current.json
+      ansible.builtin.set_fact:
+        runtime_seed_state_advanced: >-
+          {{ (not (runtime_seed_pre_state.stat.exists | default(false)))
+             or ((runtime_seed_post_state.stat.checksum | default(''))
+                 != (runtime_seed_pre_state.stat.checksum | default('')))
+             or ((runtime_seed_post_state.stat.mtime | default(0))
+                 > (runtime_seed_pre_state.stat.mtime | default(0))) }}
+      when: not ansible_check_mode
+
+    - name: Check the runtime consumer links after seeding
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      loop: "{{ runtime_seed_consumer_links }}"
+      register: runtime_seed_consumer_link_checks
+      when: not ansible_check_mode
+
+    - name: Check the runtime consumer links resolve after seeding
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: true
+      loop: "{{ runtime_seed_consumer_links }}"
+      register: runtime_seed_consumer_resolve_checks
+      when: not ansible_check_mode
+
+    # BUG-006: rc 1 is tolerated ONLY when the run still produced fresh state
+    # and every consumer link (rofi/gtk/btop/ags) is a symlink into current/
+    # that resolves. Otherwise fail loudly and name the missing path.
+    - name: Assert runtime seed produced fresh state and complete consumer links
       ansible.builtin.assert:
-        that: runtime_seed_result.rc in [0, 1]
+        that:
+          - runtime_seed_result.rc in [0, 1]
+          - runtime_seed_post_state.stat.exists | default(false)
+          - runtime_seed_state_advanced | bool
+          - runtime_seed_consumer_link_checks.results | selectattr('stat.islnk') | list | length == runtime_seed_consumer_links | length
+          - runtime_seed_consumer_link_checks.results | map(attribute='stat.lnk_target', default='') | select('search', 'dotfiles/current') | list | length == runtime_seed_consumer_links | length
+          - runtime_seed_consumer_resolve_checks.results | selectattr('stat.exists') | list | length == runtime_seed_consumer_links | length
         fail_msg: >-
-          runtime seed failed (rc={{ runtime_seed_result.rc }});
+          runtime seed did not produce fresh state and the complete consumer
+          link set (BUG-006). rc={{ runtime_seed_result.rc }};
+          state_advanced={{ runtime_seed_state_advanced | default(false) }};
+          missing_or_unresolved={{ (runtime_seed_consumer_link_checks.results | default([])
+            | rejectattr('stat.islnk') | map(attribute='item') | list)
+            + (runtime_seed_consumer_link_checks.results | default([])
+            | selectattr('stat.islnk')
+            | rejectattr('stat.lnk_target', 'search', 'dotfiles/current')
+            | map(attribute='item') | list)
+            + (runtime_seed_consumer_resolve_checks.results | default([])
+            | rejectattr('stat.exists') | map(attribute='item') | list) }};
           stdout: {{ runtime_seed_result.stdout | default('') }};
-          stderr: {{ runtime_seed_result.stderr | default('') }}
+          stderr: {{ runtime_seed_result.stderr | default('') }}.
+          Accepting rc=1 requires a fresh current.json AND every link
+          ({{ runtime_seed_consumer_links | join(', ') }}) resolving under
+          dotfiles/current. Re-run the runtime seed after fixing the reported
+          path.
       when: not ansible_check_mode

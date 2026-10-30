@@ -53,6 +53,8 @@ _PLAYBOOKS = (
     "filesystem.yaml",
     "assets.yaml",
     "runtime-seed.yaml",
+    "config-links.yaml",
+    "config-links-post-seed.yaml",
     "compositor-configs.yaml",
     "config-copies.yaml",
     "settings.yaml",

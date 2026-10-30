@@ -26,6 +26,16 @@ Notable changes to the `dotfiles-provision` repo. Format follows
   path). When `producer=tpr`, verify asserts the selected engine image exists
   and runs a bounded real `tpr generate` into a temp directory, failing if the
   selected producer cannot generate.
+- **rofi/gtk/btop palette links are post-seed (BUG-006):** `config_links` is
+  split into pre-seed settings links and post-seed palette-consumer links
+  (`gtk-3.0`, `gtk-4.0`, `rofi`, `btop`). Bootstrap order becomes
+  `config-links → runtime-seed → config-links-post-seed → display-manager →
+  verify`, so rofi never exposes a `colors.rasi` import before the seed
+  creates it. `runtime-seed` now captures pre-state and requires a fresh
+  `current.json` plus every consumer link to resolve; rc 1 is accepted only
+  when those postconditions hold, otherwise bootstrap fails with the missing
+  path. `verify` asserts the rofi/gtk/btop/AGS consumer links are symlinks
+  into `dotfiles/current` and that their targets resolve.
 - **`dotfiles-runtime` pin moves `v0.4.0` → `v0.4.1`:** the `cli_tools` role,
   the composition fixture (`cli-tools.yaml`) and the `verify` mirror
   (`verify_runtime_version` / `verify_runtime_tool_version = 0.4.1`). Runtime

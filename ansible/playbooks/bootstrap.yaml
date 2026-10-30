@@ -6,8 +6,8 @@
 # Dependency order rationale (plan §11 step 7, story 2.12 AC 4, Epic 4):
 #   packages → power_options → cli_tools → filesystem → assets → ags_platform →
 #   gui_tools → ags_apps_units → compositor_configs → config_copies → settings → zsh_tools → zsh_config →
-#   wlogout_config → kitty_config → btop_config → config_links → runtime-seed → display_manager →
-#   gloview-plugin → verify
+#   wlogout_config → kitty_config → btop_config → config_links (pre-seed) → runtime-seed →
+#   config_links_post_seed → display_manager → gloview-plugin → verify
 # `packages` first (it installs the system packages everything else assumes),
 # `verify` last (it asserts every done-criterion after all roles placed their
 # outputs). `gloview-plugin` runs after display_manager so the full desktop
@@ -95,6 +95,11 @@
 - import_playbook: btop-config.yaml
 - import_playbook: config-links.yaml
 - import_playbook: runtime-seed.yaml
+# BUG-006: palette consumers (gtk-3.0/gtk-4.0/rofi/btop) are linked only
+# AFTER the seed created their runtime-owned palette pointers. Linking them in
+# config-links.yaml (before the seed) exposed a rofi theme that hard-imports a
+# not-yet-created colors.rasi.
+- import_playbook: config-links-post-seed.yaml
 - import_playbook: display-manager.yaml
 - import_playbook: gloview-plugin.yaml
 - import_playbook: verify.yaml

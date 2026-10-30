@@ -2002,6 +2002,31 @@
       seeder owns these links, rt-4-2)
   when: not ansible_check_mode
 
+# BUG-006: a raw lnk_target containing /current/ is not proof the target
+# exists. Follow each consumer link and assert it resolves — the rofi launcher
+# hard-imports colors.rasi, so a dangling link is a broken launcher even though
+# the symlink itself is present.
+- name: Check R2 consumer symlinks resolve through current/
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop: "{{ verify_consumer_symlinks }}"
+  register: verify_consumer_symlink_resolve_checks
+  when: not ansible_check_mode
+
+- name: Assert R2 consumer symlinks resolve through current/
+  ansible.builtin.assert:
+    that:
+      - verify_consumer_symlink_resolve_checks.results | selectattr('stat.exists') | list | length == verify_consumer_symlinks | length
+    fail_msg: >-
+      a palette consumer link does not resolve under the runtime current dir
+      (BUG-006): {{ verify_consumer_symlink_resolve_checks.results
+         | rejectattr('stat.exists') | map(attribute='item') | list }}.
+      A launcher that hard-imports the palette (rofi colors.rasi, gtk
+      colors.css, btop theme) would fail at launch. Run the runtime seed and
+      re-run the post-seed config-links playbook.
+  when: not ansible_check_mode
+
 - name: Check XDG base dirs exist
   ansible.builtin.stat:
     path: "{{ item }}"
