@@ -73,6 +73,14 @@ in the provisioning layer.
       arbitrary distinct tags resolve, malformed manifests fail named.
 - [x] Verify/assets/settings pin-mirror tests now compare against the manifest
       the role reads; docs/comments no longer claim a hardcoded mirror.
+- [x] REQ-014b — the remaining mirrors are gone: `verify_*_version`,
+      `settings_*_image_tag` and `assets_{csg,tpr}_pinned_tag` derive from
+      `cli_tools_tags.<name>`; contract handshakes derive as the tag without
+      its `v` (csg's `0.2.0` contract generation stays its own literal because
+      the CLI prints `0.2.2 contract 0.2.0`); the fixture `assets.yaml`
+      template sources use the fact; the tests render every derivation with a
+      sample `cli_tools_tags` to prove the resolved paths/versions come from
+      the manifest. The assets corpus pin (`v0.6.2`) is untouched.
 - [x] Engine version `0.1.28` + CHANGELOG entry; no tag/push.
 
 ## Evidence
@@ -98,11 +106,53 @@ in the provisioning layer.
   `make ci-gates-parity` → `PASS gates=[...] jobs=[...]`.
 - OpenSpec: `openspec validate --all --strict` → `4 passed, 0 failed`.
 
+### REQ-014b — the remaining pin mirrors
+
+- No CLI pin literal left in any role:
+  `rg -n 'v0\.4\.0|v0\.4\.1|v0\.2\.2|v0\.2\.0' ansible/roles` → two comments
+  only (an assets history note and the csg contract explanation); every
+  assignment derives from the fact, e.g.
+  `verify_tpr_version: "{{ cli_tools_tags.tpr }}"`,
+  `settings_tpr_image_tag: "{{ cli_tools_tags.tpr }}"`,
+  `assets_tpr_pinned_tag: "{{ cli_tools_tags.tpr }}"`.
+- Contract handshakes: `verify_{itr,weg,tpr}_contract_version` and
+  `verify_runtime_tool_version` render as the pin without its leading `v`
+  (`regex_replace('^v', '')`); `verify_csg_contract_version` stays `0.2.0`
+  because `csg --version` prints `0.2.2 contract 0.2.0` — the contract token is
+  a separate generation (AD-4), not the package tag.
+- Fixture composition: `tests/fixtures/composition/.../assets.yaml` sources are
+  `{{ install_dir | trim }}/cli-tools/{csg,tpr}/{{ cli_tools_tags.<name> }}/...`,
+  matching the real composition (`dotfiles-v3` already uses that shape).
+- Tests: `TestTprPinMirrors`, `TestCsgAndRuntimePinMirrors`,
+  `test_itr_pin_mirrors_the_manifest`, `test_*_image_tag_mirrors_the_manifest_pin`
+  and the assets source-resolution cases assert the derivation string AND
+  render it with a sample `cli_tools_tags` (via `tests/support.py::render_pin`)
+  to prove the resolved checkout paths, image tags and contract versions come
+  from the manifest.
+- Standalone playbooks: `bootstrap.yaml` always has the fact by the
+  assets/settings/verify plays. So that `dotfiles-provision verify` (and a
+  direct `ansible-playbook` of the three per-role playbooks) keeps working, each
+  playbook's `pre_tasks` imports
+  `ansible/playbooks/_publish_cli_tool_tags.yml`, which publishes
+  `cli_tools_tags` from `manifests_dir`'s `cli-tools.yaml` ONLY when the fact is
+  absent (in bootstrap the `when` is false). No literal pin is reintroduced.
+- Gates on this branch: `make gates` → exit 0 — `test` `953 passed, 3
+  skipped, 60 deselected`; `lint` `All checks passed!`; `hermetic` `922 passed,
+  34 skipped, 60 deselected`; `lock-check` `Resolved 33 packages`; `docs-check`
+  silent (pass). `make ci-gates-parity` → `PASS gates=['docs-check',
+  'hermetic', 'lint', 'lock-check', 'test'] jobs=[...]`.
+
+
 ## Deviations / risks
 
 - `cli_tools_tags` covers pinned (`repo` + `tag`) entries only; source entries
   have no tag by definition. The role keeps the source-path install branch as
   an extension point, but today the composition fixture has no source entry.
-- The assets manifest still owns its own `assets_*_pinned_tag` mirrors; this
-  ticket only documents `cli_tools_tags` as the available mechanism, it does
-  not rewrite the composition-owned `assets.yaml` sources.
+- REQ-014b retires the last mirrors: the composition's `assets.yaml`,
+  `cli-tools.yaml` and the roles all resolve a CLI pin through
+  `cli_tools_tags`, so a pin bump is one manifest edit. The only intentional
+  literal left is `verify_csg_contract_version: 0.2.0` (a contract generation,
+  not a pin, justified above).
+- A direct per-role playbook run needs `-e manifests_dir=<composition>/dotfiles/provisioning`
+  for the fact fallback (the orchestrator already passes it on every command);
+  bootstrap needs nothing extra.
