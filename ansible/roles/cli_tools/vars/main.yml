@@ -11,6 +11,23 @@
 cli_tools_manifests_dir: "{{ manifests_dir }}"
 cli_tools_composition_root: "{{ composition_root }}"
 
+# cli_tools_manifest_path / cli_tools_manifest / cli_tools: the composition
+#   manifest is the SINGLE source of truth for the CLI pins. The role reads
+#   `{{ cli_tools_manifests_dir }}/cli-tools.yaml` at run time (the file the
+#   composition passes through `--manifests-dir`); there is no in-role pin list
+#   to drift from it. Bumping a tag in the composition is therefore sufficient
+#   — the role installs, checks out and image-tags exactly the manifest pins.
+#   tasks/main.yml validates the structure before any clone/install and
+#   publishes the resolved pins as `cli_tools_tags` (name -> tag) for later
+#   plays/roles; that fact is how composition manifests derive tag-qualified
+#   paths (e.g. the `assets.yaml` template `source`) from the pin instead of
+#   hardcoding it. The lookup is lazy (role vars are templated when used), so
+#   `--syntax-check` does not require the file.
+cli_tools_manifest_path: "{{ cli_tools_manifests_dir }}/cli-tools.yaml"
+cli_tools_manifest: >-
+  {{ lookup('ansible.builtin.file', cli_tools_manifest_path) | from_yaml }}
+cli_tools: "{{ cli_tools_manifest.entries | default([], true) }}"
+
 # cli_tools_bin_dir: uv's executable directory, resolved EXACTLY as uv does,
 #   so the PATH prepend + `creates` guard match where `uv tool install` actually
 #   drops the binary. Resolution order (uv docs): $UV_TOOL_BIN_DIR ->
@@ -58,12 +75,12 @@ cli_tools_engine_smoke_image: "docker.io/library/alpine:3.20"
 #   `weg dump-effects` is separate and runs locally.
 #
 #   NOT a second hand-written list of paths/tags: the list SELECTS the named
-#   entries out of `cli_tools` (the manifest mirror above), so each build item
-#   carries exactly the addressing shape of its manifest entry — since S6 all
-#   are pinned `repo`/`tag` entries. The image tag therefore has ONE source:
-#   the manifest `tag`. A pin bump edits the manifest (+ this mirror, locked by
-#   parity) and the build loop below picks the new tag up — there is no
-#   hardcoded tag to miss.
+#   entries out of `cli_tools` (loaded from the composition manifest above), so
+#   each build item carries exactly the addressing shape of its manifest entry —
+#   since S6 all are pinned `repo`/`tag` entries. The image tag therefore has
+#   ONE source: the manifest `tag`. A pin bump edits the composition manifest and
+#   the build loop below picks the new tag up — there is no hardcoded tag or
+#   in-role mirror to miss.
 cli_tools_image_build_names:
   - csg
   - weg
@@ -131,27 +148,11 @@ cli_tools_checkout_root: "{{ install_dir | trim }}/cli-tools"
 cli_tools_pinned: "{{ cli_tools | selectattr('repo', 'defined') | list }}"
 cli_tools_source_entries: "{{ cli_tools | rejectattr('repo', 'defined') | list }}"
 
-# cli_tools: install specs mirroring dotfiles/provisioning/cli-tools.yaml
-#   (csg + weg + itr + tpr + dotfiles-runtime -> pinned repo/tag).
-#   The console-script name is the install target; `itr` IS the icon-renderer
-#   (no separate binary). itr and dotfiles-runtime have NO container mode and
-#   are NOT in cli_tools_image_builds (the runtime is host-side
-#   reconcile/inspect only). `tpr` is the opt-in palette producer (REQ-010).
-#   Parity with the manifest is locked by a structural test, including the
-#   one-shape-per-entry rule (source XOR repo+tag).
-cli_tools:
-  - name: csg
-    repo: https://github.com/RandomGenericUsername/color-scheme-generator
-    tag: v0.2.2
-  - name: weg
-    repo: https://github.com/RandomGenericUsername/wallpaper-effects-generator
-    tag: v0.2.0
-  - name: itr
-    repo: https://github.com/RandomGenericUsername/icon-templates-renderer
-    tag: v0.2.0
-  - name: tpr
-    repo: https://github.com/RandomGenericUsername/theme-producer
-    tag: v0.4.0
-  - name: dotfiles-runtime
-    repo: https://github.com/RandomGenericUsername/dotfiles-runtime
-    tag: v0.4.1
+# cli_tools (loaded above from dotfiles/provisioning/cli-tools.yaml) holds the
+#   entries: `{name, repo, tag}` (pinned external checkout) or `{name, source}`
+#   (in-repo package path). The console-script name is the install target;
+#   `itr` IS the icon-renderer (no separate binary). itr and dotfiles-runtime
+#   have NO container mode and are NOT in cli_tools_image_builds (the runtime is
+#   host-side reconcile/inspect only). `tpr` is the opt-in palette producer
+#   (REQ-010). The one-shape-per-entry rule (source XOR repo+tag) is validated
+#   in tasks/main.yml before any clone/install.

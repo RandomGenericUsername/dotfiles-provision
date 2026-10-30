@@ -29,6 +29,13 @@
       --composition-root; direct runs pass -e manifests_dir=... -e
       composition_root=...
 
+# ── Composition manifest: the ONLY CLI pin source ──
+# `cli_tools` is loaded from `{{ cli_tools_manifests_dir }}/cli-tools.yaml` in
+# vars/main.yml. tasks/manifest.yml validates it and publishes `cli_tools_tags`
+# BEFORE any clone/install (or any other mutation).
+- name: Validate the CLI tools manifest and publish its pins
+  ansible.builtin.import_tasks: manifest.yml
+
 # AGS app launchers are NOT installed here anymore. The final topology is
 # all-standalone: ags_apps_units renders every `launcher` declared in the one
 # composition app list (capture-ui, clipboard-ui, wallpaper-selector-ui,

@@ -284,9 +284,10 @@ class TestPinMirrorsMatchTheManifest:
 
 
 class TestTprPinMirrors:
-    """REQ-010: tpr v0.4.0 has the same multi-leg pin shape as csg — the role
-    mirror, the fixture CLI entry, the assets catalog source, the settings
-    image tag and the verify mirror must all agree."""
+    """REQ-010: tpr v0.4.0 has the same multi-leg pin shape as csg — the
+    composition CLI entry (read by `cli_tools` at run time since REQ-014), the
+    assets catalog source, the settings image tag and the verify mirror must all
+    agree."""
 
     @staticmethod
     def _role_vars(role: str) -> dict[str, Any]:
@@ -302,11 +303,6 @@ class TestTprPinMirrors:
         fixture_tpr = next(
             entry for entry in cli_manifest["entries"] if entry.get("name") == "tpr"
         )
-        role_tpr = next(
-            entry
-            for entry in self._role_vars("cli_tools")["cli_tools"]
-            if entry.get("name") == "tpr"
-        )
         assets_vars = self._role_vars("assets")
         settings_vars = self._role_vars("settings")
         verify_vars = self._role_vars("verify")
@@ -318,7 +314,6 @@ class TestTprPinMirrors:
         )["source"]
 
         assert fixture_tpr["tag"] == expected
-        assert role_tpr["tag"] == expected
         assert assets_vars["assets_tpr_pinned_tag"] == expected, (
             "assets_tpr_pinned_tag must mirror the tpr pin"
         )
@@ -339,12 +334,12 @@ class TestTprPinMirrors:
 class TestCsgAndRuntimePinMirrors:
     """REQ-009: one cross-leg guard for every csg/runtime literal the engine owns.
 
-    csg v0.2.2 has five independent literals (role, assets csg-template mirror,
-    settings rendered image tag, verify, fixture) plus the fixture source path;
-    the runtime has three (role, both verify literals, fixture). The
-    role-specific tests also cover their own leg, but this guard names the whole
-    set so a bump cannot leave one leg behind while every local test stays
-    green.
+    csg v0.2.2 has independent mirrors (the composition CLI entry read by
+    `cli_tools` at run time, assets csg-template source, the settings rendered
+    image tag, verify) plus the fixture source path; the runtime has both verify
+    literals. The role-specific tests also cover their own leg, but this guard
+    names the whole set so a bump cannot leave one leg behind while every local
+    test stays green.
     """
 
     @staticmethod
@@ -363,11 +358,6 @@ class TestCsgAndRuntimePinMirrors:
     def test_all_five_csg_mirrors_and_fixture_source_are_v0_2_2(self) -> None:
         expected = "v0.2.2"
         fixture_csg = self._cli_entry("csg")
-        role_csg = next(
-            entry
-            for entry in self._role_vars("cli_tools")["cli_tools"]
-            if entry.get("name") == "csg"
-        )
         assets_vars = self._role_vars("assets")
         settings_vars = self._role_vars("settings")
         verify_vars = self._role_vars("verify")
@@ -380,9 +370,6 @@ class TestCsgAndRuntimePinMirrors:
 
         assert fixture_csg["tag"] == expected, (
             f"fixture cli-tools.yaml csg.tag must be {expected}; got {fixture_csg['tag']!r}"
-        )
-        assert role_csg["tag"] == expected, (
-            f"roles/cli_tools csg tag must be {expected}; got {role_csg['tag']!r}"
         )
         assert assets_vars["assets_csg_pinned_tag"] == expected, (
             "assets_csg_pinned_tag must mirror the csg pin; got "
@@ -412,18 +399,10 @@ class TestCsgAndRuntimePinMirrors:
     def test_runtime_mirrors_are_v0_4_1(self) -> None:
         expected = "v0.4.1"
         fixture_runtime = self._cli_entry("dotfiles-runtime")
-        role_runtime = next(
-            entry
-            for entry in self._role_vars("cli_tools")["cli_tools"]
-            if entry.get("name") == "dotfiles-runtime"
-        )
         verify_vars = self._role_vars("verify")
 
         assert fixture_runtime["tag"] == expected, (
             f"fixture cli-tools.yaml runtime tag must be {expected}; got {fixture_runtime['tag']!r}"
-        )
-        assert role_runtime["tag"] == expected, (
-            f"roles/cli_tools runtime tag must be {expected}; got {role_runtime['tag']!r}"
         )
         assert verify_vars["verify_runtime_version"] == expected, (
             f"verify_runtime_version must be {expected}; got {verify_vars['verify_runtime_version']!r}"

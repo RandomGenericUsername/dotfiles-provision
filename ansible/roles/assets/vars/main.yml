@@ -97,11 +97,12 @@ assets_wallpapers_dest: "{{ install_dir | trim }}/wallpapers"
 #   cli-tools.yaml → assets.yaml, locked by the dependency-order test).
 #
 #   `assets_csg_pinned_tag` is the AD-11 mirror of the manifest `csg.tag`
-#   (this role deliberately has no manifest reader, like roles/settings);
-#   `TestAssetsCsgTemplatesSource` fails if the manifest, the cli_tools mirror
-#   or this var drift, and the role asserts the resolved dir exists before the
-#   copy so a missing/mis-pinned checkout fails loud instead of silently
-#   deploying nothing.
+#   (this role deliberately has no manifest reader, like roles/settings; the
+#   `cli_tools` role reads that manifest directly since REQ-014);
+#   `TestAssetsCsgTemplatesSource` fails if the manifest or this var drift, and
+#   the role asserts the resolved dir exists before the copy so a
+#   missing/mis-pinned checkout fails loud instead of silently deploying
+#   nothing.
 assets_csg_pinned_tag: v0.2.2
 assets_csg_templates_source: >-
   {{ install_dir | trim }}/cli-tools/csg/{{ assets_csg_pinned_tag }}/src/color_scheme_generator/defaults/templates

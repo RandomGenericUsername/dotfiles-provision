@@ -1,0 +1,100 @@
+# Composition manifest: the ONLY CLI pin source.
+#
+# `cli_tools` is loaded from `{{ cli_tools_manifests_dir }}/cli-tools.yaml` in
+# vars/main.yml. Validate it loudly BEFORE any clone/install (or any other
+# mutation) so a malformed manifest names the offending entry/field instead of
+# half-provisioning a host. The role carries no hardcoded pin list to fall back
+# to.
+- name: Assert the CLI tools manifest is structurally valid
+  ansible.builtin.assert:
+    that:
+      - cli_tools_manifest is mapping
+      - cli_tools_manifest.kind | default('') == 'cli-tools'
+      - cli_tools is sequence
+      - cli_tools | length > 0
+    fail_msg: >-
+      {{ cli_tools_manifest_path }} must be a `kind: cli-tools` manifest with a
+      non-empty `entries` list (got kind={{
+      cli_tools_manifest.kind | default('<missing>') }}, entries={{
+      cli_tools | length }}). The composition owns this file; the engine has no
+      in-role pin list to fall back to.
+
+- name: Assert every CLI entry has a safe identifier
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.name is defined
+      - item.name is string
+      - item.name is match('^[a-z][a-z0-9-]*$')
+    fail_msg: >-
+      {{ cli_tools_manifest_path }} entry {{ cli_tools_entry_index }} has an
+      invalid `name` ({{ item.name | default(item) }}): `name` must be a
+      non-empty lowercase identifier matching ^[a-z][a-z0-9-]*$ because it is
+      the console-script install target and the key in cli_tools_tags.
+  loop: "{{ cli_tools }}"
+  loop_control:
+    index_var: cli_tools_entry_index
+    label: "{{ item.name | default('<unnamed>') }}"
+
+- name: Assert every CLI entry name is unique
+  ansible.builtin.assert:
+    that:
+      - cli_tools | selectattr('name', 'equalto', item.name) | list | length == 1
+    fail_msg: >-
+      duplicate CLI entry name '{{ item.name }}' in {{ cli_tools_manifest_path
+      }} — `name` must be unique because it is the install target and the key
+      in cli_tools_tags.
+  loop: "{{ cli_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Assert a source entry addresses exactly one shape
+  ansible.builtin.assert:
+    that:
+      - item.repo is not defined
+      - item.tag is not defined
+      - item.source | string | trim | length > 0
+    fail_msg: >-
+      CLI entry '{{ item.name }}' in {{ cli_tools_manifest_path }} declares
+      `source` together with `repo`/`tag`, or an empty `source`. An entry
+      addresses exactly one shape: `source` XOR `repo` + `tag`.
+  when: item.source is defined
+  loop: "{{ cli_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Assert a pinned entry declares a non-empty repo
+  ansible.builtin.assert:
+    that:
+      - item.repo is defined
+      - item.repo | string | trim | length > 0
+    fail_msg: >-
+      CLI entry '{{ item.name }}' in {{ cli_tools_manifest_path }} is missing a
+      non-empty `repo` — a pinned entry requires `repo` + `tag` (spine AD-10).
+  when: item.source is not defined
+  loop: "{{ cli_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Assert a pinned entry declares a non-empty tag
+  ansible.builtin.assert:
+    that:
+      - item.tag is defined
+      - item.tag | string | trim | length > 0
+    fail_msg: >-
+      CLI entry '{{ item.name }}' in {{ cli_tools_manifest_path }} is missing a
+      non-empty `tag` — a pinned entry requires `repo` + `tag`, never an
+      unpinned branch head (spine AD-10).
+  when: item.source is not defined
+  loop: "{{ cli_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Publish the resolved pins for later plays/roles (set_fact persists across
+# imported playbooks for the same host). Composition manifests use this fact to
+# derive tag-qualified paths from the pin — e.g. the `assets.yaml` template
+# `source` — instead of hardcoding a tag. Source entries have no tag, so they
+# are intentionally absent.
+- name: Publish resolved CLI pins as facts for later plays/roles
+  ansible.builtin.set_fact:
+    cli_tools_tags: "{{ cli_tools_pinned | items2dict(key_name='name', value_name='tag') }}"

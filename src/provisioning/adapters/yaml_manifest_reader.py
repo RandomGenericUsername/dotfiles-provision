@@ -26,8 +26,8 @@ _ALLOWED_MANIFEST_KEYS = frozenset({"kind", "entries"})
 #: The pinned-corpus block is valid ONLY on the assets manifest (spine AD-6):
 #: `assets: {repo, tag, classes}` is the single source of truth for the pin and
 #: the destination class map. It is validated here but NOT captured into the
-#: domain view (Ansible never reads the manifest; the role mirrors it and a
-#: parity test locks the mirror).
+#: domain view (most roles mirror their manifest and a parity test locks the
+#: mirror; `cli_tools` reads `cli-tools.yaml` directly at run time, REQ-014).
 _ASSETS_BLOCK_KIND = "assets"
 _ASSET_CLASSES = ("icons", "templates", "configs", "content", "desktop")
 _TAG = re.compile(r"^v\d+\.\d+\.\d+$")

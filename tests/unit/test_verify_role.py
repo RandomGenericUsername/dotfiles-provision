@@ -1974,12 +1974,13 @@ class TestVerifyVars:
             "dotfiles-runtime",
         ]
 
-    def test_itr_pin_mirrors_the_cli_tools_role(self) -> None:
-        """AD-11: verify carries INDEPENDENT literal pins mirroring the role so
-        a wrong-tag install cannot hide behind a green `command -v`. The
-        checkout path shape is <install>/cli-tools/<name>/<tag> (AD-10), the
-        pin record sits next to the checkout, and the contract token equals
-        the `contracts` tag dotfiles pins."""
+    def test_itr_pin_mirrors_the_manifest(self) -> None:
+        """AD-11: verify carries INDEPENDENT literal pins mirroring the
+        composition manifest the role reads, so a wrong-tag install cannot hide
+        behind a green `command -v`. The checkout path shape is
+        <install>/cli-tools/<name>/<tag> (AD-10), the pin record sits next to
+        the checkout, and the contract token equals the `contracts` tag
+        dotfiles pins."""
         data = _vars()
         assert (
             str(data["verify_cli_tools_checkout_root"])
@@ -1994,12 +1995,14 @@ class TestVerifyVars:
         )
         assert str(data["verify_itr_contract_version"]) == "0.2.0"
 
-        role_vars = yaml.safe_load(
-            (_ROLES_DIR.parent / "cli_tools" / "vars" / "main.yml").read_text()
+        # REQ-014: the role reads this manifest at run time; it no longer owns
+        # a copy of the pins. Verify's independent literals must still match it.
+        manifest = yaml.safe_load(
+            (_REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
         )
         pinned = [
             entry
-            for entry in role_vars["cli_tools"]
+            for entry in manifest["entries"]
             if "repo" in entry or "tag" in entry
         ]
         assert [(entry["name"], entry["tag"]) for entry in pinned] == [
@@ -2008,7 +2011,8 @@ class TestVerifyVars:
             ("itr", str(data["verify_itr_version"])),
             ("tpr", str(data["verify_tpr_version"])),
             ("dotfiles-runtime", str(data["verify_runtime_version"])),
-        ], "verify_*_version must equal the role's pins"
+        ], "verify_*_version must equal the manifest pins the role installs"
+        role_vars = _sibling_vars("cli_tools")
         assert str(role_vars["cli_tools_checkout_root"]) == str(
             data["verify_cli_tools_checkout_root"]
         )
@@ -2220,10 +2224,9 @@ class TestVerifyVars:
         assert names.index(image_name) < names.index(assert_name)
 
     def test_csg_image_tag_mirrors_the_manifest_and_settings_render(self) -> None:
-        """The csg pin has one source (the manifest) and two sanctioned mirrors
-        besides this role's copy: the settings render var and the `csg` entry in
-        the role. All four must agree, or a bump could build one tag and render
-        another (AD-7)."""
+        """The csg pin has one source (the manifest, read by `cli_tools` at run
+        time) and two sanctioned mirrors: the settings render var and verify.
+        All must agree, or a bump could build one tag and render another (AD-7)."""
         manifest = yaml.safe_load(
             (_REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
         )
@@ -2231,13 +2234,8 @@ class TestVerifyVars:
         settings_vars = yaml.safe_load(
             (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
         )
-        role_vars = yaml.safe_load(
-            (_ROLES_DIR.parent / "cli_tools" / "vars" / "main.yml").read_text()
-        )
-        role_csg = next(e for e in role_vars["cli_tools"] if e.get("name") == "csg")
         assert str(_vars()["verify_csg_version"]) == str(csg["tag"])
         assert str(settings_vars["settings_csg_image_tag"]) == str(csg["tag"])
-        assert str(role_csg["tag"]) == str(csg["tag"])
 
     def test_tpr_pin_and_all_three_images_are_asserted_by_execution(self) -> None:
         """REQ-010: tpr's checkout, pin record, package version and all three
@@ -2348,8 +2346,9 @@ class TestVerifyVars:
         assert "theme-producer" in [str(d) for d in data["verify_managed_link_dirs"]]
 
     def test_tpr_image_tag_mirrors_the_manifest_and_settings_render(self) -> None:
-        """One pin source (the manifest) and the settings/cli_tools/verify
-        mirrors must agree, or a bump could build one tag and render another."""
+        """One pin source (the manifest, read by `cli_tools` at run time) and the
+        settings/verify mirrors must agree, or a bump could build one tag and
+        render another."""
         manifest = yaml.safe_load(
             (_REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
         )
@@ -2357,13 +2356,8 @@ class TestVerifyVars:
         settings_vars = yaml.safe_load(
             (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
         )
-        role_vars = yaml.safe_load(
-            (_ROLES_DIR.parent / "cli_tools" / "vars" / "main.yml").read_text()
-        )
-        role_tpr = next(e for e in role_vars["cli_tools"] if e.get("name") == "tpr")
         assert str(_vars()["verify_tpr_version"]) == str(tpr["tag"])
         assert str(settings_vars["settings_tpr_image_tag"]) == str(tpr["tag"])
-        assert str(role_tpr["tag"]) == str(tpr["tag"])
 
     def test_notifd_binding_packages_pin_libastal_notifd(self) -> None:
         """Implementation gate (capture-notifications): verify pins the
@@ -2774,25 +2768,7 @@ class TestVerifyRuntimePinMirror:
 
     def test_engine_consumes_runtime_v0_4_1(self) -> None:
         verify_vars = _vars()
-        cli_tools_vars = _sibling_vars("cli_tools")
-        runtime = next(
-            entry
-            for entry in cli_tools_vars["cli_tools"]
-            if entry["name"] == "dotfiles-runtime"
-        )
-        assert runtime["tag"] == "v0.4.1", (
-            "the cli_tools role must install dotfiles-runtime v0.4.1 "
-            f"(producer config + tpr container runtime); got {runtime['tag']!r}"
-        )
-        assert verify_vars["verify_runtime_version"] == "v0.4.1", (
-            "verify_runtime_version must mirror the role pin v0.4.1; got "
-            f"{verify_vars['verify_runtime_version']!r}"
-        )
-        assert verify_vars["verify_runtime_tool_version"] == "0.4.1", (
-            "verify_runtime_tool_version must be the tag without its leading "
-            f"'v' (0.4.1); got {verify_vars['verify_runtime_tool_version']!r}"
-        )
-        fixture = yaml.safe_load(
+        manifest = yaml.safe_load(
             (
                 composition_root()
                 / "dotfiles"
@@ -2800,14 +2776,22 @@ class TestVerifyRuntimePinMirror:
                 / "cli-tools.yaml"
             ).read_text()
         )
-        fixture_runtime = next(
+        runtime = next(
             entry
-            for entry in fixture["entries"]
+            for entry in manifest["entries"]
             if entry["name"] == "dotfiles-runtime"
         )
-        assert fixture_runtime["tag"] == "v0.4.1", (
-            "the fixture cli-tools.yaml runtime tag must mirror the role pin "
-            f"v0.4.1; got {fixture_runtime['tag']!r}"
+        assert runtime["tag"] == "v0.4.1", (
+            "the cli-tools manifest must pin dotfiles-runtime v0.4.1 "
+            f"(producer config + tpr container runtime); got {runtime['tag']!r}"
+        )
+        assert verify_vars["verify_runtime_version"] == "v0.4.1", (
+            "verify_runtime_version must mirror the manifest pin v0.4.1; got "
+            f"{verify_vars['verify_runtime_version']!r}"
+        )
+        assert verify_vars["verify_runtime_tool_version"] == "0.4.1", (
+            "verify_runtime_tool_version must be the tag without its leading "
+            f"'v' (0.4.1); got {verify_vars['verify_runtime_tool_version']!r}"
         )
 
     def test_tool_version_is_the_tag_without_its_prefix(self) -> None:

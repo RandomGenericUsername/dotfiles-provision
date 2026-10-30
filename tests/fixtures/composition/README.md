@@ -2,8 +2,10 @@
 
 This is a **test input**, not a deployable composition. It exists because the
 engine repo (this repo) owns the Ansible tree but no composition checkout, while
-several structural tests have to compare a role's mirror with the manifest that
-is authoritative in the composition repo.
+several structural tests compare a role's mirror with the manifest that is
+authoritative in the composition repo. `cli_tools` is different: it reads
+`cli-tools.yaml` from here at run time (REQ-014), so this fixture is also the
+role's input in tests.
 
 Provenance: copied from `dotfiles-v3@854bac08` when the engine was extracted
 (slice S6a):
@@ -13,9 +15,9 @@ Provenance: copied from `dotfiles-v3@854bac08` when the engine was extracted
 
 The runtime is **not** stubbed here: since REQ-002 it is the pinned
 `dotfiles-runtime` repo, so the fixture carries only the composition files the
-engine's mirrors are compared against.
+engine reads and compares against.
 
-To check the engine's mirrors against a **real** composition instead, point
+To check the engine against a **real** composition instead, point
 `DOTFILES_COMPOSITION_ROOT` at one:
 
 ```bash

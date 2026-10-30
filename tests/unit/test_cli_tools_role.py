@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -125,32 +126,8 @@ def _role_vars() -> dict[str, object]:
     return data
 
 
-def _role_entries() -> list[dict[str, object]]:
-    return [dict(item) for item in _role_vars()["cli_tools"]]
-
-
 def _entry_is_pinned(entry: dict[str, object]) -> bool:
     return "repo" in entry or "tag" in entry
-
-
-def _assert_one_addressing_shape(entry: dict[str, object]) -> None:
-    """A cli_tools entry carries `source` XOR (`repo` + `tag`) — spine AD-10.
-
-    Both shapes are valid during the extraction window; an entry with neither
-    installs nothing while still passing name validation, and an entry with
-    both hides which address is authoritative (a local path would silently win
-    for one consumer while the others resolve the tag)."""
-    has_source = "source" in entry
-    has_repo = "repo" in entry
-    has_tag = "tag" in entry
-    assert not (has_source and (has_repo or has_tag)), (
-        f"{entry.get('name')!r} carries both source and repo/tag — a CLI-tools "
-        "entry addresses exactly one of an in-repo source or a pinned repo+tag"
-    )
-    assert has_source or (has_repo and has_tag), (
-        f"{entry.get('name')!r} carries neither a source nor a repo+tag pair — "
-        "the role could not install it"
-    )
 
 
 def _argv_of(task: dict[str, object]) -> list[str] | None:
@@ -177,16 +154,90 @@ def _image_build_tasks() -> list[dict[str, object]]:
 def _cli_tools_image_builds() -> list[dict[str, object]]:
     """The role's image-build entries.
 
-    `cli_tools_image_builds` is a SELECTION over the manifest mirror
+    `cli_tools_image_builds` is a SELECTION over the composition manifest
     (`cli_tools | selectattr('name', 'in', cli_tools_image_build_names)`), not
     a second hand-written list — so the build context and the image tag come
     from the entry's own addressing shape (source XOR repo+tag). This helper
-    applies that same selection to the parsed mirror.
+    applies that same selection to the fixture manifest the role reads.
     """
     data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
     names = [str(name) for name in data["cli_tools_image_build_names"]]
-    entries = [dict(entry) for entry in data["cli_tools"]]
+    entries = _manifest_entries()
     return [entry for entry in entries if str(entry.get("name")) in names]
+
+
+def _run_manifest_tasks(
+    tmp_path: Path,
+    manifest: dict[str, object] | str,
+    expected_tags: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run the role's real var-load + validation tasks against a fixture manifest.
+
+    This exercises the SAME files the role uses (`vars/main.yml` +
+    `tasks/manifest.yml`) through a real `ansible-playbook`, so the assertion
+    is about run-time resolution, not a Python re-implementation. When
+    ``expected_tags`` is supplied the play asserts ``cli_tools_tags`` equals it.
+    """
+    ansible_playbook = shutil.which("ansible-playbook")
+    assert ansible_playbook is not None, (
+        "ansible-playbook is required: REQ-014 resolves the manifest at run time"
+    )
+
+    composition = tmp_path / "composition"
+    provisioning = composition / "dotfiles" / "provisioning"
+    provisioning.mkdir(parents=True)
+    manifest_text = (
+        manifest
+        if isinstance(manifest, str)
+        else yaml.safe_dump(manifest, sort_keys=False)
+    )
+    (provisioning / "cli-tools.yaml").write_text(manifest_text)
+
+    task_lines = [
+        "- name: Load the cli_tools role vars",
+        "  ansible.builtin.include_vars:",
+        f"    file: {json.dumps(str(_ROLES_DIR / 'vars' / 'main.yml'))}",
+        "- name: Validate and publish the manifest pins",
+        "  ansible.builtin.include_tasks:",
+        f"    file: {json.dumps(str(_ROLES_DIR / 'tasks' / 'manifest.yml'))}",
+    ]
+    if expected_tags is not None:
+        expected_json = json.dumps(expected_tags, sort_keys=True)
+        task_lines += [
+            "- name: Prove the resolved pins are the manifest pins",
+            "  ansible.builtin.assert:",
+            "    that:",
+            f"      - {json.dumps('cli_tools_tags == ' + expected_json)}",
+            "    fail_msg: >-",
+            "      the role resolved {{ cli_tools_tags | to_json }}, expected",
+            f"      {expected_json}",
+        ]
+
+    playbook = tmp_path / "manifest-probe.yml"
+    playbook.write_text(
+        "\n".join(
+            [
+                "- name: Probe the cli_tools manifest source",
+                "  hosts: localhost",
+                "  gather_facts: false",
+                "  vars:",
+                f"    manifests_dir: {json.dumps(str(provisioning))}",
+                f"    composition_root: {json.dumps(str(composition))}",
+                "  tasks:",
+                *(f"    {line}" for line in task_lines),
+                "",
+            ]
+        )
+    )
+
+    env = dict(os.environ)
+    env["ANSIBLE_CONFIG"] = str(_ANSIBLE_DIR / "ansible.cfg")
+    return subprocess.run(
+        [ansible_playbook, str(playbook)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
 
 
 class TestCliToolsRoleTree:
@@ -544,17 +595,17 @@ class TestCliToolsImageBuildTasks:
         names = {b["name"] for b in _cli_tools_image_builds()}
         assert {"csg", "weg", "tpr"} <= names, "csg, weg and tpr must all be image-built"
 
-    def test_image_builds_derive_from_the_manifest_mirror(self) -> None:
+    def test_image_builds_derive_from_the_manifest_entries(self) -> None:
         """AD-7 'the tag is the pin, not latest', kept as ONE source: the image
-        build list is derived from the `cli_tools` mirror (which the parity test
-        locks to the manifest), so the tag value is the manifest tag — never a
-        hardcoded duplicate. The only pin literal lives in the `cli_tools`
-        entry."""
+        build list is derived from `cli_tools` (loaded from the composition
+        manifest at run time), so the tag value is the manifest tag — never a
+        hardcoded duplicate. The only pin literal lives in the composition
+        manifest entry."""
         data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
         expression = str(data["cli_tools_image_builds"])
         assert "cli_tools" in expression and "selectattr" in expression, (
-            "cli_tools_image_builds must select the entries from the manifest "
-            "mirror instead of restating paths/tags"
+            "cli_tools_image_builds must select the entries from the loaded "
+            "manifest instead of restating paths/tags"
         )
         assert _TAG_LITERAL.search(expression) is None, (
             "the image-build selection must not carry a tag literal — "
@@ -962,7 +1013,9 @@ class TestCliToolsPinnedCheckout:
         assert data["cli_tools_checkout_root"] == "{{ install_dir | trim }}/cli-tools", (
             "AD-10 path shape is <install>/cli-tools/<name>/<tag>"
         )
-        pinned = [e for e in data["cli_tools"] if _entry_is_pinned(e)]
+        # The fixture composition is what the role reads at run time; there is
+        # no in-role pin list anymore (REQ-014).
+        pinned = [e for e in _manifest_entries() if _entry_is_pinned(e)]
         assert [e["name"] for e in pinned] == [
             "csg",
             "weg",
@@ -1095,6 +1148,138 @@ class TestCliToolsPinnedCheckout:
         assert checks[0].get("loop") == "{{ cli_tools }}"
 
 
+class TestCliToolsManifestSource:
+    """REQ-014: the composition manifest is the single pin source.
+
+    These tests run the role's real var-load + validation tasks with a fixture
+    manifest, so they prove the resolved tags are its tags — not a hardcoded
+    engine list — and that a malformed manifest fails loudly before any
+    clone/install with a message naming the entry and field.
+    """
+
+    def test_role_resolves_the_manifest_tags(self, tmp_path: Path) -> None:
+        manifest = {
+            "kind": "cli-tools",
+            "entries": [
+                {
+                    "name": "csg",
+                    "repo": "https://example.invalid/color-scheme-generator",
+                    "tag": "v9.9.1",
+                },
+                {
+                    "name": "weg",
+                    "repo": "https://example.invalid/wallpaper-effects-generator",
+                    "tag": "v8.8.2",
+                },
+                {"name": "local-tool", "source": "src/cli-tools/local-tool"},
+            ],
+        }
+        result = _run_manifest_tasks(
+            tmp_path,
+            manifest,
+            expected_tags={"csg": "v9.9.1", "weg": "v8.8.2"},
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    @pytest.mark.parametrize(
+        ("manifest", "fragments"),
+        [
+            pytest.param(
+                {
+                    "kind": "cli-tools",
+                    "entries": [
+                        {
+                            "name": "dup",
+                            "repo": "https://example.invalid/one",
+                            "tag": "v1.0.0",
+                        },
+                        {
+                            "name": "dup",
+                            "repo": "https://example.invalid/two",
+                            "tag": "v2.0.0",
+                        },
+                    ],
+                },
+                ("duplicate CLI entry name 'dup'", "`name` must be unique"),
+                id="duplicate-name",
+            ),
+            pytest.param(
+                {
+                    "kind": "cli-tools",
+                    "entries": [
+                        {
+                            "name": "both",
+                            "source": "src/cli-tools/both",
+                            "repo": "https://example.invalid/both",
+                            "tag": "v1.0.0",
+                        }
+                    ],
+                },
+                ("CLI entry 'both'", "`source` XOR `repo` + `tag`"),
+                id="both-shapes",
+            ),
+            pytest.param(
+                {
+                    "kind": "cli-tools",
+                    "entries": [
+                        {
+                            "name": "no-tag",
+                            "repo": "https://example.invalid/no-tag",
+                        }
+                    ],
+                },
+                ("CLI entry 'no-tag'", "non-empty `tag`"),
+                id="missing-tag",
+            ),
+            pytest.param(
+                {
+                    "kind": "cli-tools",
+                    "entries": [
+                        {
+                            "name": "Bad_Name",
+                            "repo": "https://example.invalid/bad",
+                            "tag": "v1.0.0",
+                        }
+                    ],
+                },
+                ("invalid `name` (Bad_Name)", "^[a-z][a-z0-9-]*$"),
+                id="unsafe-name",
+            ),
+            pytest.param(
+                {
+                    "entries": [
+                        {
+                            "name": "no-kind",
+                            "repo": "https://example.invalid/no-kind",
+                            "tag": "v1.0.0",
+                        }
+                    ]
+                },
+                ("`kind: cli-tools`", "entries=1"),
+                id="missing-kind",
+            ),
+            pytest.param(
+                {"kind": "cli-tools", "entries": []},
+                ("non-empty `entries`", "entries=0"),
+                id="empty-entries",
+            ),
+        ],
+    )
+    def test_malformed_manifest_fails_naming_the_entry_and_field(
+        self,
+        tmp_path: Path,
+        manifest: dict[str, object],
+        fragments: tuple[str, ...],
+    ) -> None:
+        result = _run_manifest_tasks(tmp_path, manifest)
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, output
+        for fragment in fragments:
+            assert fragment in output, (
+                f"expected {fragment!r} in the failure; got:\n{output}"
+            )
+
+
 class TestCliToolsVars:
     def test_vars_parse_with_required_keys(self) -> None:
         data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
@@ -1164,59 +1349,13 @@ class TestCliToolsVars:
         """REQ-002 end state: every entry — csg, weg, itr and the runtime — is
         pinned. The source-path branch remains as an extension point but selects
         nothing; a source entry reappearing silently reopens the mixed shape."""
-        data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
         source_names = [
             str(entry["name"])
-            for entry in data["cli_tools"]
+            for entry in _manifest_entries()
             if "source" in entry
         ]
         assert source_names == [], (
             "no CLI may be installed from an in-repo source after REQ-002"
-        )
-
-    def test_cli_tools_parity_with_manifest(self) -> None:
-        """Parity lock: the role var exactly mirrors the manifest, and every
-        entry on BOTH sides carries exactly one addressing shape — `source`
-        XOR `repo` + `tag` (spine AD-10). The role and the manifest are
-        hand-maintained mirrors, so both the values and the shape are asserted
-        together: a pinned entry that lost its tag would install nothing, and
-        an entry carrying both would let a local path shadow the pin."""
-        role_entries = _role_entries()
-        manifest_entries = _manifest_entries()
-        assert len(role_entries) == len(manifest_entries)
-        assert {tuple(e.items()) for e in role_entries} == {
-            tuple(e.items()) for e in manifest_entries
-        }
-        for entry in role_entries + manifest_entries:
-            _assert_one_addressing_shape(entry)
-
-    def test_parity_rejects_a_pinned_entry_without_tag(self) -> None:
-        """A repo without a tag has no pin to install; the parity shape lock
-        must reject it instead of falling through to a branch head."""
-        with pytest.raises(AssertionError):
-            _assert_one_addressing_shape(
-                {"name": "itr", "repo": "https://example.invalid/itr"}
-            )
-
-    def test_parity_rejects_an_entry_with_neither_shape(self) -> None:
-        with pytest.raises(AssertionError):
-            _assert_one_addressing_shape({"name": "itr"})
-
-    def test_parity_rejects_an_entry_with_both_shapes(self) -> None:
-        with pytest.raises(AssertionError):
-            _assert_one_addressing_shape(
-                {
-                    "name": "itr",
-                    "source": "src/cli-tools/icon-templates-renderer",
-                    "repo": "https://example.invalid/itr",
-                    "tag": "v0.1.0",
-                }
-            )
-
-    def test_parity_accepts_both_valid_shapes(self) -> None:
-        _assert_one_addressing_shape({"name": "csg", "source": "src/cli-tools/x"})
-        _assert_one_addressing_shape(
-            {"name": "itr", "repo": "https://example.invalid/itr", "tag": "v0.1.0"}
         )
 
     def test_cli_tools_bin_dir_defaults_under_home(self) -> None:

@@ -324,8 +324,9 @@ verify_cli_tools:
 
 # verify_cli_tools_checkout_root / verify_itr_*: the pinned external CLI
 #   checkouts (spine AD-10/AD-11). `verify` carries INDEPENDENT literal pins
-#   mirroring roles/cli_tools (a parity test locks role == verify == manifest),
-#   so a wrong-tag install cannot hide behind a green `command -v`:
+#   mirroring the composition manifest `cli_tools` reads at run time (a parity
+#   test locks verify == manifest since REQ-014), so a wrong-tag install cannot
+#   hide behind a green `command -v`:
 #   - the checkout lives under the install-cli-tools root, in an itr dir named
 #     by the tag;
 #   - <install-cli-tools>/itr/pinned records exactly that tag;

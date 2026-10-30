@@ -1,4 +1,7 @@
-# CLI tools installed by the `cli_tools` role (fixture mirror).
+# CLI tools installed by the `cli_tools` role (fixture test input).
+#
+# REQ-014: the role reads this manifest at run time — it is the single source of
+# truth for the pins, not a mirror of a hardcoded role list.
 #
 # Every entry is addressed as `{name, repo, tag}` after REQ-002 moved the
 # runtime to its own pinned repo. The role shallow-clones `<repo>@<tag>` into

@@ -25,7 +25,7 @@ extra-vars:
 
 | Flag | Default | Extra-var | Used for |
 | --- | --- | --- | --- |
-| `--manifests-dir` | `<cwd>/dotfiles/provisioning` | `manifests_dir` | manifest validation, `scripts/gloview-activate` |
+| `--manifests-dir` | `<cwd>/dotfiles/provisioning` | `manifests_dir` | CLI pins (`cli-tools.yaml`), manifest validation, `scripts/gloview-activate` |
 | `--composition-root` | parent of `--manifests-dir`'s parent | `composition_root` | the composition checkout root (`dotfiles/`); the legacy active-theme path is read only for the R-07 migration |
 | `--inventory` | this engine's `ansible/inventory/localhost.yaml` | (executor `-i`) | the host Ansible runs against |
 

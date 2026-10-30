@@ -6,6 +6,40 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-10-30
+
+### Changed
+
+- **`cli_tools` consumes the composition manifest as its single pin source
+  (REQ-014):** the role now loads
+  `{{ cli_tools_manifests_dir }}/cli-tools.yaml` at run time (the file passed
+  through `--manifests-dir`) and takes `cli_tools` from its `entries` list. The
+  hardcoded engine pin list is deleted, so bumping a tag in the composition —
+  e.g. tpr/runtime to `v0.5.0` — now changes what bootstrap clones, installs,
+  records in `pinned` and image-tags. No pin values moved in this commit.
+- **Manifest validation fails loud before any clone/install:** `kind:
+  cli-tools` and a non-empty `entries` list are required; every entry needs a
+  unique safe `name` (`^[a-z][a-z0-9-]*$`), exactly one addressing shape
+  (`source` XOR `repo` + `tag`), and non-empty values. Errors name the offending
+  entry and field (duplicate name, both shapes, missing/empty repo or tag,
+  unsafe name, missing kind, empty entries).
+- **Resolved pins are published as facts:** `cli_tools_tags` maps each pinned
+  name to its tag, so later plays/roles can derive tag-qualified paths from the
+  pin (e.g. an `assets.yaml` template `source`) instead of hardcoding it.
+- **Tests prove run-time resolution:** the old role-vs-manifest parity test is
+  replaced by real `ansible-playbook` runs of the role's var-load + validation
+  tasks against fixture manifests; arbitrary distinct tags resolve into
+  `cli_tools_tags`, and malformed manifests fail with the named error. Verify,
+  assets and settings pin mirrors are now checked against the manifest the role
+  actually reads.
+
+### Notes
+
+- No engine-side pin bump; the composition fixture keeps csg `v0.2.2`, weg/itr
+  `v0.2.0`, tpr `v0.4.0`, runtime `v0.4.1`.
+- The orchestrator tags/releases after review; this commit does not tag, merge
+  or push.
+
 ## [0.1.27] - 2026-10-29
 
 ### Changed
