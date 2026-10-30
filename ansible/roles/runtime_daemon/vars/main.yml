@@ -11,14 +11,27 @@ runtime_daemon_bin_dir: >-
 # runtime_daemon_unit_name: the --user unit file name.
 runtime_daemon_unit_name: dotfiles-runtime-daemon.service
 
-# runtime_daemon_environment_d_file: the systemd user-session environment file
-#   carrying the palette-producer switch (REQ-010). environment.d is read by
-#   systemd --user at session start, so the AGS wallpaper selector (and every
-#   other session child) sees RUNTIME__PALETTE__PRODUCER without a shell rc
-#   edit; the daemon unit repeats it as Environment= because a unit started by
-#   an already-running manager also needs the value after a re-provision.
-#   One var (`runtime_palette_producer`) feeds both, so they cannot diverge.
-runtime_daemon_environment_d_file: >-
+# runtime_daemon_spine_config_dir / runtime_daemon_producer_config_file: the
+#   runtime-owned producer config (runtime REQ-004). This is the ONE
+#   authoritative producer source: the daemon, the CLI and runtime-seed all
+#   read <install>/config/dotfiles-runtime/producer.json at operation time.
+#   `runtime_palette_producer` / `runtime_palette_tpr_engine` are provisioning
+#   INPUTS rendered here; ambient environment.d/unit Environment= values are
+#   deliberately NOT written (a stale session env is non-authoritative and the
+#   runtime warns about it).
+runtime_daemon_spine_config_dir: "{{ install_dir | trim }}/config/dotfiles-runtime"
+runtime_daemon_producer_config_file: "{{ runtime_daemon_spine_config_dir }}/producer.json"
+runtime_daemon_producer_schema_version: 1
+
+# runtime_daemon_tpr_runtime: the tpr execution mode recorded in producer.json.
+#   Container mode ships `tpr` + `tpr-native` inside the pinned engine image,
+#   so provisioning never extracts a host helper (BUG-007).
+runtime_daemon_tpr_runtime: container
+
+# runtime_daemon_legacy_environment_d_file: the pre-REQ-004 producer switch.
+#   The role REMOVES this file so a stale ambient producer value cannot
+#   outlive the cutover; the runtime no longer reads it.
+runtime_daemon_legacy_environment_d_file: >-
   {{ ansible_facts.env.HOME }}/.config/environment.d/10-dotfiles-runtime.conf
 
 # runtime_daemon_activate: enable live automatic convergence. Owner decision

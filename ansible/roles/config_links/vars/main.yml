@@ -93,6 +93,47 @@ config_links_managed_dirs:
   - rofi
   - btop
 
+# config_links_pre_seed_dirs / config_links_post_seed_dirs: BUG-006 splits the
+#   links around runtime-seed. The PRE-SEED half exposes the settings + CLI
+#   configs the seed needs (the CLIs discover them through ~/.config/<tool>).
+#   The POST-SEED half exposes the PALETTE CONSUMERS whose runtime-owned
+#   pointer files (`colors.css` / `colors.rasi` / the btop theme) do not exist
+#   until `dotfiles-runtime wallpaper set` runs. Linking rofi/gtk/btop before
+#   the seed leaves a launcher that hard-imports a missing palette (BUG-006).
+#   Bootstrap order is config-links (pre-seed) -> runtime-seed ->
+#   config-links-post-seed; the whole seed is NOT moved before config-links
+#   because the seed's CLIs need the pre-seed settings links.
+#
+#   The two halves partition config_links_managed_dirs EXACTLY (locked by
+#   test); config_links_managed_dirs stays the full set verify mirrors.
+config_links_pre_seed_dirs:
+  - hypr
+  - hyprpaper
+  - nvim
+  - starship
+  - wlogout
+  - zsh
+  - kitty
+  - color-scheme-generator
+  - weg
+  - itr
+  - theme-producer
+config_links_post_seed_dirs:
+  - gtk-3.0
+  - gtk-4.0
+  - rofi
+  - btop
+
+# config_links_phase: which half this invocation links.
+#   all       — every managed dir (standalone/direct use and the legacy tests)
+#   pre_seed  — config-links.yaml in bootstrap.yaml (before runtime-seed)
+#   post_seed — config-links-post-seed.yaml in bootstrap.yaml (after seed)
+config_links_phase: all
+config_links_dirs_for_phase: >-
+  {{ config_links_managed_dirs if config_links_phase == 'all'
+     else (config_links_pre_seed_dirs if config_links_phase == 'pre_seed'
+     else config_links_post_seed_dirs) }}
+
 # config_links_gtk_dirs: the managed dirs that get the migrate-then-symlink
 #   treatment (gt-3-1): a spine-dir ensure + seed-copy of the user's existing
 #   ~/.config/<name> contents into the spine BEFORE the backup move-aside, and

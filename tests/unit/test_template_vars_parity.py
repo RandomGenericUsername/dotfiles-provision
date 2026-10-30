@@ -339,7 +339,7 @@ class TestTprPinMirrors:
 class TestCsgAndRuntimePinMirrors:
     """REQ-009: one cross-leg guard for every csg/runtime literal the engine owns.
 
-    csg v0.2.1 has five independent literals (role, assets csg-template mirror,
+    csg v0.2.2 has five independent literals (role, assets csg-template mirror,
     settings rendered image tag, verify, fixture) plus the fixture source path;
     the runtime has three (role, both verify literals, fixture). The
     role-specific tests also cover their own leg, but this guard names the whole
@@ -360,8 +360,8 @@ class TestCsgAndRuntimePinMirrors:
         manifest = yaml.safe_load((manifests_dir() / "cli-tools.yaml").read_text())
         return next(entry for entry in manifest["entries"] if entry.get("name") == name)
 
-    def test_all_five_csg_mirrors_and_fixture_source_are_v0_2_1(self) -> None:
-        expected = "v0.2.1"
+    def test_all_five_csg_mirrors_and_fixture_source_are_v0_2_2(self) -> None:
+        expected = "v0.2.2"
         fixture_csg = self._cli_entry("csg")
         role_csg = next(
             entry
@@ -396,21 +396,21 @@ class TestCsgAndRuntimePinMirrors:
             f"verify_csg_version must be {expected}; got {verify_vars['verify_csg_version']!r}"
         )
         assert str(verify_vars["verify_csg_contract_version"]) == "0.2.0", (
-            "csg v0.2.1 still prints `0.2.1 contract 0.2.0`; the contract token "
+            "csg v0.2.2 still prints `0.2.2 contract 0.2.0`; the contract token "
             "must not move with the package tag"
         )
         assert f"/cli-tools/csg/{expected}/src/" in str(csg_source), (
             f"fixture csg-templates source must read the {expected} checkout; got {csg_source!r}"
         )
-        assert "/cli-tools/csg/v0.2.0/" not in str(csg_source), (
+        assert "/cli-tools/csg/v0.2.1/" not in str(csg_source), (
             "fixture csg-templates source still names the previous csg checkout"
         )
         assert str(assets_manifest["assets"]["tag"]) == "v0.6.2", (
             "the assets corpus tag must stay v0.6.2 in the fixture manifest"
         )
 
-    def test_runtime_mirrors_are_v0_4_0(self) -> None:
-        expected = "v0.4.0"
+    def test_runtime_mirrors_are_v0_4_1(self) -> None:
+        expected = "v0.4.1"
         fixture_runtime = self._cli_entry("dotfiles-runtime")
         role_runtime = next(
             entry
@@ -428,7 +428,7 @@ class TestCsgAndRuntimePinMirrors:
         assert verify_vars["verify_runtime_version"] == expected, (
             f"verify_runtime_version must be {expected}; got {verify_vars['verify_runtime_version']!r}"
         )
-        assert str(verify_vars["verify_runtime_tool_version"]) == "0.4.0", (
+        assert str(verify_vars["verify_runtime_tool_version"]) == "0.4.1", (
             "verify_runtime_tool_version must be the tag without its leading 'v'; got "
             f"{verify_vars['verify_runtime_tool_version']!r}"
         )

@@ -18,8 +18,15 @@
 # config_links_xdg_config_home from {{ ansible_facts.env.HOME }} and
 # {{ ansible_facts.env.XDG_CONFIG_HOME }}, which are only populated after the
 # fact-gathering setup module runs.
-- name: Link managed configs into the XDG config home
+- name: Link managed settings configs into the XDG config home (pre-seed)
   hosts: localhost
   gather_facts: true
+  vars:
+    # BUG-006: bootstrap calls this playbook BEFORE runtime-seed, so it links
+    # only the settings/CLI dirs the seed needs. The palette consumers (gtk,
+    # rofi, btop) are linked by config-links-post-seed.yaml AFTER the seed
+    # creates their runtime-owned pointers. A direct/standalone invocation can
+    # override with -e config_links_phase=all.
+    config_links_phase: pre_seed
   roles:
     - config_links

@@ -103,7 +103,7 @@ settings_weg_image_tag: v0.2.0
 #   is authoritative; this is the AD-11 mirror, and `TestSettingsImageTag`
 #   fails if the manifest, this var and `roles/verify`'s `verify_csg_version`
 #   drift. A two-pin render test proves the template follows the value.
-settings_csg_image_tag: v0.2.1
+settings_csg_image_tag: v0.2.2
 
 # settings_tpr_image_tag: the container image tag the rendered TPR settings
 #   resolve (`[container] image_tag`). AD-7: the tag IS the pin — never

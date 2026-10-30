@@ -40,8 +40,16 @@
 # AGS basename here would create a second owner (and the standalone installer's
 # force-link would fight this role's migrate-then-symlink guard).
 
-- name: Link each managed config dir into the XDG config home
+- name: Assert the config-links phase is all, pre_seed or post_seed
+  ansible.builtin.assert:
+    that: config_links_phase in ["all", "pre_seed", "post_seed"]
+    fail_msg: >-
+      config_links_phase is '{{ config_links_phase }}' — accepted phases are
+      'all' (standalone), 'pre_seed' (bootstrap before runtime-seed) and
+      'post_seed' (bootstrap after runtime-seed).
+
+- name: Link the managed config dirs for this phase into the XDG config home
   ansible.builtin.include_tasks: _link_one.yml
-  loop: "{{ config_links_managed_dirs }}"
+  loop: "{{ config_links_dirs_for_phase }}"
   loop_control:
     loop_var: config_link_name

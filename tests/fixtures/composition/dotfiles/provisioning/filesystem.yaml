@@ -21,6 +21,9 @@ entries:
   - name: icon-templates
   - name: icon-mappings
   - name: config
+  # Runtime-owned producer config (runtime REQ-004). runtime_daemon renders
+  # producer.json here before the daemon/seed read it.
+  - name: config/dotfiles-runtime
   - name: config/color-scheme-generator
   - name: config/color-scheme-generator/templates
   - name: config/hypr
