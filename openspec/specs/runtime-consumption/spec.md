@@ -12,11 +12,17 @@ green `command -v`.
 
 ### Requirement: the runtime is a pinned CLI entry
 
-`roles/cli_tools/vars/main.yml` SHALL mirror `dotfiles-runtime` as `{name, repo, tag}` with no
-`source` key, like `csg`/`weg`/`itr`. The role SHALL install it from the tag-bearing checkout
-`<install>/cli-tools/dotfiles-runtime/<tag>/` and record the tag in `pinned` beside it.
+`roles/cli_tools` SHALL load `dotfiles-runtime` as `{name, repo, tag}` with no `source` key, like
+`csg`/`weg`/`itr`, from `{{ cli_tools_manifests_dir }}/cli-tools.yaml` at run time, not from an
+in-role pin list. It SHALL install it from `<install>/cli-tools/dotfiles-runtime/<tag>/`, record
+the tag in `pinned` beside it, and publish `cli_tools_tags` (name → tag) for later plays.
 
-Source: spine AD-10/AD-11; `dotfiles-v3/tickets` / runtime repo `v0.1.0`.
+Source: spine AD-10/AD-11; `dotfiles-v3/tickets`; REQ-014.
+
+#### Scenario: the manifest is the pin source
+
+- **WHEN** the composition manifest pins `dotfiles-runtime` at a different tag
+- **THEN** `cli_tools` installs, records and image-tags that tag without an engine edit
 
 #### Scenario: the source path selects nothing
 
@@ -25,9 +31,23 @@ Source: spine AD-10/AD-11; `dotfiles-v3/tickets` / runtime repo `v0.1.0`.
 
 #### Scenario: the pinned branch installs the runtime
 
-- **WHEN** the `cli_tools` role runs against the mirrored entry
-- **THEN** it clones the runtime repo at `v0.1.0`, removes `.git`, writes `pinned`, and installs
-  from the checkout (never a `git+…@tag` URL)
+- **WHEN** the `cli_tools` role runs against the manifest entry
+- **THEN** it clones the runtime repo at the manifest tag, removes `.git`, writes `pinned`, and
+  installs from the checkout (never a `git+…@tag` URL)
+
+### Requirement: the CLI manifest is validated before install
+
+`roles/cli_tools` SHALL validate `kind: cli-tools`, a non-empty `entries` list, unique safe names
+(`^[a-z][a-z0-9-]*$`), exactly one addressing shape (`source` XOR `repo` + `tag`) and non-empty
+values before any clone/install.
+
+Source: REQ-014.
+
+#### Scenario: a malformed manifest fails before install
+
+- **WHEN** the manifest has the wrong kind, no entries, or an entry with a duplicate/unsafe name,
+  both addressing shapes, or a missing/empty value
+- **THEN** the role fails naming the offending entry and field before any clone/install
 
 ### Requirement: verify asserts the runtime pin by execution
 
@@ -41,7 +61,7 @@ Source: spine AD-10/AD-11; `dotfiles-runtime` `version` command.
 
 #### Scenario: a stale runtime install fails
 
-- **WHEN** the installed runtime's checkout, pin record or version differs from the mirror
+- **WHEN** the installed runtime's checkout, pin record or version differs from the manifest pin
 - **THEN** the verify assert fails naming the observed checkout/pin/stdout
 
 #### Scenario: the runtime is on PATH
