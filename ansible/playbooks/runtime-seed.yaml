@@ -67,6 +67,9 @@
         path: "{{ runtime_seed_producer_config }}"
       register: runtime_seed_producer_config_check
 
+    # Check-gated: a standalone `--check` of this playbook does not run the
+    # runtime_daemon role, so the config may legitimately be absent in a dry
+    # run; the real seed below is check-gated too.
     - name: Assert the runtime producer config exists before seeding
       ansible.builtin.assert:
         that: runtime_seed_producer_config_check.stat.isreg | default(false)
@@ -75,6 +78,7 @@
           renders the producer config before runtime-seed (bootstrap order).
           Without it the runtime cannot resolve the selected producer.
           Re-run the runtime-daemon playbook (or bootstrap in order).
+      when: not ansible_check_mode
 
     # BUG-006: capture the pre-seed state so a tolerated rc=1 is only accepted
     # when the seed actually produced FRESH state and the complete consumer

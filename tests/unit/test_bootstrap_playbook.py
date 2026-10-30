@@ -118,6 +118,17 @@ class TestBootstrapPlaybook:
             f"bootstrap.yaml import order must be {_EXPECTED_ORDER}; got {order}"
         )
 
+    def test_runtime_daemon_renders_producer_config_before_seed(self) -> None:
+        """BUG-008: runtime_daemon renders producer.json, and bootstrap imports
+        it before runtime-seed; the seed resolves the producer from that file,
+        never from ambient RUNTIME__PALETTE__PRODUCER env."""
+        order = [str(entry["import_playbook"]) for entry in _load_imports()]
+        assert order.index("runtime-daemon.yaml") < order.index("runtime-seed.yaml")
+        assert order.index("config-links.yaml") < order.index("runtime-seed.yaml")
+        assert order.index("runtime-seed.yaml") < order.index(
+            "config-links-post-seed.yaml"
+        )
+
     def test_verify_is_last_import(self) -> None:
         """The aggregate must end with verify.yaml — done-criteria are asserted
         AFTER every role placed its outputs."""

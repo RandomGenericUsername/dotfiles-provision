@@ -75,6 +75,10 @@ def test_seed_requires_the_runtime_producer_config() -> None:
     assert "runtime_seed_producer_config_check.stat.isreg" in str(
         assert_task["ansible.builtin.assert"]["that"]
     )
+    assert assert_task.get("when") == "not ansible_check_mode", (
+        "the config precondition must stay check-gated so a standalone "
+        "--check (without runtime-daemon) remains dry"
+    )
     names = [str(t.get("name", "")) for t in tasks]
     assert names.index(stat["name"]) < names.index("Seed runtime state from default wallpaper")
 
@@ -169,6 +173,58 @@ class TestSeedPostconditionsExecution:
             env=env,
             timeout=180,
         )
+
+    def test_seed_resolves_tpr_from_config_despite_stale_env(self) -> None:
+        """BUG-008: the seed must resolve tpr from the spine producer config. If
+        the old single/double-underscore ambient env were authoritative, the
+        stale csg below would silently select csg."""
+        import shutil
+        import tempfile
+
+        if shutil.which("ansible-playbook") is None:
+            pytest.skip("ansible-playbook not installed")
+        with tempfile.TemporaryDirectory() as raw:
+            env, bin_dir, state, install = self._env(Path(raw))
+            env["RUNTIME_PALETTE_PRODUCER"] = "csg"
+            env["RUNTIME__PALETTE__PRODUCER"] = "csg"
+            env["RUNTIME__PALETTE__TPR_ENGINE"] = "matugen"
+            current = state / "dotfiles" / "current"
+            current.mkdir(parents=True)
+            artifacts = {
+                "config/ags/colors.css": "colors.gtk.css",
+                "config/gtk-3.0/colors.css": "colors.gtk.css",
+                "config/gtk-4.0/colors.css": "colors.adw.css",
+                "config/rofi/colors.rasi": "colors.rasi",
+                "config/btop/themes/colors.btop.theme": "colors.btop.theme",
+            }
+            for artifact in artifacts.values():
+                (current / artifact).write_text("x\n")
+            for link, artifact in artifacts.items():
+                target = install / link
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.symlink_to(current / artifact)
+
+            marker = Path(raw) / "resolved-producer.txt"
+            config = install / "config" / "dotfiles-runtime" / "producer.json"
+            stub = bin_dir / "dotfiles-runtime"
+            stub.write_text(
+                "#!/bin/sh\n"
+                "set -eu\n"
+                f"producer=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"producer\"])' {config})\n"
+                "printf '%s %s %s\\n' \"$producer\" \"${RUNTIME_PALETTE_PRODUCER:-}\" \"${RUNTIME__PALETTE__PRODUCER:-}\" > "  # noqa: E501
+                f"{marker}\n"
+                f"printf '{{\"schema_version\": 2, \"advanced\": true}}\\n' > {state}/dotfiles/current.json\n"
+                "exit 0\n"
+            )
+            stub.chmod(0o755)
+
+            result = self._run(env, install)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert marker.read_text().strip() == "tpr csg csg", (
+                "the seed must resolve producer=tpr from producer.json even "
+                "with stale single/double-underscore ambient env present; got "
+                + marker.read_text()
+            )
 
     def test_rc1_without_fresh_state_or_links_fails_with_the_missing_path(self) -> None:
         import shutil
