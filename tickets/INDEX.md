@@ -10,7 +10,7 @@
 
 ## Requirements
 
-(none)
+- [REQ-014-cli-tools-manifest-source/ticket.md](./REQ-014-cli-tools-manifest-source/ticket.md) — `cli_tools`: consume the composition manifest as the single pin source | `in-progress` | fixes PIN-0119 no-op (engine hardcoded v0.4.0 pins)
 
 ## Bugs
 
