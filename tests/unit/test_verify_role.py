@@ -1987,8 +1987,8 @@ class TestVerifyVars:
         so verify uses the `version` subcommand and asserts the exact tool
         version (the tag without its leading `v`)."""
         data = _vars()
-        assert str(data["verify_runtime_version"]) == "v0.4.0"
-        assert str(data["verify_runtime_tool_version"]) == "0.4.0"
+        assert str(data["verify_runtime_version"]) == "v0.4.1"
+        assert str(data["verify_runtime_tool_version"]) == "0.4.1"
         assert str(data["verify_runtime_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/"
             "{{ verify_runtime_version }}"
@@ -2116,7 +2116,7 @@ class TestVerifyVars:
         missing tag, so an image left at `latest` (the pre-S6 shape) or at the
         previous pin fails the gate."""
         data = _vars()
-        assert str(data["verify_csg_version"]) == "v0.2.1"
+        assert str(data["verify_csg_version"]) == "v0.2.2"
         assert str(data["verify_csg_checkout"]) == (
             "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
         )
@@ -2632,6 +2632,84 @@ class TestVerifyVars:
         assert hit is None, f"vars/main.yml hardcodes an absolute path: {hit!r} (trim lock)"
 
 
+class TestVerifyProducerConfig:
+    """BUG-007/BUG-008: verify reads the runtime-owned producer config and
+    proves the SELECTED producer can generate; image presence alone is not
+    enough."""
+
+    def test_producer_config_vars_mirror_the_selected_inputs(self) -> None:
+        data = _vars()
+        assert str(data["verify_producer_config_path"]) == (
+            "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
+        )
+        assert str(data["verify_expected_producer"]) == (
+            "{{ runtime_palette_producer | default('csg', true) }}"
+        )
+        assert str(data["verify_expected_tpr_engine"]) == (
+            "{{ runtime_palette_tpr_engine | default('native', true) }}"
+        )
+        assert str(data["verify_expected_tpr_runtime"]) == "container"
+        assert data["verify_producer_config_schema_version"] == 1
+
+    def test_verify_reads_and_asserts_the_producer_config(self) -> None:
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        read_name = "Read the runtime producer config"
+        assert_name = "Assert the runtime producer config matches the selected values"
+        assert read_name in names and assert_name in names
+        read = tasks[names.index(read_name)]
+        assert _module_key(read) == "ansible.builtin.slurp"
+        assert _module(read).get("src") == "{{ verify_producer_config_path }}"
+        check = tasks[names.index(assert_name)]
+        that = " ".join(str(item) for item in _module(check).get("that", []))
+        for expected in (
+            "verify_producer_config_schema_version",
+            "verify_expected_producer",
+            "verify_expected_tpr_engine",
+            "verify_expected_tpr_runtime",
+        ):
+            assert expected in that, f"producer config assert must check {expected}"
+
+    def test_selected_tpr_engine_has_an_image_and_a_real_generate_smoke(self) -> None:
+        data = _vars()
+        assert str(data["verify_tpr_selected_image_reference"]) == (
+            "{{ verify_tpr_image_prefix }}-{{ verify_expected_tpr_engine }}-"
+            "{{ container_runtime_engine }}:{{ verify_tpr_version }}"
+        )
+        assert [str(a) for a in data["verify_tpr_smoke_artifacts"]] == [
+            "colors.yaml",
+            "colors.conf",
+            "colors.gtk.css",
+            "colors.adw.css",
+            "colors.sequences",
+            "colors.rasi",
+            "colors.kitty",
+            "colors.btop.theme",
+        ]
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        image_name = "Check the selected tpr engine image exists at the pinned reference"
+        smoke_name = "Generate a palette with the selected tpr producer (bounded, temp output)"
+        assert image_name in names and smoke_name in names
+        image = tasks[names.index(image_name)]
+        assert _module(image)["argv"][-1] == "{{ verify_tpr_selected_image_reference }}"
+        smoke = tasks[names.index(smoke_name)]
+        argv = [str(part) for part in _module(smoke)["argv"]]
+        assert argv[0] == "timeout"
+        assert "--runtime" in argv and "container" in argv
+        assert "--engine" in argv and "{{ verify_expected_tpr_engine }}" in argv
+        assert "{{ verify_tpr_smoke_dir.path }}" in argv, (
+            "the smoke must write into a temp dir, never live state"
+        )
+        for name in ("image_name", "smoke_name"):
+            task = tasks[names.index(locals()[name])]
+            when = task.get("when")
+            clauses = when if isinstance(when, list) else [when]
+            assert 'verify_expected_producer == "tpr"' in clauses, (
+                "tpr-only smoke must gate on the selected producer"
+            )
+
+
 class TestVerifyAgsPinMirror:
     """The legacy monorepo pin is retired; the platform tuple remains shared."""
 
@@ -2656,15 +2734,14 @@ class TestVerifyAgsPinMirror:
 class TestVerifyRuntimePinMirror:
     """REQ-009: the runtime pin is one version across role, verify and fixture.
 
-    v0.4.0 adds the palette producer seam (`TprAdapter`, `THEME__` allowlist,
-    producer fingerprint in the cache key, `RUNTIME__PALETTE__PRODUCER` default
-    `csg`). The installer pin, its hand-maintained verify mirror and the fixture
+    v0.4.1 adds the runtime-owned producer config reader and the tpr container
+    runtime. The installer pin, its hand-maintained verify mirror and the fixture
     manifest are separate literals, so this guard fails while any leg still says
-    v0.3.0. `verify_runtime_tool_version` is the tag without its leading `v` —
+    v0.4.0. `verify_runtime_tool_version` is the tag without its leading `v` —
     the runtime's `version` subcommand prints package metadata, not the tag.
     """
 
-    def test_engine_consumes_runtime_v0_4_0(self) -> None:
+    def test_engine_consumes_runtime_v0_4_1(self) -> None:
         verify_vars = _vars()
         cli_tools_vars = _sibling_vars("cli_tools")
         runtime = next(
@@ -2672,17 +2749,17 @@ class TestVerifyRuntimePinMirror:
             for entry in cli_tools_vars["cli_tools"]
             if entry["name"] == "dotfiles-runtime"
         )
-        assert runtime["tag"] == "v0.4.0", (
-            "the cli_tools role must install dotfiles-runtime v0.4.0 "
-            f"(palette producer seam); got {runtime['tag']!r}"
+        assert runtime["tag"] == "v0.4.1", (
+            "the cli_tools role must install dotfiles-runtime v0.4.1 "
+            f"(producer config + tpr container runtime); got {runtime['tag']!r}"
         )
-        assert verify_vars["verify_runtime_version"] == "v0.4.0", (
-            "verify_runtime_version must mirror the role pin v0.4.0; got "
+        assert verify_vars["verify_runtime_version"] == "v0.4.1", (
+            "verify_runtime_version must mirror the role pin v0.4.1; got "
             f"{verify_vars['verify_runtime_version']!r}"
         )
-        assert verify_vars["verify_runtime_tool_version"] == "0.4.0", (
+        assert verify_vars["verify_runtime_tool_version"] == "0.4.1", (
             "verify_runtime_tool_version must be the tag without its leading "
-            f"'v' (0.4.0); got {verify_vars['verify_runtime_tool_version']!r}"
+            f"'v' (0.4.1); got {verify_vars['verify_runtime_tool_version']!r}"
         )
         fixture = yaml.safe_load(
             (
@@ -2697,9 +2774,9 @@ class TestVerifyRuntimePinMirror:
             for entry in fixture["entries"]
             if entry["name"] == "dotfiles-runtime"
         )
-        assert fixture_runtime["tag"] == "v0.4.0", (
+        assert fixture_runtime["tag"] == "v0.4.1", (
             "the fixture cli-tools.yaml runtime tag must mirror the role pin "
-            f"v0.4.0; got {fixture_runtime['tag']!r}"
+            f"v0.4.1; got {fixture_runtime['tag']!r}"
         )
 
     def test_tool_version_is_the_tag_without_its_prefix(self) -> None:
@@ -4120,6 +4197,7 @@ def _build_provisioned_layout(
         "icon-templates",
         "icon-mappings",
         "config",
+        "config/dotfiles-runtime",
         "config/color-scheme-generator",
         "config/color-scheme-generator/templates",
         "config/hypr",
@@ -4145,6 +4223,10 @@ def _build_provisioned_layout(
     for rel in spine_dirs:
         (install / rel).mkdir(parents=True, exist_ok=True)
     (install / "config" / "weg" / "effects.yaml").write_text("{}\n")
+    (install / "config" / "dotfiles-runtime" / "producer.json").write_text(
+        '{"schema_version":1,"producer":"csg","tpr_engine":"native",'
+        '"tpr_runtime":"container"}\n'
+    )
 
     (home / ".local" / "state").mkdir(parents=True, exist_ok=True)
     (home / ".cache").mkdir(parents=True, exist_ok=True)

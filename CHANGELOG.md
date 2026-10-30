@@ -6,6 +6,43 @@ Notable changes to the `dotfiles-provision` repo. Format follows
 
 ## [Unreleased]
 
+## [0.1.27] - 2026-10-29
+
+### Changed
+
+- **Runtime-owned palette producer config (BUG-007/BUG-008):** the
+  `runtime_daemon` role now renders
+  `<install>/config/dotfiles-runtime/producer.json` from
+  `runtime_palette_producer` (`csg`|`tpr`) and `runtime_palette_tpr_engine`
+  (default `native`), with `tpr_runtime: container`. The daemon, CLI and
+  `runtime-seed` all resolve this ONE file at operation time; the old
+  `environment.d` switch and the unit's `Environment=` producer line are
+  removed, so ambient `RUNTIME__PALETTE__*` env is no longer authoritative and
+  the seed can no longer silently fall back to csg. `config/dotfiles-runtime`
+  joins the filesystem spine and verify asserts the config matches the
+  selected values.
+- **tpr runs in container mode (BUG-007):** provisioning no longer expects a
+  host `tpr-native` helper (the manual `~/.local/bin` copy is not a supported
+  path). When `producer=tpr`, verify asserts the selected engine image exists
+  and runs a bounded real `tpr generate` into a temp directory, failing if the
+  selected producer cannot generate.
+- **`dotfiles-runtime` pin moves `v0.4.0` → `v0.4.1`:** the `cli_tools` role,
+  the composition fixture (`cli-tools.yaml`) and the `verify` mirror
+  (`verify_runtime_version` / `verify_runtime_tool_version = 0.4.1`). Runtime
+  v0.4.1 implements the producer config reader and the tpr container runtime.
+- **`csg` pin moves `v0.2.1` → `v0.2.2`:** every csg mirror moves together —
+  `cli_tools`, the fixture manifest, `assets_csg_pinned_tag` and the fixture
+  `csg-templates` source, `settings_csg_image_tag`, and `verify_csg_version`.
+  The invocation contract token stays `0.2.0`.
+- **No other pin moves:** `weg v0.2.0`, `itr v0.2.0`, `tpr v0.4.0`,
+  `dotfiles-assets v0.6.2` and ags-apps/ags-platform are unchanged.
+
+### Notes
+
+- The runtime/CSG tags are released by the orchestrator after their own gates;
+  this engine commit does not tag, merge or push.
+- No host provision and no `dotfiles-v3`, assets or app-repo edits.
+
 ## [0.1.26] - 2026-10-29
 
 ### Changed

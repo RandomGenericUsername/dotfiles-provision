@@ -36,6 +36,10 @@
     runtime_seed_bin_dir: >-
       {{ ansible_facts.env.UV_TOOL_BIN_DIR
          | default(ansible_facts.env.XDG_BIN_HOME | default(ansible_facts.env.HOME + '/.local/bin', true), true) }}
+    # The runtime-owned producer config (runtime REQ-004). runtime_daemon
+    # renders it before this playbook; the seed reads it through the runtime.
+    # NO producer env is passed here: ambient env is non-authoritative.
+    runtime_seed_producer_config: "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
   tasks:
     - name: Assert install_dir seam is provided
       ansible.builtin.assert:
@@ -44,6 +48,20 @@
           install_dir is undefined or empty — the runtime-seed step requires
           the install_dir seam extra-var (the orchestrator resolves
           $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
+
+    - name: Check the runtime producer config exists before seeding
+      ansible.builtin.stat:
+        path: "{{ runtime_seed_producer_config }}"
+      register: runtime_seed_producer_config_check
+
+    - name: Assert the runtime producer config exists before seeding
+      ansible.builtin.assert:
+        that: runtime_seed_producer_config_check.stat.isreg | default(false)
+        fail_msg: >-
+          {{ runtime_seed_producer_config }} is missing — runtime_daemon
+          renders the producer config before runtime-seed (bootstrap order).
+          Without it the runtime cannot resolve the selected producer.
+          Re-run the runtime-daemon playbook (or bootstrap in order).
 
     - name: Seed runtime state from default wallpaper
       ansible.builtin.command:

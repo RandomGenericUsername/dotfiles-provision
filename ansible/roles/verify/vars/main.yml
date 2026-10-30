@@ -133,6 +133,9 @@ verify_install_spine_dirs:
   - icon-templates
   - icon-mappings
   - config
+  # Runtime-owned producer config (runtime REQ-004), parity with
+  # filesystem_spine_dirs. runtime_daemon renders producer.json here.
+  - config/dotfiles-runtime
   - config/color-scheme-generator
   - config/color-scheme-generator/templates
   - config/hypr
@@ -339,10 +342,21 @@ verify_itr_contract_version: 0.2.0
 #   `dotfiles-runtime` has no `--version` flag and no contract token: the
 #   `version` subcommand prints the package version, which equals the tag
 #   without its leading `v`.
-verify_runtime_version: v0.4.0
-verify_runtime_tool_version: 0.4.0
+verify_runtime_version: v0.4.1
+verify_runtime_tool_version: 0.4.1
 verify_runtime_checkout: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/{{ verify_runtime_version }}"
 verify_runtime_pin_file: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/pinned"
+
+# verify_producer_*: the runtime-owned producer config (runtime REQ-004).
+#   runtime_daemon renders exactly this file from the provisioning inputs
+#   (`runtime_palette_producer` / `runtime_palette_tpr_engine`); verify reads
+#   it back and asserts the selected values. It is the ONE authority every
+#   runtime composition root (daemon, CLI, seed) resolves — no ambient env.
+verify_producer_config_path: "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
+verify_producer_config_schema_version: 1
+verify_expected_producer: "{{ runtime_palette_producer | default('csg', true) }}"
+verify_expected_tpr_engine: "{{ runtime_palette_tpr_engine | default('native', true) }}"
+verify_expected_tpr_runtime: container
 
 # verify_weg_*: the same four legs for `weg` (S5), plus the container image.
 #   weg is the first container-mode CLI consumed as a pinned repo, so verify
@@ -370,7 +384,7 @@ verify_weg_image_reference: >-
 #   a missing backend is a named failure, not a count. The pin is the manifest
 #   `csg.tag` (AD-7/AD-11) — never `latest`; the cli_tools role builds them at
 #   this tag by passing `COLORSCHEME__CONTAINER__IMAGE_TAG={{ pin }}`.
-verify_csg_version: v0.2.1
+verify_csg_version: v0.2.2
 verify_csg_checkout: "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
 verify_csg_pin_file: "{{ verify_cli_tools_checkout_root }}/csg/pinned"
 verify_csg_contract_version: 0.2.0
@@ -407,6 +421,25 @@ verify_tpr_image_references:
   - "{{ verify_tpr_image_prefix }}-base-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
   - "{{ verify_tpr_image_prefix }}-matugen-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
   - "{{ verify_tpr_image_prefix }}-native-{{ container_runtime_engine }}:{{ verify_tpr_version }}"
+
+# verify_tpr_selected_image_reference / verify_tpr_smoke_artifacts: BUG-007.
+#   When the selected producer is tpr, verify asserts the engine SELECTED by
+#   producer.json exists as an image and runs a bounded REAL generate into a
+#   temp dir (never live state). The eight artifact names are the runtime's
+#   palette contract — the exact set tpr must produce for the selected
+#   producer/engine.
+verify_tpr_selected_image_reference: >-
+  {{ verify_tpr_image_prefix }}-{{ verify_expected_tpr_engine }}-{{ container_runtime_engine }}:{{ verify_tpr_version }}
+verify_tpr_smoke_artifacts:
+  - colors.yaml
+  - colors.conf
+  - colors.gtk.css
+  - colors.adw.css
+  - colors.sequences
+  - colors.rasi
+  - colors.kitty
+  - colors.btop.theme
+verify_tpr_smoke_timeout_seconds: 180
 
 # verify_notifd_binding_packages: the AUR packages backing the AstalNotifd
 #   binding the notifications overlay imports (capture-notifications

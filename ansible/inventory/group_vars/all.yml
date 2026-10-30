@@ -53,12 +53,13 @@ composition_root: ""
 container_runtime_engine: "{{ ansible_facts.env.DOTFILES_CONTAINER_ENGINE | default('podman', true) }}"
 
 # runtime_palette_producer: which palette producer the runtime composes
-#   (REQ-010). Default `csg` keeps the existing behaviour; `tpr` activates the
-#   opt-in theme-producer path. ONE var change flips it for BOTH consumers:
-#   the runtime_daemon role writes it to
-#   ~/.config/environment.d/10-dotfiles-runtime.conf (the systemd user session
-#   environment the AGS wallpaper selector inherits) and into the daemon unit's
-#   Environment= line. Precedence, highest first:
+#   (REQ-010 / runtime REQ-004). Default `csg` keeps the existing behaviour;
+#   `tpr` activates the opt-in theme-producer path. This is a PROVISIONING
+#   INPUT only: runtime_daemon renders it into the single runtime-owned config
+#   file <install>/config/dotfiles-runtime/producer.json, which every runtime
+#   composition root (daemon, CLI, seed) reads. No ambient environment.d or
+#   unit Environment= variable is authoritative any more. Precedence, highest
+#   first:
 #     1. extra-var  -e runtime_palette_producer=tpr
 #     2. env var    RUNTIME_PALETTE_PRODUCER=tpr
 #     3. shipped default csg
@@ -66,6 +67,12 @@ container_runtime_engine: "{{ ansible_facts.env.DOTFILES_CONTAINER_ENGINE | defa
 #   tpr itself stays installed/verified either way: flipping the producer never
 #   requires re-provisioning the pin.
 runtime_palette_producer: "{{ ansible_facts.env.RUNTIME_PALETTE_PRODUCER | default('csg', true) }}"
+
+# runtime_palette_tpr_engine: the engine recorded in producer.json for the tpr
+#   producer. Default `native`; the runtime runs it through tpr's CONTAINER
+#   runtime (tpr_runtime=container), so no host tpr-native helper is needed.
+#   This is the provisioning value rendered into the same single config file.
+runtime_palette_tpr_engine: "{{ ansible_facts.env.RUNTIME_PALETTE_TPR_ENGINE | default('native', true) }}"
 
 # ── Shell / zsh tunables (consumed by the zsh_config + wlogout_config roles) ──
 # Overridable via extra-var/group_vars without touching role or template code.

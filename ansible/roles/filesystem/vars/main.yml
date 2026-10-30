@@ -52,6 +52,9 @@ filesystem_spine_dirs:
   - icon-templates
   - icon-mappings
   - config
+  # Runtime-owned producer config (runtime REQ-004): runtime_daemon renders
+  # producer.json here; the daemon, CLI and runtime-seed all read it.
+  - config/dotfiles-runtime
   - config/color-scheme-generator
   - config/color-scheme-generator/templates
   - config/hypr

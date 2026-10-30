@@ -762,6 +762,33 @@
       provisioning never re-pinned dotfiles-runtime; re-run the cli-tools playbook
   when: not ansible_check_mode
 
+# runtime REQ-004 / BUG-008: the producer is a runtime-owned config file, not
+# ambient env. runtime_daemon renders it BEFORE the daemon starts and before
+# runtime-seed runs, from the SAME provisioning inputs verify compares against
+# here. A missing/malformed file or a producer/engine mismatch fails loud.
+- name: Read the runtime producer config
+  ansible.builtin.slurp:
+    src: "{{ verify_producer_config_path }}"
+  register: verify_producer_config_raw
+  when: not ansible_check_mode
+
+- name: Assert the runtime producer config matches the selected values
+  ansible.builtin.assert:
+    that:
+      - (verify_producer_config_raw.content | b64decode | from_json).schema_version == verify_producer_config_schema_version
+      - (verify_producer_config_raw.content | b64decode | from_json).producer == verify_expected_producer
+      - (verify_producer_config_raw.content | b64decode | from_json).tpr_engine == verify_expected_tpr_engine
+      - (verify_producer_config_raw.content | b64decode | from_json).tpr_runtime == verify_expected_tpr_runtime
+    fail_msg: >-
+      {{ verify_producer_config_path }} does not match the provisioning inputs
+      (runtime REQ-004). Expected schema_version={{ verify_producer_config_schema_version }},
+      producer={{ verify_expected_producer }}, tpr_engine={{ verify_expected_tpr_engine }},
+      tpr_runtime={{ verify_expected_tpr_runtime }}; got
+      {{ verify_producer_config_raw.content | default('', true) | b64decode | trim }}.
+      runtime_daemon renders this file before the daemon and runtime-seed;
+      re-run the runtime-daemon playbook (or bootstrap in order).
+  when: not ansible_check_mode
+
 # S5: `weg` follows the same four legs (CHECKOUT / PIN / CONTRACT / IMAGE).
 # `weg` is the FIRST container-mode CLI consumed as a pinned repo, so the pin
 # assertion must also cover the image the role built: AD-7 says the image tag
@@ -982,6 +1009,120 @@
       left at another tag means provisioning never re-pinned tpr; re-run the
       cli-tools playbook
   when: not ansible_check_mode
+
+# BUG-007: image presence is not proof that the SELECTED producer can
+# generate. When producer.json selects tpr, assert the selected engine image
+# exists and run a REAL bounded tpr generate into a temp dir — never live
+# state. Container mode ships tpr + tpr-native inside the image, so no host
+# tpr-native helper is required. A csg selection skips the tpr smoke (its own
+# parse/image gates above still run).
+- name: Check the selected tpr engine image exists at the pinned reference
+  ansible.builtin.command:
+    argv:
+      - "{{ container_runtime_engine }}"
+      - image
+      - inspect
+      - "{{ verify_tpr_selected_image_reference }}"
+  register: verify_tpr_selected_image_check
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - verify_expected_producer == "tpr"
+
+- name: Create a temporary output directory for the tpr generate smoke
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: dotfiles-tpr-smoke-
+  register: verify_tpr_smoke_dir
+  when:
+    - not ansible_check_mode
+    - verify_expected_producer == "tpr"
+
+- name: Generate a palette with the selected tpr producer (bounded, temp output)
+  ansible.builtin.command:
+    argv:
+      - "timeout"
+      - "{{ verify_tpr_smoke_timeout_seconds }}"
+      - "{{ verify_cli_bin_dir | trim }}/tpr"
+      - generate
+      - "{{ install_dir | trim }}/wallpapers/default.png"
+      - --config
+      - "{{ install_dir | trim }}/config/theme-producer/settings.toml"
+      - --engine
+      - "{{ verify_expected_tpr_engine }}"
+      - --runtime
+      - container
+      - --container-engine
+      - "{{ container_runtime_engine }}"
+      - --templates-dir
+      - "{{ install_dir | trim }}/config/theme-producer/templates"
+      - --output-dir
+      - "{{ verify_tpr_smoke_dir.path }}"
+      - --format
+      - yaml
+      - --format
+      - conf
+      - --format
+      - gtk.css
+      - --format
+      - adw.css
+      - --format
+      - sequences
+      - --format
+      - rasi
+      - --format
+      - kitty
+      - --format
+      - btop.theme
+  register: verify_tpr_smoke
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ verify_cli_bin_dir }}:{{ ansible_facts.env.PATH }}"
+  when:
+    - not ansible_check_mode
+    - verify_expected_producer == "tpr"
+
+- name: Check the tpr smoke produced the palette artifacts
+  ansible.builtin.stat:
+    path: "{{ verify_tpr_smoke_dir.path }}/{{ item }}"
+  loop: "{{ verify_tpr_smoke_artifacts }}"
+  register: verify_tpr_smoke_artifact_checks
+  when:
+    - not ansible_check_mode
+    - verify_expected_producer == "tpr"
+
+- name: Assert the selected tpr producer can generate a palette
+  ansible.builtin.assert:
+    that:
+      - verify_tpr_selected_image_check.rc | default(1) == 0
+      - verify_tpr_smoke.rc | default(1) == 0
+      - verify_tpr_smoke_artifact_checks.results | selectattr('stat.isreg') | list | length == verify_tpr_smoke_artifacts | length
+    fail_msg: >-
+      the selected producer is tpr/{{ verify_expected_tpr_engine }} but it
+      cannot generate (BUG-007). Expected the engine image
+      {{ verify_tpr_selected_image_reference }} present and a bounded `tpr
+      generate` (container runtime, temp output) to write all
+      {{ verify_tpr_smoke_artifacts | join(', ') }}. Observed:
+      image_rc={{ verify_tpr_selected_image_check.rc | default('n/a', true) }},
+      generate_rc={{ verify_tpr_smoke.rc | default('n/a', true) }},
+      stderr={{ verify_tpr_smoke.stderr | default('', true) | trim }},
+      missing_artifacts={{ verify_tpr_smoke_artifact_checks.results
+        | rejectattr('stat.isreg') | map(attribute='item') | list }}.
+      Container mode requires no host tpr-native helper; rebuild the tpr
+      images with the cli-tools playbook and check the container engine.
+  when:
+    - not ansible_check_mode
+    - verify_expected_producer == "tpr"
+
+- name: Remove the temporary tpr generate smoke output
+  ansible.builtin.file:
+    path: "{{ verify_tpr_smoke_dir.path }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - verify_expected_producer == "tpr"
 
 # The notifications overlay imports AstalNotifd at startup — a provisioned
 # machine with the app dir deployed but the binding missing would ship a

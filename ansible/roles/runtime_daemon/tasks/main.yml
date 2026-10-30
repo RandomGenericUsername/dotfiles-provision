@@ -12,8 +12,9 @@
 # graphical-session.target.wants/ directly (what `enable` would create), so
 # the next graphical login starts the daemon. Both paths are check-safe.
 
-# REQ-010: the palette-producer switch is pure variable state; a typo must
-# fail before either consumer is written. UNGATED so --check also validates.
+# REQ-010 / runtime REQ-004: the producer inputs are pure variable state; a
+# typo must fail before the config file is rendered. UNGATED so --check also
+# validates.
 - name: Assert the palette producer is csg or tpr
   ansible.builtin.assert:
     that:
@@ -23,26 +24,46 @@
       runtime accepts only 'csg' (default) or 'tpr'. Override it with
       -e runtime_palette_producer=tpr or export RUNTIME_PALETTE_PRODUCER=tpr.
 
+- name: Assert install_dir seam is provided
+  ansible.builtin.assert:
+    that: install_dir is defined and install_dir | trim | length > 0
+    fail_msg: >-
+      install_dir is undefined or empty — the runtime_daemon role renders the
+      runtime producer config under <install_dir>/config/dotfiles-runtime, so
+      it requires the install_dir seam extra-var (the orchestrator resolves
+      $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
+
 - name: Ensure the user systemd unit directory exists
   ansible.builtin.file:
     path: "{{ ansible_facts.env.HOME }}/.config/systemd/user"
     state: directory
     mode: "0755"
 
-# The session-wide half of the switch: systemd --user imports environment.d at
-# login, so this is what the AGS wallpaper selector (and every other session
-# child) sees. The daemon unit repeats the same value as Environment= below.
-- name: Ensure the user environment.d directory exists
+# The producer is a RUNTIME-OWNED config file (runtime REQ-004), not ambient
+# environment: the daemon, the CLI and runtime-seed all resolve the same file at
+# operation time. Render it BEFORE the unit is installed/started and (in
+# bootstrap order) before runtime-seed runs. The filesystem role also owns the
+# dir in the spine; this role ensures it here because runtime-daemon imports
+# BEFORE filesystem in bootstrap.yaml.
+- name: Ensure the runtime producer config directory exists
   ansible.builtin.file:
-    path: "{{ ansible_facts.env.HOME }}/.config/environment.d"
+    path: "{{ runtime_daemon_spine_config_dir }}"
     state: directory
     mode: "0755"
 
-- name: Write the palette-producer switch into the session environment
-  ansible.builtin.copy:
-    content: "RUNTIME__PALETTE__PRODUCER={{ runtime_palette_producer }}\n"
-    dest: "{{ runtime_daemon_environment_d_file }}"
+- name: Render the runtime producer config
+  ansible.builtin.template:
+    src: producer.json.j2
+    dest: "{{ runtime_daemon_producer_config_file }}"
     mode: "0644"
+
+# REQ-004 cutover: the old environment.d switch is not authoritative (the
+# runtime ignores ambient producer env). Remove the stale file so a session
+# cannot keep advertising a producer the config file does not select.
+- name: Remove the legacy palette-producer environment.d switch
+  ansible.builtin.file:
+    path: "{{ runtime_daemon_legacy_environment_d_file }}"
+    state: absent
 
 - name: Install the daemon unit file
   ansible.builtin.template:

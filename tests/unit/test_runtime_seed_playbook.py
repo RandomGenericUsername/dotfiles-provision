@@ -57,3 +57,30 @@ def test_seed_stays_check_gated() -> None:
     assert task.get("when") == "not ansible_check_mode"
     assert task.get("changed_when") == "runtime_seed_result.rc == 0"
     assert task.get("failed_when") == "runtime_seed_result.rc not in [0, 1]"
+
+
+def test_seed_requires_the_runtime_producer_config() -> None:
+    """BUG-007/BUG-008: the runtime reads the spine producer config, not ambient
+    env. runtime_daemon renders it before this playbook; the seed asserts it."""
+    play = _play()
+    assert str(play["vars"]["runtime_seed_producer_config"]) == (
+        "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
+    )
+    tasks = play["tasks"]
+    stat = next(t for t in tasks if str(t.get("name")) == "Check the runtime producer config exists before seeding")
+    assert stat["ansible.builtin.stat"]["path"] == "{{ runtime_seed_producer_config }}"
+    assert_task = next(t for t in tasks if str(t.get("name")) == "Assert the runtime producer config exists before seeding")
+    assert "runtime_seed_producer_config_check.stat.isreg" in str(
+        assert_task["ansible.builtin.assert"]["that"]
+    )
+    names = [str(t.get("name", "")) for t in tasks]
+    assert names.index(stat["name"]) < names.index("Seed runtime state from default wallpaper")
+
+
+def test_seed_never_injects_producer_environment() -> None:
+    """A stale single/double-underscore env must not select the seed producer:
+    the runtime resolves the spine config instead."""
+    text = _PLAYBOOK.read_text(encoding="utf-8")
+    assert "RUNTIME__PALETTE" not in text
+    assert "RUNTIME_PALETTE" not in text
+    assert "environment:" not in text
