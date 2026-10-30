@@ -2,7 +2,7 @@
 id: REQ-014
 title: "cli_tools: consume the composition manifest as the single pin source"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -156,3 +156,19 @@ in the provisioning layer.
 - A direct per-role playbook run needs `-e manifests_dir=<composition>/dotfiles/provisioning`
   for the fact fallback (the orchestrator already passes it on every command);
   bootstrap needs nothing extra.
+
+## Outcome
+
+Released engine `v0.1.28` (tag pushed). Live proof 2026-10-30 (PIN-0120
+bootstrap, verify all green, 299 tasks):
+- `cli_tools` resolves pins from `dotfiles/provisioning/cli-tools.yaml`
+  (fixture tests prove arbitrary tags; malformed manifests fail named);
+- it publishes `cli_tools_tags`; `assets`, `settings` and `verify` derive
+  every tag, image tag, contract and tag-qualified path from it (standalone
+  playbooks publish the fact when absent);
+- installed pins are now `tpr v0.5.0` and `dotfiles-runtime v0.5.0`
+  (`cli-tools/*/pinned`), tpr images exist at `v0.5.0`, and the live palette
+  carries `on_backdrop`;
+- remaining literal: `verify_csg_contract_version: 0.2.0` (the csg version
+  handshake's contract generation, not the package tag); `assets_pinned_tag`
+  (corpus pin) is out of scope.

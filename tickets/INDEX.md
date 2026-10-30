@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- [REQ-014-cli-tools-manifest-source/ticket.md](./REQ-014-cli-tools-manifest-source/ticket.md) — `cli_tools`: consume the composition manifest as the single pin source | `in-progress` | fixes PIN-0119 no-op (engine hardcoded v0.4.0 pins)
+- [REQ-014-cli-tools-manifest-source/ticket.md](./REQ-014-cli-tools-manifest-source/ticket.md) — `cli_tools`: consume the composition manifest as the single pin source | `done` | tag: v0.1.28 | live: tpr/runtime v0.5.0 installed from manifest
 
 ## Bugs
 
