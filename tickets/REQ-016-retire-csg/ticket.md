@@ -23,23 +23,23 @@ csg.
 
 ## Acceptance
 
-- [ ] `settings`: csg settings template, `settings_csg_image_tag`, cache/config
+- [x] `settings`: csg settings template, `settings_csg_image_tag`, cache/config
       dirs and `settings_files` entry removed.
-- [ ] `assets`: `csg-templates` source/copy, native-checkout dir assertion and
+- [x] `assets`: `csg-templates` source/copy, native-checkout dir assertion and
       config-in-spine relocation removed.
-- [ ] `verify`: `verify_csg_version`, `verify_csg_contract_version`,
+- [x] `verify`: `verify_csg_version`, `verify_csg_contract_version`,
       checkout/pin/image/contract tasks and result keys removed.
-- [ ] `filesystem`, `config_links`, `cli_tools`, `runtime_daemon`,
+- [x] `filesystem`, `config_links`, `cli_tools`, `runtime_daemon`,
       `group_vars/**` carry no csg behavior; `runtime_palette_producer`
       defaults to `tpr` and the domain assert accepts only `tpr`.
-- [ ] Composition fixtures (`cli-tools`, `assets`, `packages`, `filesystem`)
+- [x] Composition fixtures (`cli-tools`, `assets`, `packages`, `filesystem`)
       carry no csg entries.
-- [ ] Tests that asserted csg behavior are removed or rewritten; the pin-parity
+- [x] Tests that asserted csg behavior are removed or rewritten; the pin-parity
       set no longer includes csg.
-- [ ] `rg -ni 'csg|color-scheme-generator' ansible src tests/fixtures
+- [x] `rg -ni 'csg|color-scheme-generator' ansible src tests/fixtures
       tests/unit tests/integration --glob '*.{yml,yaml,py,j2}'` returns only
       explicit historical comments.
-- [ ] Version `0.1.30` + CHANGELOG entry. No tag/push/merge.
+- [x] Version `0.1.30` + CHANGELOG entry. No tag/push/merge.
 
 ## Evidence / Verify
 
@@ -48,9 +48,29 @@ csg.
   producer.
 - `rg` sweep: only three justified historical comments remain
   (`group_vars/all.yml`, `runtime_daemon/tasks/main.yml`).
-- `make gates` and `make ci-gates-parity` results recorded in the Outcome
-  section below (orchestrator run).
+- `rg` result (exact):
+  ```
+  ansible/inventory/group_vars/all.yml:56:#   (REQ-010 / runtime REQ-004). REQ-016 retired csg: `tpr` is the sole
+  ansible/inventory/group_vars/all.yml:57:#   producer (runtime >= v0.5.1 rejects csg). This is a PROVISIONING INPUT
+  ansible/roles/runtime_daemon/tasks/main.yml:18:# rejects csg before it reads producer.json).
+  ```
+- `make gates` → **PASS** (rc=0): `945 passed, 3 skipped, 52 deselected`
+  (fast suite, 22m22s); `ruff check src tests` → `All checks passed!`;
+  hermetic `914 passed, 34 skipped, 52 deselected` (18m57s); `uv lock --check`
+  → `Resolved 33 packages in 1ms`; `docs-check` clean.
+- `make ci-gates-parity` → **PASS**: gates `docs-check, hermetic, lint,
+  lock-check, test`; CI jobs include those + `assets-parity`,
+  `ci-gates-parity`, `release` (both exempt where declared).
+- Engine version `0.1.30`; `uv.lock` re-locked to `0.1.30`.
+- Code commit `ac7d22d` (tag `v0.1.30`); this ticket-evidence commit rides on
+  top of it on `ticket/REQ-016-retire-csg`.
 
 ## Outcome
 
-In progress. No tag, push or merge.
+CSG is retired from provisioning. `tpr` is the sole palette producer
+(`runtime_palette_producer` defaults to `tpr`; `runtime_daemon` accepts only
+`tpr`). No bootstrap path installs, renders, links, verifies or documents csg;
+the engine still reads all tool lists from the composition manifests, so a
+manifest without csg is the supported shape.
+
+No tag, push or merge.
