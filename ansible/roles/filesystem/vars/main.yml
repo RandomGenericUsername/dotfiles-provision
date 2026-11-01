@@ -39,10 +39,10 @@ filesystem_compositor_dirs:
 # (never rm -rf user state) and ignored by every gate.
 #
 # config-in-spine (2026-08-16): the `config/` subtree hosts ALL managed
-# configs (tool dirs + the csg-templates/effects relocations); the
+# configs (tool dirs + the effects relocation); the
 # config-links role symlinks each ~/.config/<name> -> <install>/config/<name>.
-# csg-templates moved to config/color-scheme-generator/templates (CSG tool
-# config); weg-effects.yaml moved to config/weg/effects.yaml (WEG tool config).
+# tpr-templates moved to config/theme-producer/templates (TPR tool config);
+# weg-effects.yaml moved to config/weg/effects.yaml (WEG tool config).
 # gt-3-1: the GTK consumer dirs (config/gtk-3.0, config/gtk-4.0) join the
 # spine so the config-links role can migrate+symlink ~/.config/gtk-{3,4}.0.
 # Provisioning creates the DIRS only — never the colors.css pointers inside
@@ -55,8 +55,6 @@ filesystem_spine_dirs:
   # Runtime-owned producer config (runtime REQ-004): runtime_daemon renders
   # producer.json here; the daemon, CLI and runtime-seed all read it.
   - config/dotfiles-runtime
-  - config/color-scheme-generator
-  - config/color-scheme-generator/templates
   - config/hypr
   - config/hyprpaper
   # Every config/ags* path is DELIBERATELY absent: ags_apps_units owns each

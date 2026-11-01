@@ -59,7 +59,7 @@ config_links_backup_policy: auto
 
 # config_links_managed_dirs: the complete set of config dirs this role
 #   symlinks. Mirrors the union of what the writing roles place:
-#   - assets       → color-scheme-generator (templates/), weg (effects.yaml)
+#   - assets       → weg (effects.yaml)
 #   - compositor_configs → hypr, hyprpaper
 #   - gui_tools    → (none)
 #   - ags_apps_units → (none: the ONLY AGS installer creates every app's
@@ -67,7 +67,7 @@ config_links_backup_policy: auto
 #                    the composition app list. No AGS basename appears in this
 #                    role's managed set — that would be a second owner.)
 #   - config_copies → nvim, starship, wlogout, zsh
-#   - settings     → color-scheme-generator, weg, itr, theme-producer
+#   - settings     → weg, itr, theme-producer
 #   - gt-3-1       → gtk-3.0, gtk-4.0 (the GTK consumer dirs)
 #   - add-rofi-app-launcher → rofi
 #   - provision-btop-config → btop (the btop_config role renders btop.conf
@@ -84,7 +84,6 @@ config_links_managed_dirs:
   - wlogout
   - zsh
   - kitty
-  - color-scheme-generator
   - weg
   - itr
   - theme-producer
@@ -114,7 +113,6 @@ config_links_pre_seed_dirs:
   - wlogout
   - zsh
   - kitty
-  - color-scheme-generator
   - weg
   - itr
   - theme-producer

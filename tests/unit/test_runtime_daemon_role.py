@@ -64,7 +64,7 @@ _RENDER_VARS = {
     "runtime_daemon_activate": True,
     "runtime_daemon_prune_on_reactive": False,
     "runtime_daemon_run_flags": " --activate",
-    "runtime_palette_producer": "csg",
+    "runtime_palette_producer": "tpr",
 }
 
 
@@ -209,7 +209,7 @@ class TestUnitContent:
         }
         defaulted = env.from_string(template).render(
             runtime_daemon_producer_schema_version=1,
-            runtime_palette_producer="csg",
+            runtime_palette_producer="tpr",
             runtime_daemon_tpr_runtime="container",
         )
         assert json.loads(defaulted)["tpr_engine"] == "native"
@@ -299,7 +299,7 @@ class TestTasks:
             task
             for task in _load_tasks()
             if _module_key(task) == "ansible.builtin.assert"
-            and 'runtime_palette_producer in ["csg", "tpr"]'
+            and 'runtime_palette_producer == "tpr"'
             in str(task.get("ansible.builtin.assert", ""))
         ]
         assert len(matches) == 1, "expected one palette-producer domain assert"
@@ -347,20 +347,20 @@ class TestTasks:
         )
         assert data["runtime_daemon_tpr_runtime"] == "container"
 
-    def test_palette_producer_defaults_to_csg_in_group_vars(self) -> None:
-        """REQ-010: the switch ships csg; an env var can select tpr for a run."""
+    def test_palette_producer_defaults_to_tpr_in_group_vars(self) -> None:
+        """REQ-016: tpr is the sole producer; the env var can still restate it."""
         group_vars = yaml.safe_load(
             (_ANSIBLE_DIR / "inventory" / "group_vars" / "all.yml").read_text()
         )
         value = str(group_vars["runtime_palette_producer"])
         assert "RUNTIME_PALETTE_PRODUCER" in value
-        assert "default('csg'" in value
+        assert "default('tpr'" in value
         env = Environment(undefined=StrictUndefined)
         env.filters["default"] = lambda raw, fallback, *args: (
             fallback if isinstance(raw, Undefined) or raw in (None, "") else raw
         )
         rendered = env.from_string(value).render(ansible_facts={"env": {}})
-        assert rendered == "csg"
+        assert rendered == "tpr"
         rendered_tpr = env.from_string(value).render(
             ansible_facts={"env": {"RUNTIME_PALETTE_PRODUCER": "tpr"}}
         )

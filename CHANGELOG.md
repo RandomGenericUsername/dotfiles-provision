@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.30] - 2026-10-31
+
+### Changed
+
+- **CSG retired from provisioning (REQ-016):** `tpr` is the sole palette
+  producer (runtime >= v0.5.1 rejects `csg`). Removed the csg settings
+  template and `settings_csg_image_tag`, the `csg-templates` asset source /
+  copy / native-checkout assertion, the csg config dirs and config-links
+  symlink, the csg verify legs (checkout, pin, contract and four images), the
+  csg image build from `cli_tools`, and the csg entries from the composition
+  fixtures. `runtime_palette_producer` now defaults to `tpr` and the
+  `runtime_daemon` domain assert accepts only `tpr`.
+- Domain enums drop `Capability.CSG` and `AssetKind.CSG_TEMPLATE`; manifests
+  without csg remain fully supported, since producer choices stay owned by
+  the composition manifests.
+
 ## 0.1.29
 
 Consume dotfiles-assets v0.6.3 (semantic-role icon mappings, REQ-008 Phase B).

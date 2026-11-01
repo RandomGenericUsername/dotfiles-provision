@@ -1,6 +1,6 @@
 # Assets role (Story 2.6; pinned corpus since S1) — deploys the asset kinds into
 # the install spine that the filesystem role (2.5) created (FR-17, chaining-spine.md):
-# the wallpaper tarball, the icon-template / icon-mapping / csg-template
+# the wallpaper tarball, the icon-template / icon-mapping / tpr-template
 # directories, and the weg-effects catalog.
 #
 # S1 CUT-OVER (spine AD-6/AD-13): the icon/content corpus is no longer read from
@@ -51,8 +51,8 @@
 # - User-scoped privilege context: NO become/become_user anywhere (AC 12).
 # - No composition-repo paths: every corpus source is an absolute path into the
 #   pinned assets checkout ({{ assets_checkout_root }}/...), asserted present
-#   before the first copy. The csg-templates source is the same shape for the
-#   pinned csg checkout (spine AD-10).
+#   before the first copy. The tpr-templates source is the same shape for the
+#   pinned tpr checkout (spine AD-10).
 
 - name: Assert install_dir seam is provided
   ansible.builtin.assert:
@@ -286,32 +286,14 @@
   loop: "{{ assets_copies }}"
   when: not ansible_check_mode
 
-# csg-templates and tpr-templates read PINNED CLI checkouts (spine AD-10),
-# which the cli_tools role materializes at
-# <install>/cli-tools/<name>/<tag>/ (bootstrap order: cli-tools.yaml before
-# assets.yaml). Their sources are already absolute, so this loop is the same
-# mirror WITHOUT the repo-root prefix. The stat/assert pairs above make a
-# missing or mis-pinned checkout a named failure here rather than a silently
-# empty deploy (synchronize against a missing src copies nothing and would
-# leave the previous catalog in place).
-- name: Check the pinned csg checkout template catalog exists
-  ansible.builtin.stat:
-    path: "{{ assets_csg_templates_source }}"
-  register: assets_csg_templates_dir
-  when: not ansible_check_mode
-
-- name: Assert the pinned csg checkout template catalog is deployed
-  ansible.builtin.assert:
-    that: assets_csg_templates_dir.stat.isdir | default(false)
-    fail_msg: >-
-      the pinned csg template catalog is missing at
-      {{ assets_csg_templates_source }} — the assets role copies it FROM the
-      cli_tools checkout (spine AD-10), so the cli-tools playbook must have
-      cloned csg at {{ assets_csg_pinned_tag }} first (bootstrap order:
-      cli-tools.yaml before assets.yaml). A missing checkout means the csg pin
-      was never fetched; re-run the cli-tools playbook
-  when: not ansible_check_mode
-
+# tpr-templates read the PINNED tpr checkout (spine AD-10), which the
+# cli_tools role materializes at <install>/cli-tools/tpr/<tag>/ (bootstrap
+# order: cli-tools.yaml before assets.yaml). Its source is already absolute, so
+# this loop is the same mirror WITHOUT the repo-root prefix. The stat/assert
+# pair below makes a missing or mis-pinned checkout a named failure here rather
+# than a silently empty deploy (synchronize against a missing src copies
+# nothing and would leave the previous catalog in place).
+#
 # REQ-010: the tpr catalog has the identical pinned-checkout contract. The
 # runtime's TprAdapter reads `config/theme-producer/templates` from the spine,
 # so a missing catalog would make the tpr producer fail on the first wallpaper

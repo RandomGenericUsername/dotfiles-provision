@@ -2,9 +2,9 @@
 # XDG config/state/cache dirs. Each entry is a node name Ansible ensures exists.
 #
 # config-in-spine (2026-08-16): the `config/` subtree hosts ALL managed configs
-# (tool dirs + the csg-templates/effects relocations); `config` is DUAL-USE —
-# the XDG config base dir AND the spine's managed-config root. The csg-templates
-# live at config/color-scheme-generator/templates and the weg effects catalog at
+# (tool dirs + the effects relocation); `config` is DUAL-USE —
+# the XDG config base dir AND the spine's managed-config root. The tpr-templates
+# live at config/theme-producer/templates and the weg effects catalog at
 # config/weg/effects.yaml (the `weg-effects.yaml` file node maps there; its
 # parent `config/weg` is the spine dir). Parity-locked with
 # roles/filesystem/vars/main.yml (filesystem_spine_dirs / file_nodes).
@@ -24,8 +24,6 @@ entries:
   # Runtime-owned producer config (runtime REQ-004). runtime_daemon renders
   # producer.json here before the daemon/seed read it.
   - name: config/dotfiles-runtime
-  - name: config/color-scheme-generator
-  - name: config/color-scheme-generator/templates
   - name: config/hypr
   - name: config/hyprpaper
   # config/ags is DELIBERATELY absent: the ags_apps role owns it as the

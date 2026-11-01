@@ -71,7 +71,6 @@ _TASK_KEYWORDS = {
 }
 
 _EXPECTED_TEMPLATES = {
-    "csg": "csg-settings.toml.j2",
     "weg": "weg-settings.toml.j2",
     "itr": "itr-settings.toml.j2",
     "tpr": "tpr-settings.toml.j2",
@@ -186,7 +185,6 @@ class TestSettingsRoleTree:
     _REQUIRED_FILES = (
         "tasks/main.yml",
         "vars/main.yml",
-        "templates/csg-settings.toml.j2",
         "templates/weg-settings.toml.j2",
         "templates/itr-settings.toml.j2",
         "templates/tpr-settings.toml.j2",
@@ -383,17 +381,17 @@ class TestSettingsVars:
             "role-internal content (no repo-file sources)"
         )
 
-    def test_settings_files_are_exactly_four(self) -> None:
-        """AC 1: settings_files has exactly the four {name, template, dest}
-        entries (csg/weg/itr/tpr) with matching template filenames."""
+    def test_settings_files_are_exactly_three(self) -> None:
+        """AC 1: settings_files has exactly the three {name, template, dest}
+        entries (weg/itr/tpr) with matching template filenames."""
         data = _vars()
         files = list(data["settings_files"])
-        assert len(files) == 4, (
-            f"settings_files must have exactly 4 entries (csg/weg/itr/tpr); found {len(files)}"
+        assert len(files) == 3, (
+            f"settings_files must have exactly 3 entries (weg/itr/tpr); found {len(files)}"
         )
         names = {str(f["name"]) for f in files}
-        assert names == {"csg", "weg", "itr", "tpr"}, (
-            f"settings_files names must be {{csg, weg, itr, tpr}}; found {names}"
+        assert names == {"weg", "itr", "tpr"}, (
+            f"settings_files names must be {{weg, itr, tpr}}; found {names}"
         )
         for file_ in files:
             template = str(file_["template"])
@@ -473,7 +471,7 @@ class TestSettingsTemplates:
         cli_tools build) — neither container-mode template may hardcode
         `engine = "podman"`, and neither may carry a default() fallback (an
         undefined value must fail loud)."""
-        for name in ("csg", "weg", "tpr"):
+        for name in ("weg", "tpr"):
             text = (_TEMPLATES_DIR / _EXPECTED_TEMPLATES[name]).read_text()
             assert 'engine = "podman"' not in text, (
                 f"{name} template must not hardcode the podman engine — that "
@@ -487,22 +485,6 @@ class TestSettingsTemplates:
                 f"{name} must NOT carry a default() on the engine — an undefined "
                 "value must fail loud"
             )
-
-    def test_csg_renders_spine_contract_and_keeps_overwrite_false(self) -> None:
-        """Epic 4: CSG [output] directory → XDG cache default (manual
-        `csg generate` runs only — the runtime always passes
-        COLORSCHEME__OUTPUT__DIRECTORY per render); `overwrite = false`
-        MUST be kept (the runtime owns the per-task env override)."""
-        text = (_TEMPLATES_DIR / "csg-settings.toml.j2").read_text()
-        assert 'directory = "{{ settings_xdg_cache_home | trim }}/dotfiles/csg-output"' in text
-        assert "overwrite = false" in text, (
-            "CSG template must keep overwrite = false (the runtime owns the "
-            "per-task COLORSCHEME__OUTPUT__OVERWRITE override)"
-        )
-        assert "install_dir | trim }}/generated" not in text, (
-            "CSG template must not reference a generated/ spine path "
-            "(Epic 4 removed the tree)"
-        )
 
     def test_weg_renders_spine_contract_and_locks_strict_false(self) -> None:
         """Epic 4: WEG [output] directory + [processing] temp_dir → XDG
@@ -678,18 +660,6 @@ class TestSettingsPlaybook:
             for name, path in _expected_files(install).items():
                 assert path.is_file(), f"{name} settings.toml {path} was never rendered"
 
-            csg = tomllib.loads(_expected_files(install)["csg"].read_text())
-            assert str(csg["output"]["directory"]) == str(
-                cache_home / "dotfiles" / "csg-output"
-            )
-            assert csg["output"]["overwrite"] is False, (
-                "rendered CSG file must keep overwrite = false (the runtime "
-                "owns the per-task env override)"
-            )
-            assert csg["output"]["default_formats"] == [], (
-                "rendered CSG default_formats must be EMPTY (= all formats from "
-                "the template catalog on interactive csg generate)"
-            )
             weg = tomllib.loads(_expected_files(install)["weg"].read_text())
             assert str(weg["output"]["directory"]) == str(
                 cache_home / "dotfiles" / "weg-output"
@@ -751,8 +721,8 @@ class TestSettingsPlaybook:
 
     def test_playbook_renders_declared_engine_and_rejects_invalid(self) -> None:
         """Option 2b behavioral lock: the REAL playbook renders
-        `[container].engine` from the declared container_runtime_engine for BOTH
-        csg and weg. Default run → podman; `-e container_runtime_engine=docker`
+        `[container].engine` from the declared container_runtime_engine for both
+        weg and tpr. Default run → podman; `-e container_runtime_engine=docker`
         and env `DOTFILES_CONTAINER_ENGINE=docker` → docker; an invalid declared
         engine → non-zero exit (the ungated domain assert aborts)."""
         ansible_playbook = shutil.which("ansible-playbook")
@@ -801,17 +771,17 @@ class TestSettingsPlaybook:
         with tempfile.TemporaryDirectory() as tmp:
             default, default_install = run("default")
             assert default.returncode == 0, default.stdout + default.stderr
-            for tool in ("csg", "weg", "tpr"):
+            for tool in ("weg", "tpr"):
                 assert engine_of(default_install, tool) == "podman"
 
             extra, extra_install = run("extra", extra=("-e", "container_runtime_engine=docker"))
             assert extra.returncode == 0, extra.stdout + extra.stderr
-            for tool in ("csg", "weg", "tpr"):
+            for tool in ("weg", "tpr"):
                 assert engine_of(extra_install, tool) == "docker"
 
             env_run, env_install = run("env", env_engine="docker")
             assert env_run.returncode == 0, env_run.stdout + env_run.stderr
-            for tool in ("csg", "weg", "tpr"):
+            for tool in ("weg", "tpr"):
                 assert engine_of(env_install, tool) == "docker"
 
             bogus, _ = run("bogus", extra=("-e", "container_runtime_engine=bogus"))
@@ -869,10 +839,9 @@ class TestSettingsPlaybook:
         a machine with only one CLI still gates that half. A temp HOME won't
         find uv-installed tools, so absent CLIs are skipped — the authoritative
         gate is Story 2.12 (verify) + Story 3.3 (settings-parity)."""
-        csg = shutil.which("csg")
         weg = shutil.which("weg")
-        if csg is None and weg is None:
-            pytest.skip("csg/weg not installed; skipping runtime gate (owned by 2.12/3.3)")
+        if weg is None:
+            pytest.skip("weg not installed; skipping runtime gate (owned by 2.12/3.3)")
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")
@@ -905,13 +874,6 @@ class TestSettingsPlaybook:
             assert result.returncode == 0, result.stdout + result.stderr
 
             gates: list[tuple[list[str], Path]] = []
-            if csg is not None:
-                gates.append(
-                    (
-                        [csg, "info", "--config"],
-                        install / "config" / "color-scheme-generator" / "settings.toml",
-                    )
-                )
             if weg is not None:
                 gates.append(
                     ([weg, "info", "--config"], install / "config" / "weg" / "settings.toml")
@@ -959,7 +921,6 @@ def _expected_files(install: Path) -> dict[str, Path]:
     <install>/config/ (NOT the XDG config home — settings renders into the
     spine; the config-links role symlinks ~/.config/<tool> -> the spine)."""
     return {
-        "csg": install / "config" / "color-scheme-generator" / "settings.toml",
         "weg": install / "config" / "weg" / "settings.toml",
         "itr": install / "config" / "itr" / "settings.toml",
         "tpr": install / "config" / "theme-producer" / "settings.toml",
@@ -1080,104 +1041,9 @@ class TestSettingsImageTag:
                 assert rendered["container"]["image_tag"] != "latest"
 
 
-class TestSettingsCsgImageTag:
-    """AD-7 for CSG: the rendered `[container] image_tag` is the PIN, never
-    `latest`. Same single-source discipline as WEG — the manifest `csg.tag` is
-    authoritative, `settings_csg_image_tag` and `verify_csg_version` are the
-    AD-11 mirrors, and the cli_tools role builds the images at that tag (via
-    `COLORSCHEME__CONTAINER__IMAGE_TAG`, since csg's verb has no --image-tag).
-    """
-
-    _PLAYBOOK = _ANSIBLE_DIR / "playbooks" / "settings.yaml"
-    _MANIFEST = manifests_dir() / "cli-tools.yaml"
-
-    @staticmethod
-    def _manifest_csg_tag() -> str:
-        manifest = yaml.safe_load(TestSettingsCsgImageTag._MANIFEST.read_text())
-        entry = next(e for e in manifest["entries"] if e.get("name") == "csg")
-        return str(entry["tag"])
-
-    def test_image_tag_mirrors_the_manifest_pin(self) -> None:
-        data = _vars()
-        assert str(data["settings_csg_image_tag"]) == "{{ cli_tools_tags.csg }}", (
-            "settings_csg_image_tag must DERIVE from the cli_tools_tags fact "
-            "the cli_tools role publishes from "
-            f"dotfiles/provisioning/cli-tools.yaml; got {data['settings_csg_image_tag']!r}"
-        )
-        assert render_pin(data["settings_csg_image_tag"]) == self._manifest_csg_tag()
-        template = (_TEMPLATES_DIR / "csg-settings.toml.j2").read_text()
-        assert 'image_tag = "{{ settings_csg_image_tag }}"' in template, (
-            "the CSG template must render the pin, not a literal"
-        )
-        assert 'image_tag = "latest"' not in template, (
-            "the CSG template must never hardcode `latest` (AD-7)"
-        )
-
-    def test_image_tag_verify_literal_mirrors_the_pin(self) -> None:
-        verify_vars = yaml.safe_load(
-            (_ANSIBLE_DIR / "roles" / "verify" / "vars" / "main.yml").read_text()
-        )
-        assert verify_vars["verify_csg_version"] == _vars()["settings_csg_image_tag"], (
-            "verify_csg_version must derive from the same cli_tools_tags fact as "
-            "the rendered image tag — verify asserts csg's base + backend images "
-            "exist at exactly that tag (AD-11)"
-        )
-        assert render_pin(verify_vars["verify_csg_version"]) == self._manifest_csg_tag()
-        references = " ".join(str(r) for r in verify_vars["verify_csg_image_references"])
-        assert "verify_csg_version" in references, (
-            "every csg image reference verify probes must be derived from the pin"
-        )
-        assert "latest" not in references, "no csg image reference may be `latest`"
-
-    def test_image_tag_renders_the_pin_and_follows_a_bump(self) -> None:
-        """Two renders with different pins: the rendered value equals the pin
-        each time — so a pin bump changes the tag end-to-end and the pre-S6
-        hardcoded `latest` can never survive it."""
-        ansible_playbook = shutil.which("ansible-playbook")
-        if ansible_playbook is None:
-            pytest.skip("ansible-playbook not installed; skipping render test")
-        for tag in ("v0.1.0", "v0.2.0"):
-            with tempfile.TemporaryDirectory() as tmp:
-                home = Path(tmp) / "home"
-                xdg = Path(tmp) / "xdg"
-                install = Path(tmp) / "install"
-                home.mkdir()
-                xdg.mkdir()
-                install.mkdir()
-                env = _test_env(
-                    HOME=str(home),
-                    XDG_CONFIG_HOME=str(xdg),
-                    XDG_STATE_HOME=str(Path(tmp) / "state-home"),
-                    XDG_CACHE_HOME=str(Path(tmp) / "cache-home"),
-                    ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
-                )
-                result = subprocess.run(
-                    [
-                        ansible_playbook,
-                        str(self._PLAYBOOK),
-                        "-e",
-                        f"install_dir={install}",
-                        *_cli_tags_extra_vars(),
-                        "-e",
-                        f"settings_csg_image_tag={tag}",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                    timeout=120,
-                )
-                assert result.returncode == 0, result.stdout + result.stderr
-                rendered = tomllib.loads(_expected_files(install)["csg"].read_text())
-                assert rendered["container"]["image_tag"] == tag, (
-                    "the rendered CSG image_tag must equal the pin passed to the "
-                    f"settings role; expected {tag!r}"
-                )
-                assert rendered["container"]["image_tag"] != "latest"
-
-
 class TestSettingsTprImageTag:
     """REQ-010: the rendered TPR `[container] image_tag` is the PIN, never
-    `latest`. Same single-source discipline as CSG/WEG — the manifest `tpr.tag`
+    `latest`. Same single-source discipline as WEG — the manifest `tpr.tag`
     is authoritative, and `settings_tpr_image_tag` / `verify_tpr_version` are
     the AD-11 mirrors. The cli_tools role builds tpr's images at this tag by
     passing `THEME__CONTAINER__IMAGE_TAG`.

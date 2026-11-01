@@ -15,9 +15,7 @@
 #       task) and the `follow: false` + isdir dest check verbatim (criterion 9).
 #   (b) vs 2.7 default_palette (command -v + bin-dir PATH-prepend + check-gated
 #       assert): verify reuses the pattern for BOTH system binaries (criterion
-#       2) and CLI tools (criterion 3); unlike 2.7 it has no csg presence
-#       REQUIREMENT per se — the whole point is asserting what provisioning
-#       placed.
+#       2) and CLI tools (criterion 3); it asserts what provisioning placed.
 #   (c) vs 2.11 settings (hardened install_dir assert + spine-target contract):
 #       verify consumes the SAME spine targets the settings role renders (the
 #       six verify_settings_spine_targets) and inherits the hardened five-
@@ -28,7 +26,7 @@
 #       lock them.
 #   (e) vs 2.6 assets (asset kind → spine-segment mapping): verify re-checks
 #       the deployed asset outcomes (default.png, icon-templates/, icon-mappings/,
-#       csg-templates/, weg-effects.yaml) read-only, plus the pinned assets
+#       tpr-templates/, weg-effects.yaml) read-only, plus the pinned assets
 #       checkout (`assets/pinned` + the five class dirs, spine AD-6/AD-7).
 #   (f) vs 2.9 compositor_configs (skeleton/fragment target map): verify
 #       re-checks the placed skeletons + fragments read-only; the AGS
@@ -127,7 +125,7 @@ verify_xdg_dirs:
 #   Epic 4 single-source: no generated/ tree (runtime owns all derived
 #   artifacts under $XDG_STATE_HOME/dotfiles/).
 #   config-in-spine (2026-08-16): the `config/` subtree hosts all managed
-#   configs; csg-templates live at config/color-scheme-generator/templates.
+#   configs; tpr-templates live at config/theme-producer/templates.
 verify_install_spine_dirs:
   - wallpapers
   - icon-templates
@@ -136,8 +134,6 @@ verify_install_spine_dirs:
   # Runtime-owned producer config (runtime REQ-004), parity with
   # filesystem_spine_dirs. runtime_daemon renders producer.json here.
   - config/dotfiles-runtime
-  - config/color-scheme-generator
-  - config/color-scheme-generator/templates
   - config/hypr
   - config/hyprpaper
   # Every config/ags* path is DELIBERATELY absent: ags_apps_units owns each
@@ -238,24 +234,7 @@ verify_install_spine_files:
 #   container existence — an empty templates dir silently derives empty output).
 verify_derivation_template_dirs:
   - icon-templates
-  - config/color-scheme-generator/templates
   - config/theme-producer/templates
-
-# verify_csg_template_files: the CSG color-format templates the runtime's
-#   csg_adapter requests by name (adapters/csg_adapter.py `--format` args).
-#   Non-empty is NOT enough (AD-43): csg silently OMITS a format whose
-#   `colors.<fmt>.j2` template is missing, and the runtime then fails a
-#   palette entry with "csg did not write expected artifact" (e.g. a missing
-#   colors.kitty.j2 leaves current/colors.kitty dangling and kitty never
-#   re-themes). Parity-locked to the adapter's requested format set.
-verify_csg_template_files:
-  - colors.yaml.j2
-  - colors.conf.j2
-  - colors.gtk.css.j2
-  - colors.adw.css.j2
-  - colors.sequences.j2
-  - colors.rasi.j2
-  - colors.kitty.j2
 
 # verify_weg_effects_path: the spine effects catalog the WEG gate must read.
 #   The assets role (2.6) emits it via `weg dump-effects --output` to
@@ -316,7 +295,6 @@ verify_system_binaries:
 #   the icon-renderer console script (no separate binary); `dotfiles-runtime`
 #   is the host runtime. Mirror of cli_tools.cli_tools.
 verify_cli_tools:
-  - csg
   - weg
   - itr
   - tpr
@@ -359,7 +337,7 @@ verify_runtime_pin_file: "{{ verify_cli_tools_checkout_root }}/dotfiles-runtime/
 #   runtime composition root (daemon, CLI, seed) resolves — no ambient env.
 verify_producer_config_path: "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
 verify_producer_config_schema_version: 1
-verify_expected_producer: "{{ runtime_palette_producer | default('csg', true) }}"
+verify_expected_producer: "{{ runtime_palette_producer | default('tpr', true) }}"
 verify_expected_tpr_engine: "{{ runtime_palette_tpr_engine | default('native', true) }}"
 verify_expected_tpr_runtime: container
 
@@ -379,34 +357,8 @@ verify_weg_image_name: weg
 verify_weg_image_reference: >-
   {{ verify_weg_image_name }}-{{ container_runtime_engine }}:{{ verify_weg_version }}
 
-# verify_csg_*: the same four legs for `csg` (S6), plus FOUR images.
-#   csg builds one base image plus one per backend (`csg install` with no
-#   `--backend` builds all of `Backend`): `base`, `custom`, `pywal`, `wallust`,
-#   each engine-qualified — `<prefix>-<suffix>-<engine>:<tag>` via
-#   oci_runtime.naming.engine_qualified_image, with `image_prefix` "csg" from
-#   the rendered settings and `container_runtime_engine` the same DECLARED
-#   value the build used. `verify_csg_image_references` spells all four out so
-#   a missing backend is a named failure, not a count. The pin is the manifest
-#   `csg.tag` (AD-7/AD-11) — never `latest`; the cli_tools role builds them at
-#   this tag by passing `COLORSCHEME__CONTAINER__IMAGE_TAG={{ pin }}`.
-verify_csg_version: "{{ cli_tools_tags.csg }}"
-verify_csg_checkout: "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
-verify_csg_pin_file: "{{ verify_cli_tools_checkout_root }}/csg/pinned"
-# The one contract pin that is NOT tag-derived: csg reports
-# `<package-version> contract 0.2.0` (v0.2.2 today), so the contract token is
-# its own generation (AD-4) and must not follow the package tag. The verify
-# task greps this exact token, so bumping it belongs to a contracts generation
-# change, not a csg pin bump.
-verify_csg_contract_version: 0.2.0
-verify_csg_image_prefix: csg
-verify_csg_image_references:
-  - "{{ verify_csg_image_prefix }}-base-{{ container_runtime_engine }}:{{ verify_csg_version }}"
-  - "{{ verify_csg_image_prefix }}-custom-{{ container_runtime_engine }}:{{ verify_csg_version }}"
-  - "{{ verify_csg_image_prefix }}-pywal-{{ container_runtime_engine }}:{{ verify_csg_version }}"
-  - "{{ verify_csg_image_prefix }}-wallust-{{ container_runtime_engine }}:{{ verify_csg_version }}"
-
-# verify_tpr_*: REQ-010, the opt-in palette producer. Same legs as csg —
-#   checkout, pin record, console handshake and THREE images (base + one per
+# verify_tpr_*: REQ-010, the sole palette producer. Same pinned-checkout legs
+#   as weg — checkout, pin record, console handshake and THREE images (base + one per
 #   shipped engine: matugen, native), each engine-qualified at the pin via
 #   oci_runtime.naming.engine_qualified_image:
 #   `<prefix>-<suffix>-<engine>:<tag>`.
@@ -415,7 +367,7 @@ verify_csg_image_references:
 #   pin, so a `latest`-only or previous-pin image fails here.
 #
 #   CONTRACT TOKEN: tpr's `--version` prints only the package version; unlike
-#   csg/weg/itr it has no `contract <x>` token, so there is nothing dynamic to
+#   weg/itr it has no `contract <x>` token, so there is nothing dynamic to
 #   grep. `verify_tpr_contract_version` records the invocation-contract
 #   generation this consumer expects (the pin without its leading `v`) and is
 #   asserted to equal `verify_tpr_version | regex_replace('^v', '')` by the
@@ -607,7 +559,6 @@ verify_expected_engine_tag: "{{ expected_engine_tag | default('', true) }}"
 #   ~/.config/<tool> symlink — exercising the link too. Parity-EXACT with
 #   settings_files dests (the test locks it).
 verify_settings_files:
-  - { name: csg, dest: "{{ install_dir | trim }}/config/color-scheme-generator/settings.toml" }
   - { name: weg, dest: "{{ install_dir | trim }}/config/weg/settings.toml" }
   - { name: itr, dest: "{{ install_dir | trim }}/config/itr/settings.toml" }
   - { name: tpr, dest: "{{ install_dir | trim }}/config/theme-producer/settings.toml" }
@@ -621,8 +572,6 @@ verify_settings_files:
 #   settings templates is locked by test (each dotted key must exist as a
 #   path-bearing assignment in the matching settings/templates/*.j2).
 verify_settings_spine_keys:
-  csg:
-    - output.directory
   weg:
     - output.directory
     - processing.temp_dir
@@ -636,8 +585,8 @@ verify_settings_spine_keys:
 # verify_asset_dirs / verify_asset_files: the five deployed asset outcomes
 #   (criterion 4), split by inode type so the assert can check isdir/isreg
 #   (review finding 2026-08-13: an exists-only check let a regular FILE satisfy
-#   a required DIRECTORY). config-in-spine (2026-08-16): csg-templates live at
-#   config/color-scheme-generator/templates; weg-effects.yaml at
+#   a required DIRECTORY). config-in-spine (2026-08-16): tpr-templates live at
+#   config/theme-producer/templates; weg-effects.yaml at
 #   config/weg/effects.yaml (also in verify_install_spine_files).
 verify_asset_dirs:
   - icon-templates
@@ -652,7 +601,6 @@ verify_asset_dirs:
   # would otherwise ship a panel whose main transport button renders nothing.
   - icon-templates/media-transport-panel
   - icon-mappings
-  - config/color-scheme-generator/templates
   - config/theme-producer/templates
 verify_asset_files:
   - wallpapers/default.png
@@ -846,7 +794,6 @@ verify_managed_link_dirs:
   - wlogout
   - zsh
   - kitty
-  - color-scheme-generator
   - weg
   - itr
   - theme-producer

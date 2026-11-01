@@ -1,4 +1,4 @@
-# CLI tools role (Story 2.4) — installs csg/weg/itr via `uv tool install`
+# CLI tools role (Story 2.4) — installs weg/itr/tpr via `uv tool install`
 # against the repo package paths (FR-15, plan §3), then verifies each binary
 # resolves on PATH in the run context (AC 3).
 #
@@ -245,7 +245,7 @@
   changed_when: false
   when: not ansible_check_mode
 
-- name: Verify csg/weg/itr/tpr resolve on PATH
+- name: Verify weg/itr/tpr resolve on PATH
   ansible.builtin.shell: "command -v {{ item.name }}"
   loop: "{{ cli_tools }}"
   environment:
@@ -297,10 +297,10 @@
     - cli_tools_codex_standalone.stat.exists
 
 # Container image builds for the container-mode CLIs (product decision
-# 2026-08-12: csg/weg run in container mode; REQ-010 adds tpr; the host never
+# 2026-08-12: weg runs in container mode; REQ-010 adds tpr; the host never
 # installs backend binaries). `uv tool install` above only installs the
 # host-side launcher — `<cli> install` builds the image that does the actual
-# work. The list of CLIs is `cli_tools_image_builds` (csg + weg + tpr).
+# work. The list of CLIs is `cli_tools_image_builds` (weg + tpr).
 #
 # Container engine (Option 2b, single DECLARED source of truth):
 # - The engine is DECLARED, not detected: `container_runtime_engine` from
@@ -326,9 +326,8 @@
 #   silently reuse the previous image, and the rendered `image_tag` in
 #   roles/settings resolves the image this task built. Since S6 every
 #   container-mode CLI is pinned; they differ only in transport (weg takes
-#   `--image-tag` on argv; csg and tpr read their settings env because their
-#   `install` verbs have no such flag: COLORSCHEME__CONTAINER__IMAGE_TAG and
-#   THEME__CONTAINER__IMAGE_TAG respectively). The tag value in every case is
+#   `--image-tag` on argv; tpr reads its settings env because its `install`
+#   verb has no such flag: THEME__CONTAINER__IMAGE_TAG). The tag value in every case is
 #   `{{ item.tag }}` — the manifest pin, never a literal.
 #   The legacy source-path build task stays for a future in-repo container-mode
 #   entry; today its loop selects nothing (the runtime moved to its own pin and
@@ -481,9 +480,9 @@
     PATH: "{{ cli_tools_bin_dir }}:{{ ansible_facts.env.PATH }}"
   when: not ansible_check_mode
 
-# csg and tpr have no `--image-tag` on their `install` verbs: they read
-# `container.image_tag` through their settings resolvers, whose env prefixes are
-# `COLORSCHEME` and `THEME`. Passing the pin as that env var is the SAME AD-7
+# tpr has no `--image-tag` on its `install` verb: it reads
+# `container.image_tag` through its settings resolver, whose env prefix is
+# `THEME`. Passing the pin as that env var is the SAME AD-7
 # contract — the image tag is the manifest pin, never `latest` — just a
 # different transport. The key is looked up per entry from
 # `cli_tools_image_tag_env_keys`, so each tool carries its own prefix instead

@@ -45,7 +45,7 @@ _TASK_KEYWORDS = {
 }
 
 # The theme file btop's setTheme must match by FILENAME. It is the cache
-# artifact name (colors.btop.theme), NOT a csg-prefixed alias: an
+# artifact name (colors.btop.theme), NOT a producer-prefixed alias: an
 # unmatched color_theme is not an error, it is a SILENT fallback to
 # Default_theme (btop_theme.cpp:451-471).
 _SELECTED_THEME = "colors.btop.theme"

@@ -34,7 +34,6 @@ class TestCapability:
         assert Capability.HYPRLAND.value == "Hyprland"
         assert Capability.HYPRPAPER.value == "hyprpaper"
         assert Capability.AGS.value == "ags"
-        assert Capability.CSG.value == "csg"
         assert Capability.WEG.value == "weg"
         assert Capability.ICON_RENDERER.value == "itr"
         assert Capability.FONTS.value == "fonts"
@@ -43,7 +42,6 @@ class TestCapability:
         assert Capability.HYPRLAND.kind() is CapabilityKind.BINARY
         assert Capability.HYPRPAPER.kind() is CapabilityKind.BINARY
         assert Capability.AGS.kind() is CapabilityKind.BINARY
-        assert Capability.CSG.kind() is CapabilityKind.BINARY
         assert Capability.WEG.kind() is CapabilityKind.BINARY
         assert Capability.ICON_RENDERER.kind() is CapabilityKind.BINARY
 
@@ -77,7 +75,7 @@ class TestAssetKind:
         assert AssetKind.WALLPAPER.value == "wallpaper"
         assert AssetKind.ICON_TEMPLATE.value == "icon-template"
         assert AssetKind.ICON_MAPPING.value == "icon-mapping"
-        assert AssetKind.CSG_TEMPLATE.value == "csg-template"
+
         assert AssetKind.TPR_TEMPLATE.value == "tpr-template"
         assert AssetKind.WEG_EFFECTS.value == "weg-effects"
 
@@ -85,7 +83,7 @@ class TestAssetKind:
         assert AssetKind.WALLPAPER.spine_segment() == "wallpapers"
         assert AssetKind.ICON_TEMPLATE.spine_segment() == "icon-templates"
         assert AssetKind.ICON_MAPPING.spine_segment() == "icon-mappings"
-        assert AssetKind.CSG_TEMPLATE.spine_segment() == "csg-templates"
+
         assert AssetKind.TPR_TEMPLATE.spine_segment() == "tpr-templates"
         assert AssetKind.WEG_EFFECTS.spine_segment() == "weg-effects.yaml"
 

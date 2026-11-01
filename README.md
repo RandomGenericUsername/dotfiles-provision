@@ -53,23 +53,22 @@ dotfiles-provision \
 `plan` is Ansible `--check` (no machine changes). `verify` is a real, non-mutating assertion run
 against the deployed spine. `apply`/`bootstrap` change the machine.
 
-## Palette producer switch (REQ-010)
+## Palette producer (REQ-016)
 
-The runtime composes either the existing `csg` producer (default) or the opt-in
-`theme-producer` (`tpr`) producer. `tpr` is pinned and verified either way; activation is
-**one variable change**, never a separate provisioning path:
+`theme-producer` (`tpr`) is the sole palette producer. The runtime (>= v0.5.1)
+rejects `csg`, so provisioning installs, links and verifies `tpr` only. The pin
+comes from the composition manifest (`cli-tools.yaml`), not an in-role list.
+
+The `runtime_daemon` role writes `runtime_palette_producer` to the
+runtime-owned config file `<install>/config/dotfiles-runtime/producer.json`; the
+daemon, CLI and runtime seed all read that one file. No ambient environment.d
+or unit `Environment=` variable is authoritative.
 
 ```bash
-# csg is the shipped default; choose tpr for both the session CLI and the daemon:
+# tpr is the shipped default; the value remains overridable for diagnostics:
 dotfiles-provision apply -e runtime_palette_producer=tpr
 # or export RUNTIME_PALETTE_PRODUCER=tpr for the run
 ```
-
-The `runtime_daemon` role writes the value to
-`~/.config/environment.d/10-dotfiles-runtime.conf` (the systemd user session environment the
-AGS wallpaper selector inherits) and to the daemon unit's
-`Environment="RUNTIME__PALETTE__PRODUCER=…"` line. The two cannot diverge because both render
-from `runtime_palette_producer` (shipped default `csg`; `csg|tpr` is asserted).
 
 ## Install from a checkout (development)
 

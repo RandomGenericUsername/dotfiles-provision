@@ -849,8 +849,8 @@ class TestVerifyTasks:
         )
 
     def test_settings_parse_gate_tasks_exist_and_are_check_gated(self) -> None:
-        """AC 3: the three settings parse-gate command tasks (csg info / weg
-        info / itr list) exist, are `ansible.builtin.command`, and are gated
+        """AC 3: the settings parse-gate command tasks (weg info / itr list)
+        exist, are `ansible.builtin.command`, and are gated
         `when: not ansible_check_mode` (command tasks skip under --check).
 
         The loop iterates PROBE tasks (command AND shell), not just command:
@@ -858,13 +858,12 @@ class TestVerifyTasks:
         invisible. Kept as its own test so the AC-3 parse gate keeps its own
         failure message distinct from the role-wide invariant's."""
         gate_names = {
-            "Gate csg settings parse",
             "Gate weg settings parse",
             "Gate itr list against icons.yaml",
         }
         names = {str(task.get("name")) for task in _probe_tasks()}
         assert gate_names.issubset(names), (
-            f"expected the three parse-gate command tasks; found {names}"
+            f"expected the parse-gate command tasks; found {names}"
         )
         for task in _probe_tasks():
             gate = _ungated_probe_problems([task])
@@ -875,8 +874,7 @@ class TestVerifyTasks:
         parse_asserts = [
             task
             for task in _assert_tasks()
-            if "verify_csg_gate" in str(_module(task).get("that", ""))
-            or "verify_weg_gate" in str(_module(task).get("that", ""))
+            if "verify_weg_gate" in str(_module(task).get("that", ""))
             or "verify_itr_gate" in str(_module(task).get("that", ""))
         ]
         assert len(parse_asserts) == 1, (
@@ -1035,7 +1033,7 @@ class TestVerifyTasks:
                     asserts `stat.isdir` (the link resolves to a real dir);
           layer 4 — a `stat` over verify_config_copy_content asserts
                     `stat.isreg` THROUGH the link (content reachable);
-          layer 5 — the parse gates (csg/weg/itr info --config) read the
+          layer 5 — the parse gates (weg/itr info --config) read the
                     settings THROUGH the link — covered by
                     test_settings_parse_gate_tasks_exist_and_are_check_gated.
         All tasks gated `when: not ansible_check_mode`."""
@@ -1788,7 +1786,7 @@ class TestVerifyVars:
         the TOML section + key name (e.g. [output] directory → output.directory)."""
         data = _vars()
         keys = data["verify_settings_spine_keys"]
-        assert set(keys) == {"csg", "weg", "itr", "tpr"}
+        assert set(keys) == {"weg", "itr", "tpr"}
         for name, dotted_keys in keys.items():
             template = (
                 _ANSIBLE_DIR / "roles" / "settings" / "templates" / f"{name}-settings.toml.j2"
@@ -1964,10 +1962,9 @@ class TestVerifyVars:
         )
         assert "ansible_facts.env.XDG_STATE_HOME" not in value
 
-    def test_cli_tools_are_csg_weg_itr_tpr_runtime(self) -> None:
+    def test_cli_tools_are_weg_itr_tpr_runtime(self) -> None:
         data = _vars()
         assert [str(c) for c in data["verify_cli_tools"]] == [
-            "csg",
             "weg",
             "itr",
             "tpr",
@@ -2016,7 +2013,6 @@ class TestVerifyVars:
             if "repo" in entry or "tag" in entry
         ]
         assert [(entry["name"], entry["tag"]) for entry in pinned] == [
-            ("csg", render_pin(data["verify_csg_version"])),
             ("weg", render_pin(data["verify_weg_version"])),
             ("itr", render_pin(data["verify_itr_version"])),
             ("tpr", render_pin(data["verify_tpr_version"])),
@@ -2169,109 +2165,6 @@ class TestVerifyVars:
         assert render_pin(_vars()["verify_weg_version"]) == str(weg["tag"])
         assert render_pin(settings_vars["settings_weg_image_tag"]) == str(weg["tag"])
 
-    def test_csg_pin_and_all_four_images_are_asserted_by_execution(self) -> None:
-        """AD-7/AD-11 for csg: the checkout, pin record, contract token AND all
-        four tag-qualified images (base + custom/pywal/wallust backends) must be
-        asserted by execution. `engine image inspect` exits nonzero for a
-        missing tag, so an image left at `latest` (the pre-S6 shape) or at the
-        previous pin fails the gate."""
-        data = _vars()
-        tags = cli_tool_tags()
-        assert str(data["verify_csg_version"]) == "{{ cli_tools_tags.csg }}", (
-            "verify_csg_version must DERIVE from the cli_tools_tags fact"
-        )
-        assert render_pin(data["verify_csg_version"]) == tags["csg"]
-        assert str(data["verify_csg_checkout"]) == (
-            "{{ verify_cli_tools_checkout_root }}/csg/{{ verify_csg_version }}"
-        )
-        assert str(data["verify_csg_pin_file"]) == (
-            "{{ verify_cli_tools_checkout_root }}/csg/pinned"
-        )
-        # csg's contract token is its own generation (it prints
-        # `<package-version> contract 0.2.0`), NOT the tag without `v` — the
-        # one pin that intentionally stays literal.
-        assert str(data["verify_csg_contract_version"]) == "0.2.0", (
-            "csg's contract generation is independent of the package tag; see "
-            "the task's `contract <x>` grep"
-        )
-        assert str(data["verify_csg_image_prefix"]) == "csg"
-        references = [str(r) for r in data["verify_csg_image_references"]]
-        assert len(references) == 4, (
-            "csg builds base + one image per backend (custom/pywal/wallust)"
-        )
-        for suffix in ("base", "custom", "pywal", "wallust"):
-            assert any(
-                f"verify_csg_image_prefix }}}}-{suffix}-" in ref for ref in references
-            ), f"missing the {suffix} image reference"
-        for ref in references:
-            assert "container_runtime_engine" in ref, (
-                "every reference must use the DECLARED engine the build used"
-            )
-            assert "verify_csg_version" in ref and "latest" not in ref, (
-                "every reference must be the pin, never `latest` (AD-7)"
-            )
-
-        tasks = _load_tasks()
-        names = [str(task.get("name", "")) for task in tasks]
-
-        stat_name = "Check the pinned csg checkout and its pin record"
-        assert stat_name in names, f"missing task {stat_name!r}"
-        stat_task = tasks[names.index(stat_name)]
-        assert _module_key(stat_task) == "ansible.builtin.stat"
-        loop = str(stat_task.get("loop"))
-        assert "verify_csg_checkout" in loop and "verify_csg_pin_file" in loop
-
-        image_name = "Check every pinned csg image exists at its tag-qualified reference"
-        assert image_name in names, f"missing task {image_name!r}"
-        image_task = tasks[names.index(image_name)]
-        assert _module_key(image_task) == "ansible.builtin.command"
-        argv = _module(image_task).get("argv")
-        assert isinstance(argv, list)
-        assert argv[0] == "{{ container_runtime_engine }}"
-        assert argv[1:3] == ["image", "inspect"], (
-            "podman and docker share `image inspect`; a missing tag exits nonzero"
-        )
-        assert argv[3] == "{{ item }}"
-        assert str(image_task.get("loop")) == "{{ verify_csg_image_references }}", (
-            "the image probe must loop the four tag-qualified references"
-        )
-        assert image_task.get("changed_when") is False
-        assert image_task.get("failed_when") is False
-        assert image_task.get("when") == "not ansible_check_mode"
-
-        assert_name = (
-            "Assert the csg checkout, pin, contract and all four images are the pinned tag"
-        )
-        assert assert_name in names, f"missing task {assert_name!r}"
-        assert_task = tasks[names.index(assert_name)]
-        assert _module_key(assert_task) == "ansible.builtin.assert"
-        that = str(_module(assert_task).get("that"))
-        assert "verify_csg_checkout_checks.results[0].stat.isdir" in that
-        assert "verify_csg_checkout_checks.results[1].stat.isreg" in that
-        assert "verify_csg_checkout is search(verify_csg_version)" in that
-        assert "b64decode | trim == verify_csg_version" in that
-        assert "'contract ' ~ verify_csg_contract_version" in that
-        assert "verify_csg_image_checks.results" in that, (
-            "every image probe must be asserted, not merely registered"
-        )
-        assert assert_task.get("when") == "not ansible_check_mode"
-        assert names.index(stat_name) < names.index(assert_name)
-        assert names.index(image_name) < names.index(assert_name)
-
-    def test_csg_image_tag_mirrors_the_manifest_and_settings_render(self) -> None:
-        """The csg pin has one source (the manifest, read by `cli_tools` at run
-        time) and two sanctioned mirrors: the settings render var and verify.
-        All must agree, or a bump could build one tag and render another (AD-7)."""
-        manifest = yaml.safe_load(
-            (_REPO_ROOT / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
-        )
-        csg = next(e for e in manifest["entries"] if e.get("name") == "csg")
-        settings_vars = yaml.safe_load(
-            (_ROLES_DIR.parent / "settings" / "vars" / "main.yml").read_text()
-        )
-        assert render_pin(_vars()["verify_csg_version"]) == str(csg["tag"])
-        assert render_pin(settings_vars["settings_csg_image_tag"]) == str(csg["tag"])
-
     def test_tpr_pin_and_all_three_images_are_asserted_by_execution(self) -> None:
         """REQ-010: tpr's checkout, pin record, package version and all three
         tag-qualified images (base + matugen/native) must be asserted by
@@ -2368,7 +2261,6 @@ class TestVerifyVars:
         input), so a missing render/deploy cannot pass the gate."""
         data = _vars()
         assert {str(f["name"]) for f in data["verify_settings_files"]} == {
-            "csg",
             "weg",
             "itr",
             "tpr",
@@ -2710,7 +2602,7 @@ class TestVerifyProducerConfig:
             "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
         )
         assert str(data["verify_expected_producer"]) == (
-            "{{ runtime_palette_producer | default('csg', true) }}"
+            "{{ runtime_palette_producer | default('tpr', true) }}"
         )
         assert str(data["verify_expected_tpr_engine"]) == (
             "{{ runtime_palette_tpr_engine | default('native', true) }}"
@@ -3442,7 +3334,7 @@ class TestVerifyRuntime:
         2026-08-13): a stub CLI that exits NON-ZERO must make verify FAIL —
         the parse gates are real gates, not stubbed-green. Previously the
         stubs exited 0 unconditionally, so a broken gate (or wrong --config
-        path) would go green; this proves the weg/itr/csg rc asserts bite."""
+        path) would go green; this proves the weg/itr rc asserts bite."""
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")
@@ -3459,7 +3351,7 @@ class TestVerifyRuntime:
             bin_dir = _write_stub_binaries(home)
             _build_provisioned_layout(home, xdg, install, state_home, cache_home)
 
-            # Make the WEG stub fail on `weg info` (itr/csg stay green — only
+            # Make the WEG stub fail on `weg info` (itr stays green — only
             # the WEG gate is tripped, proving that specific rc assert is a
             # real gate). `--version` still reports the pinned contract so the
             # earlier AD-11 handshake passes and the failure is attributable to
@@ -3748,13 +3640,12 @@ class TestVerifyRuntime:
             bin_dir = _write_stub_binaries(home)
             _build_provisioned_layout(home, xdg, install, state_home, cache_home)
 
-            # Mis-render the CSG settings to point at a directory that does
+            # Mis-render the TPR settings to point at a directory that does
             # NOT exist (still valid TOML — the file parses fine). The file
             # lives in the SPINE (config-in-spine); the ~/.config symlink
             # exposes it to the tools.
-            (install / "config" / "color-scheme-generator" / "settings.toml").write_text(
+            (install / "config" / "theme-producer" / "settings.toml").write_text(
                 f'[output]\ndirectory = "{install}/generated/missing-dir"\n'
-                'overwrite = false\ndefault_formats = ["conf", "gtk.css", "yaml"]\n'
             )
 
             env = _test_env(
@@ -3785,64 +3676,6 @@ class TestVerifyRuntime:
                 "verify must FAIL when a rendered settings file references a "
                 "MISSING spine path (parse ≠ works — the gate reads the "
                 "rendered files, not a static list); recap:\n" + result.stdout
-            )
-
-    def test_verify_fails_when_csg_color_template_missing(self) -> None:
-        """Negative lock: csg silently OMITS a format whose ``colors.<fmt>.j2``
-        template is absent, so a spine templates dir that is non-empty but
-        LACKS ``colors.kitty.j2`` must FAIL verify (not pass on a subset)."""
-        ansible_playbook = shutil.which("ansible-playbook")
-        if ansible_playbook is None:
-            pytest.skip("ansible-playbook not installed; skipping execution test")
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp) / "home"
-            xdg = Path(tmp) / "xdg"
-            install = Path(tmp) / "install"
-            state_home = Path(tmp) / "state-home"
-            cache_home = Path(tmp) / "cache-home"
-            home.mkdir()
-            xdg.mkdir()
-            install.mkdir()
-
-            bin_dir = _write_stub_binaries(home)
-            _build_provisioned_layout(home, xdg, install, state_home, cache_home)
-
-            (
-                install
-                / "config"
-                / "color-scheme-generator"
-                / "templates"
-                / "colors.kitty.j2"
-            ).unlink()
-
-            env = _test_env(
-                HOME=str(home),
-                XDG_CONFIG_HOME=str(xdg),
-                XDG_STATE_HOME=str(state_home),
-                XDG_CACHE_HOME=str(cache_home),
-                ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
-                PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
-            )
-            result = subprocess.run(
-                [
-                    ansible_playbook,
-                    str(self._PATH),
-                    "-e",
-                    f"install_dir={install}",
-                    "-e",
-                    f"manifests_dir={manifests_dir()}",
-                    *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
-                ],
-                capture_output=True,
-                text=True,
-                env=env,
-                timeout=300,
-            )
-            assert result.returncode != 0, (
-                "verify must FAIL when a CSG color-format template is missing "
-                "(csg silently omits the format; the dir is non-empty but "
-                "incomplete); recap:\n" + result.stdout
             )
 
     def test_verify_criterion_6_checks_current_only(self) -> None:
@@ -4114,14 +3947,14 @@ def _test_env(**overrides: str) -> dict[str, str]:
 
 
 def _write_stub_binaries(home: Path) -> Path:
-    """Stub hyprland/hyprpaper/ags/csg/weg/itr as executable `#!/bin/sh`
-    scripts in home/.local/bin that exit 0 — so `command -v` + the csg/weg/itr
+    """Stub hyprland/hyprpaper/ags/weg/itr as executable `#!/bin/sh`
+    scripts in home/.local/bin that exit 0 — so `command -v` + the weg/itr
     parse gates pass without installing real CLIs. Also stub `systemctl` so the
     NetworkManager-active gate (criterion-2 sibling) passes on the synthetic
     machine: report `NetworkManager` as active."""
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    for name in ("hyprland", "hyprpaper", "power-options-gtk", "csg", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston"):
+    for name in ("hyprland", "hyprpaper", "power-options-gtk", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston"):
         stub = bin_dir / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
@@ -4140,10 +3973,10 @@ def _write_stub_binaries(home: Path) -> Path:
     wrapper = bin_dir / "ags-run-locked"
     wrapper.write_text("#!/bin/sh\nexit 0\n")
     wrapper.chmod(0o755)
-    # csg/weg/itr: the pinned-CLI handshake asserts `contract <x>` in
+    # weg/itr: the pinned-CLI handshake asserts `contract <x>` in
     # `--version` stdout. The generic exit-0 stub above cannot satisfy that.
     verify_vars = _vars()
-    for cli_name in ("csg", "weg", "itr"):
+    for cli_name in ("weg", "itr"):
         contract = render_pin(verify_vars[f"verify_{cli_name}_contract_version"])
         stub = bin_dir / cli_name
         stub.write_text(
@@ -4159,6 +3992,18 @@ def _write_stub_binaries(home: Path) -> Path:
         "#!/bin/sh\n"
         f'if [ "$1" = "--version" ]; then echo "'
         f'{render_pin(verify_vars["verify_tpr_version"]).removeprefix("v")}"; exit 0; fi\n'
+        'if [ "$1" = "generate" ]; then\n'
+        '  prev=""; out=""\n'
+        '  for arg in "$@"; do\n'
+        '    [ "$prev" = "--output-dir" ] && out="$arg"\n'
+        '    prev="$arg"\n'
+        '  done\n'
+        '  [ -n "$out" ] && mkdir -p "$out"\n'
+        '  for f in colors.yaml colors.conf colors.gtk.css colors.adw.css '
+        "colors.sequences colors.rasi colors.kitty colors.btop.theme; do\n"
+        '    : > "$out/$f"\n'
+        '  done\n'
+        "fi\n"
         "exit 0\n"
     )
     tpr_stub.chmod(0o755)
@@ -4336,8 +4181,6 @@ def _build_provisioned_layout(
         "icon-mappings",
         "config",
         "config/dotfiles-runtime",
-        "config/color-scheme-generator",
-        "config/color-scheme-generator/templates",
         "config/hypr",
         "config/hyprpaper",
         # Every config/ags* path is a spine SYMLINK into an app tag, created
@@ -4362,7 +4205,7 @@ def _build_provisioned_layout(
         (install / rel).mkdir(parents=True, exist_ok=True)
     (install / "config" / "weg" / "effects.yaml").write_text("{}\n")
     (install / "config" / "dotfiles-runtime" / "producer.json").write_text(
-        '{"schema_version":1,"producer":"csg","tpr_engine":"native",'
+        '{"schema_version":1,"producer":"tpr","tpr_engine":"native",'
         '"tpr_runtime":"container"}\n'
     )
 
@@ -4370,7 +4213,6 @@ def _build_provisioned_layout(
     (home / ".cache").mkdir(parents=True, exist_ok=True)
     (cache_home / "dotfiles" / "weg-output").mkdir(parents=True, exist_ok=True)
     (cache_home / "dotfiles" / "weg-tmp").mkdir(parents=True, exist_ok=True)
-    (cache_home / "dotfiles" / "csg-output").mkdir(parents=True, exist_ok=True)
     (cache_home / "dotfiles" / "itr-output").mkdir(parents=True, exist_ok=True)
     (cache_home / "dotfiles" / "tpr-output").mkdir(parents=True, exist_ok=True)
 
@@ -4413,7 +4255,6 @@ def _build_provisioned_layout(
     # is why the runtime verify tests aborted at the itr pin on master).
     verify_vars = _vars()
     for cli_name, version_key in (
-        ("csg", "verify_csg_version"),
         ("weg", "verify_weg_version"),
         ("itr", "verify_itr_version"),
         ("tpr", "verify_tpr_version"),
@@ -4463,23 +4304,8 @@ def _build_provisioned_layout(
     panel_icon.mkdir(parents=True, exist_ok=True)
     (panel_icon / "play.svg").write_text("<svg/>\n")
     (panel_icon / "pause.svg").write_text("<svg/>\n")
-    (install / "config" / "color-scheme-generator" / "templates" / "template.j2").write_text("x\n")
-    for _tpl in (
-        "colors.yaml.j2",
-        "colors.conf.j2",
-        "colors.gtk.css.j2",
-        "colors.adw.css.j2",
-        "colors.sequences.j2",
-        "colors.rasi.j2",
-        "colors.kitty.j2",
-    ):
-        (install / "config" / "color-scheme-generator" / "templates" / _tpl).write_text("x\n")
     (install / "config" / "theme-producer" / "templates" / "colors.yaml.j2").write_text("x\n")
 
-    (install / "config" / "color-scheme-generator" / "settings.toml").write_text(
-        f'[output]\ndirectory = "{cache_home}/dotfiles/csg-output"\n'
-        'overwrite = false\ndefault_formats = ["conf", "gtk.css", "yaml"]\n'
-    )
     (install / "config" / "weg" / "settings.toml").write_text(
         f'[output]\ndirectory = "{cache_home}/dotfiles/weg-output"\n'
         f'[processing]\ntemp_dir = "{cache_home}/dotfiles/weg-tmp"\n'
@@ -4713,7 +4539,6 @@ def _build_provisioned_layout(
         "wlogout",
         "zsh",
         "kitty",
-        "color-scheme-generator",
         "weg",
         "itr",
         "theme-producer",

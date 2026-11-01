@@ -332,8 +332,8 @@ class _Target:
             or "No usable container engine" in combined
         ):
             raise _TargetInfraError(
-                f"{stage} cannot complete inside the target: the csg "
-                "container-mode chain (cli_tools/default_palette) needs a "
+                f"{stage} cannot complete inside the target: the tpr "
+                "container-mode chain (cli_tools/runtime-seed) needs a "
                 "NESTED container engine inside the disposable container and "
                 "none is present — this host-class cannot provision the full "
                 "chain (documented AC 3 honest gate). Output tail:\n" + _tail(proc)
@@ -391,7 +391,7 @@ def test_apply_then_verify_on_disposable_container(container_target: _Target) ->
     if not container_target.nested_engine_available():
         pytest.skip(
             "the disposable target has NO container engine inside it and the "
-            "csg container-mode chain (cli_tools/default_palette) requires a "
+            "tpr container-mode chain (cli_tools/runtime-seed) requires a "
             "NESTED engine — the full apply cannot provision on this "
             "host-class (documented AC 3 honest gate). The ten done-criteria "
             "are asserted on host-classes that can provide a nested engine; "
@@ -424,7 +424,7 @@ def test_criterion_6_accepts_runtime_current_palette_in_container(
     if not container_target.nested_engine_available():
         pytest.skip(
             "the disposable target has NO container engine inside it and the "
-            "csg container-mode chain (cli_tools/default_palette) requires a "
+            "tpr container-mode chain (cli_tools/runtime-seed) requires a "
             "NESTED engine — the full apply cannot provision on this "
             "host-class (documented AC 3 honest gate)"
         )

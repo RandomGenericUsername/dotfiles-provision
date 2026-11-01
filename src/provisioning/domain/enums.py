@@ -40,7 +40,6 @@ class Capability(StrEnum):
     HYPRPAPER = "hyprpaper"
     AGS = "ags"
     FONTS = "fonts"
-    CSG = "csg"
     WEG = "weg"
     ICON_RENDERER = "itr"
 
@@ -53,7 +52,6 @@ _KIND_BY_CAPABILITY: dict[Capability, CapabilityKind] = {
     Capability.HYPRLAND: CapabilityKind.BINARY,
     Capability.HYPRPAPER: CapabilityKind.BINARY,
     Capability.AGS: CapabilityKind.BINARY,
-    Capability.CSG: CapabilityKind.BINARY,
     Capability.WEG: CapabilityKind.BINARY,
     Capability.ICON_RENDERER: CapabilityKind.BINARY,
     Capability.FONTS: CapabilityKind.PACKAGE_GROUP,
@@ -81,7 +79,6 @@ class AssetKind(StrEnum):
     WALLPAPER = "wallpaper"
     ICON_TEMPLATE = "icon-template"
     ICON_MAPPING = "icon-mapping"
-    CSG_TEMPLATE = "csg-template"
     TPR_TEMPLATE = "tpr-template"
     WEG_EFFECTS = "weg-effects"
 
@@ -100,7 +97,6 @@ _SPINE_SEGMENT: dict[AssetKind, str] = {
     AssetKind.WALLPAPER: "wallpapers",
     AssetKind.ICON_TEMPLATE: "icon-templates",
     AssetKind.ICON_MAPPING: "icon-mappings",
-    AssetKind.CSG_TEMPLATE: "csg-templates",
     AssetKind.TPR_TEMPLATE: "tpr-templates",
     AssetKind.WEG_EFFECTS: "weg-effects.yaml",
 }

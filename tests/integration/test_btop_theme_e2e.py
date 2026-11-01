@@ -24,11 +24,11 @@ This test drives the swap at the layer the swap is defined at: it repoints
 ``current/`` at a NEW palette cache entry and re-places the btop consumer
 pointer, which is verbatim what ``CacheSeeder.repoint_consumer_symlinks``
 does. It does NOT shell out to ``dotfiles-runtime wallpaper set``, because
-the CSG ``btop.theme`` backend that command needs is a SIBLING change
+the retired producer's ``btop.theme`` backend that command needs is a SIBLING change
 that does not exist in this worktree — invoking it here would fail on a
 missing template, not on a broken pointer. The palette CONTENT is synthetic
 (crafted in ``_THEME_BODY``) for the same reason: btop's theme FILE format is
-btop's, and the palette DERIVATION from a wallpaper is CSG's, not this
+btop's, and the palette DERIVATION from a wallpaper is the producer's, not this
 change's. Both are covered by the sibling changes' own gates.
 """
 
@@ -360,7 +360,7 @@ class TestThemeApplication:
         dangling consumer pointer, because btop's own failure mode for both is
         a silent Default_theme fallback."""
         conf = machine.btop_spine / "btop.conf"
-        conf.write_text(conf.read_text().replace(_SELECTED, "csg-minimal.theme"))
+        conf.write_text(conf.read_text().replace(_SELECTED, "tpr-minimal.theme"))
         with pytest.raises(ThemeApplicationError):
             assert_theme_applied(
                 config_home=machine.xdg,

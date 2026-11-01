@@ -70,13 +70,12 @@ assets_weg_bin_dir: >-
 #   Re-ensured as directories before the unarchive task (unarchive does NOT
 #   create its `dest`); the filesystem role (2.5) already created them on the
 #   bootstrap chain, this keeps the role self-contained on a direct run.
-#   config-in-spine (2026-08-16): csg-templates land at
-#   config/color-scheme-generator/templates and weg-effects at config/weg.
+#   config-in-spine (2026-08-16): tpr-templates land at
+#   config/theme-producer/templates and weg-effects at config/weg.
 assets_deploy_dirs:
   - wallpapers
   - icon-templates
   - icon-mappings
-  - config/color-scheme-generator/templates
   - config/theme-producer/templates
   - config/weg
 
@@ -88,26 +87,8 @@ assets_wallpapers_tarball: "{{ assets_checkout_root }}/content/wallpapers/wallpa
 #   validated `{{ install_dir | trim }}` value the fail-loud assert enforces.
 assets_wallpapers_dest: "{{ install_dir | trim }}/wallpapers"
 
-# assets_csg_pinned_tag / assets_csg_templates_source: the csg-templates asset
-#   reads the PINNED csg checkout, not a repo tree (spine AD-10). csg is
-#   consumed from its pinned repo (`dotfiles/provisioning/cli-tools.yaml`, S6),
-#   so the old repo-relative package path no longer exists: the template
-#   catalog lives in the checkout the cli_tools role materializes at
-#   `<install>/cli-tools/csg/<tag>/` BEFORE this role runs (bootstrap order:
-#   cli-tools.yaml → assets.yaml, locked by the dependency-order test).
-#
-#   `assets_csg_pinned_tag` is the tag the cli_tools role resolved from the
-#   composition manifest and published as `cli_tools_tags.csg` (REQ-014); this
-#   role derives the path from that fact instead of owning a second literal, so
-#   a composition pin bump moves the template source with it. The role asserts
-#   the resolved dir exists before the copy so a missing/mis-pinned checkout
-#   fails loud instead of silently deploying nothing.
-assets_csg_pinned_tag: "{{ cli_tools_tags.csg }}"
-assets_csg_templates_source: >-
-  {{ install_dir | trim }}/cli-tools/csg/{{ assets_csg_pinned_tag }}/src/color_scheme_generator/defaults/templates
-
 # assets_tpr_pinned_tag / assets_tpr_templates_source: REQ-010, the same
-#   pinned-checkout shape for the opt-in palette producer. tpr ships its
+#   pinned-checkout shape for the sole palette producer. tpr ships its
 #   projection catalog at `src/theme_producer/defaults/templates/`; the
 #   runtime's TprAdapter reads the DEPLOYED copy at
 #   `<install>/config/theme-producer/templates` (never the checkout). The pin
@@ -131,11 +112,11 @@ assets_tpr_templates_source: >-
 #   of the pinned tree. `target` IS the AssetKind.spine_segment() of the kind —
 #   parity-locked by the structural test.
 #
-# config-in-spine (2026-08-16): the csg-templates target moved from
-#   <install>/csg-templates to <install>/config/color-scheme-generator/templates
-#   (CSG's templates are TOOL CONFIG — the config-links role symlinks
-#   ~/.config/color-scheme-generator -> <install>/config/color-scheme-generator,
-#   so csg's native XDG discovery finds them through the link). icon-templates
+# config-in-spine (2026-08-16): the tpr-templates target moved from
+#   <install>/tpr-templates to <install>/config/theme-producer/templates
+#   (TPR's templates are TOOL CONFIG — the config-links role symlinks
+#   ~/.config/theme-producer -> <install>/config/theme-producer,
+#   so tpr's native XDG discovery finds them through the link). icon-templates
 #   and icon-mappings stay under the spine root (machine assets, not tool
 #   configs — they have no XDG stop to satisfy).
 #
@@ -154,7 +135,6 @@ assets_copies:
 #   to it. Partition, not a duplicate list: the two loops together cover
 #   `assets_copies` ∪ `assets_checkout_copies` exactly (parity-locked).
 assets_checkout_copies:
-  - { name: csg-templates, kind: csg-template, source: "{{ assets_csg_templates_source }}/", target: config/color-scheme-generator/templates }
   - { name: tpr-templates, kind: tpr-template, source: "{{ assets_tpr_templates_source }}/", target: config/theme-producer/templates }
 
 # (2026-09-07) icon-mappings is CONVERGE again, like every other copy: the

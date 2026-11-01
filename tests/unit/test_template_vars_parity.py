@@ -341,15 +341,11 @@ class TestTprPinMirrors:
         )
 
 
-class TestCsgAndRuntimePinMirrors:
-    """REQ-009/REQ-014: one cross-leg guard for every csg/runtime pin.
-
-    csg has one source — the composition CLI entry read by `cli_tools` at run
-    time and republished as `cli_tools_tags` — and the assets template source,
-    the settings rendered image tag and verify all DERIVE from that fact (plus
-    the fixture source path); the runtime has the verify leg. The guard renders
-    each derivation with the composition's tags and names the whole set so a
-    bump cannot leave one leg behind while every local test stays green.
+class TestRuntimePinMirrors:
+    """REQ-014: the runtime pin has one source — the composition CLI entry
+    read by `cli_tools` at run time and republished as `cli_tools_tags` — and
+    verify derives from that fact. The guard renders the derivation with the
+    composition's tags so a bump cannot leave the leg behind.
     """
 
     @staticmethod
@@ -364,49 +360,6 @@ class TestCsgAndRuntimePinMirrors:
     def _cli_entry(name: str) -> dict[str, Any]:
         manifest = yaml.safe_load((manifests_dir() / "cli-tools.yaml").read_text())
         return next(entry for entry in manifest["entries"] if entry.get("name") == name)
-
-    def test_all_csg_mirrors_and_fixture_source_derive_from_cli_tools_tags(self) -> None:
-        tags = cli_tool_tags()
-        expected = tags["csg"]
-        fixture_csg = self._cli_entry("csg")
-        assets_vars = self._role_vars("assets")
-        settings_vars = self._role_vars("settings")
-        verify_vars = self._role_vars("verify")
-        assets_manifest = yaml.safe_load((manifests_dir() / "assets.yaml").read_text())
-        csg_source = next(
-            entry
-            for entry in assets_manifest["entries"]
-            if entry.get("name") == "csg-templates"
-        )["source"]
-
-        assert fixture_csg["tag"] == expected, (
-            f"fixture cli-tools.yaml csg.tag must be {expected}; got {fixture_csg['tag']!r}"
-        )
-        assert str(assets_vars["assets_csg_pinned_tag"]) == "{{ cli_tools_tags.csg }}", (
-            "assets_csg_pinned_tag must DERIVE from the fact; got "
-            f"{assets_vars['assets_csg_pinned_tag']!r}"
-        )
-        assert render_pin(assets_vars["assets_csg_pinned_tag"]) == expected
-        assert str(settings_vars["settings_csg_image_tag"]) == "{{ cli_tools_tags.csg }}", (
-            "settings_csg_image_tag must DERIVE from the fact (the runtime "
-            f"renders this image tag); got {settings_vars['settings_csg_image_tag']!r}"
-        )
-        assert render_pin(settings_vars["settings_csg_image_tag"]) == expected
-        assert str(verify_vars["verify_csg_version"]) == "{{ cli_tools_tags.csg }}", (
-            f"verify_csg_version must DERIVE from the fact; got {verify_vars['verify_csg_version']!r}"
-        )
-        assert render_pin(verify_vars["verify_csg_version"]) == expected
-        assert str(verify_vars["verify_csg_contract_version"]) == "0.2.0", (
-            "csg prints `0.2.2 contract 0.2.0`; the contract token is its own "
-            "generation and must not move with the package tag"
-        )
-        assert "{{ cli_tools_tags.csg }}" in str(csg_source), (
-            "fixture csg-templates source must derive from the same fact; got "
-            f"{csg_source!r}"
-        )
-        assert str(assets_manifest["assets"]["tag"]) == "v0.6.3", (
-            "the assets corpus tag must stay v0.6.3 in the fixture manifest"
-        )
 
     def test_runtime_mirror_derives_from_cli_tools_tags(self) -> None:
         expected = cli_tool_tags()["dotfiles-runtime"]

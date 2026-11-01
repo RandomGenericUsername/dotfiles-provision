@@ -92,10 +92,10 @@ packages:
   # Undeclared, the gui_tools task failed outright (no such binary) and the
   # verify assert failed with it — a fresh machine could not reach the gate.
   xdg-utils: xdg-utils
-  # Container engine for the csg container-mode chain (cli_tools builds the
-  # image + runtime-seed runs csg generate under podman). DOCUMENTED DEPENDENCY — must be provisioned on
+  # Container engine for the tpr container-mode chain (cli_tools builds the
+  # image + runtime-seed runs tpr generate under podman). DOCUMENTED DEPENDENCY — must be provisioned on
   # a fresh machine (VM-verified 2026-08-19: a fresh Arch cloud image has no
-  # engine, so the csg image build aborts). slirp4netns + fuse-overlayfs make
+  # engine, so the tpr image build aborts). slirp4netns + fuse-overlayfs make
   # rootless podman work out of the box.
   container_engine:
     - podman

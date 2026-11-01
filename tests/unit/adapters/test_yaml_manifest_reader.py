@@ -325,7 +325,7 @@ class TestYamlManifestReaderPerKindSchemas:
 
     def test_cli_tools_kind_requires_source_or_repo_and_tag(self, tmp_path: Path) -> None:
         path = tmp_path / "cli-tools.yaml"
-        path.write_text("kind: cli-tools\nentries:\n  - name: csg\n", encoding="utf-8")
+        path.write_text("kind: cli-tools\nentries:\n  - name: alpha\n", encoding="utf-8")
         with pytest.raises(ManifestReadError, match="source"):
             READER.read(path)
 
@@ -334,13 +334,13 @@ class TestYamlManifestReaderPerKindSchemas:
         path.write_text(
             "kind: cli-tools\n"
             "entries:\n"
-            "  - name: csg\n"
-            "    source: src/cli-tools/color-scheme-generator\n",
+            "  - name: alpha\n"
+            "    source: src/cli-tools/alpha\n",
             encoding="utf-8",
         )
         manifest = READER.read(path)
         assert manifest.kind is ManifestKind.CLI_TOOLS
-        assert manifest.entries == (Spec(name="csg"),)
+        assert manifest.entries == (Spec(name="alpha"),)
 
     def test_cli_tools_kind_parses_repo_and_tag(self, tmp_path: Path) -> None:
         """The pinned shape (spine AD-10): {name, repo, tag} with no source."""
@@ -363,15 +363,15 @@ class TestYamlManifestReaderPerKindSchemas:
         path.write_text(
             "kind: cli-tools\n"
             "entries:\n"
-            "  - name: csg\n"
-            "    source: src/cli-tools/color-scheme-generator\n"
+            "  - name: alpha\n"
+            "    source: src/cli-tools/alpha\n"
             "  - name: itr\n"
             "    repo: https://github.com/RandomGenericUsername/icon-templates-renderer\n"
             "    tag: v0.1.0\n",
             encoding="utf-8",
         )
         manifest = READER.read(path)
-        assert manifest.entries == (Spec(name="csg"), Spec(name="itr"))
+        assert manifest.entries == (Spec(name="alpha"), Spec(name="itr"))
 
     @pytest.mark.parametrize("missing", ["repo", "tag"])
     def test_cli_tools_kind_rejects_incomplete_pin(
@@ -419,7 +419,7 @@ class TestYamlManifestReaderPerKindSchemas:
     def test_cli_tools_kind_empty_source_rejected(self, tmp_path: Path, bad_source: str) -> None:
         path = tmp_path / "cli-tools.yaml"
         path.write_text(
-            f"kind: cli-tools\nentries:\n  - name: csg\n    source: {bad_source}\n",
+            f"kind: cli-tools\nentries:\n  - name: alpha\n    source: {bad_source}\n",
             encoding="utf-8",
         )
         with pytest.raises(ManifestReadError, match="source"):
@@ -582,8 +582,8 @@ class TestReadRealManifests:
         assert "ags" not in names
         assert "zsh" not in names
 
-    def test_cli_tools_manifest_has_five_install_targets(self) -> None:
+    def test_cli_tools_manifest_has_four_install_targets(self) -> None:
         manifest = READER.read(_MANIFEST_DIR / "cli-tools.yaml")
         names = [entry.name for entry in manifest.entries]
         assert len(names) == len(set(names)), f"duplicate cli-tool entries: {names}"
-        assert set(names) == {"csg", "weg", "itr", "tpr", "dotfiles-runtime"}
+        assert set(names) == {"weg", "itr", "tpr", "dotfiles-runtime"}

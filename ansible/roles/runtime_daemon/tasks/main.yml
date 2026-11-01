@@ -14,14 +14,15 @@
 
 # REQ-010 / runtime REQ-004: the producer inputs are pure variable state; a
 # typo must fail before the config file is rendered. UNGATED so --check also
-# validates.
-- name: Assert the palette producer is csg or tpr
+# validates. REQ-016: tpr is the sole palette producer (runtime >= v0.5.1
+# rejects csg before it reads producer.json).
+- name: Assert the palette producer is tpr
   ansible.builtin.assert:
     that:
-      - runtime_palette_producer in ["csg", "tpr"]
+      - runtime_palette_producer == "tpr"
     fail_msg: >-
       runtime_palette_producer is '{{ runtime_palette_producer }}' — the
-      runtime accepts only 'csg' (default) or 'tpr'. Override it with
+      runtime accepts only 'tpr'. Override it with
       -e runtime_palette_producer=tpr or export RUNTIME_PALETTE_PRODUCER=tpr.
 
 - name: Assert install_dir seam is provided
@@ -159,7 +160,7 @@
 # runs the code provisioning just installed. Binary mtime is the freshness
 # signal; uv re-stamps it on every force install, so a re-run of an unchanged
 # tree still restarts. That is accepted-by-design (same "convergence over quiet
-# reports" semantics as the csg image build): the invariant is no stale process,
+# reports" semantics as the tpr image build): the invariant is no stale process,
 # not a no-op report.
 - name: Detect a runtime executable newer than the running daemon
   ansible.builtin.shell:

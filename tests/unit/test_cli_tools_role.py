@@ -568,9 +568,9 @@ class TestCliToolsCodexShadowCleanup:
 class TestCliToolsImageBuildTasks:
     def test_image_build_task_loops_over_configured_clis(self) -> None:
         """Container mode (product decision 2026-08-12) requires the cli_tools
-        role to build the csg AND weg container images — `uv tool install`
+        role to build the weg AND tpr container images — `uv tool install`
         only installs the host-side launchers. S6 split the pinned loop by TAG
-        TRANSPORT (weg takes `--image-tag` on argv; csg's `install` verb reads the
+        TRANSPORT (weg takes `--image-tag` on argv; tpr's `install` verb reads the
         tag from settings env) and kept the legacy source-path loop, so the
         three loops must together cover exactly the configured names."""
         tasks = _image_build_tasks()
@@ -593,7 +593,7 @@ class TestCliToolsImageBuildTasks:
             "the legacy source-path loop must still select source entries"
         )
         names = {b["name"] for b in _cli_tools_image_builds()}
-        assert {"csg", "weg", "tpr"} <= names, "csg, weg and tpr must all be image-built"
+        assert {"weg", "tpr"} <= names, "weg and tpr must both be image-built"
 
     def test_image_builds_derive_from_the_manifest_entries(self) -> None:
         """AD-7 'the tag is the pin, not latest', kept as ONE source: the image
@@ -642,22 +642,18 @@ class TestCliToolsImageBuildTasks:
         }, "only tpr takes its build context through oci_runtime's env override"
         flag_names = [str(n) for n in data["cli_tools_image_tag_flag_names"]]
         assert flag_names == ["weg"], (
-            "weg's install verb takes --image-tag; csg and tpr do not, so they "
+            "weg's install verb takes --image-tag; tpr does not, so it "
             "must be built through the env transport"
         )
-        expected_tags = {"csg": "v0.2.2", "weg": "v0.2.0", "tpr": "v0.4.0"}
+        expected_tags = {"weg": "v0.2.0", "tpr": "v0.4.0"}
         for entry in _cli_tools_image_builds():
             assert entry.get("tag") == expected_tags[str(entry.get("name"))], (
                 f"{entry.get('name')} image tag must be the pinned repo tag"
             )
         env_keys = data["cli_tools_image_tag_env_keys"]
         assert env_keys == {
-            "csg": "COLORSCHEME__CONTAINER__IMAGE_TAG",
             "tpr": "THEME__CONTAINER__IMAGE_TAG",
-        }, (
-            "each env-tag build must carry its own settings prefix (REQ-010); "
-            "a shared key would send tpr's tag to csg's resolver or vice versa"
-        )
+        }, "the env-tag build must carry tpr's settings prefix"
         env_names = {
             str(e["name"])
             for e in _cli_tools_image_builds()
@@ -731,7 +727,7 @@ class TestCliToolsImageBuildTasks:
         for env_task in (env_flag_context[0], env_context[0]):
             env_argv = _argv_of(env_task)
             assert "--image-tag" not in env_argv, (
-                "csg/tpr install verbs have no --image-tag; it must not be passed"
+                "tpr's install verb has no --image-tag; it must not be passed"
             )
             env_body = env_task.get("environment")
             # Ansible templates env VALUES but not literal mapping KEYS, so the
@@ -747,10 +743,9 @@ class TestCliToolsImageBuildTasks:
             assert "cli_tools_bin_dir" in env_body and "PATH" in env_body, (
                 "the build must keep the pinned bin dir on PATH"
             )
-            assert "COLORSCHEME__CONTAINER__IMAGE_TAG" not in str(env_task), (
-                "the csg key must not be hardcoded in the task anymore — it "
-                "lives in cli_tools_image_tag_env_keys so tpr can carry its own "
-                "prefix"
+            assert "THEME__CONTAINER__IMAGE_TAG" not in str(env_task), (
+                "the tpr key must not be hardcoded in the task — it lives in "
+                "cli_tools_image_tag_env_keys"
             )
 
         # tpr has no --context: its checkout travels as THEME_PRODUCER_SOURCE_ROOT
@@ -770,8 +765,8 @@ class TestCliToolsImageBuildTasks:
             "a source-only CLI has no pin to pass as its tag"
         )
         assert source[0].get("environment", {}).get(
-            "COLORSCHEME__CONTAINER__IMAGE_TAG"
-        ) is None, "the legacy source build must not carry the csg env tag"
+            "THEME__CONTAINER__IMAGE_TAG"
+        ) is None, "the legacy source build must not carry the tpr env tag"
 
     def test_image_build_tasks_have_no_hardcoded_image_tag(self) -> None:
         """AD-7/AD-11: the tag comes from the manifest entry at task time, so a
@@ -1017,32 +1012,27 @@ class TestCliToolsPinnedCheckout:
         # no in-role pin list anymore (REQ-014).
         pinned = [e for e in _manifest_entries() if _entry_is_pinned(e)]
         assert [e["name"] for e in pinned] == [
-            "csg",
             "weg",
             "itr",
             "tpr",
             "dotfiles-runtime",
         ], "every entry is pinned; REQ-010 added theme-producer"
         assert pinned[0]["repo"] == (
-            "https://github.com/RandomGenericUsername/color-scheme-generator"
-        )
-        assert pinned[0]["tag"] == "v0.2.2"
-        assert pinned[1]["repo"] == (
             "https://github.com/RandomGenericUsername/wallpaper-effects-generator"
+        )
+        assert pinned[0]["tag"] == "v0.2.0"
+        assert pinned[1]["repo"] == (
+            "https://github.com/RandomGenericUsername/icon-templates-renderer"
         )
         assert pinned[1]["tag"] == "v0.2.0"
         assert pinned[2]["repo"] == (
-            "https://github.com/RandomGenericUsername/icon-templates-renderer"
-        )
-        assert pinned[2]["tag"] == "v0.2.0"
-        assert pinned[3]["repo"] == (
             "https://github.com/RandomGenericUsername/theme-producer"
         )
-        assert pinned[3]["tag"] == "v0.4.0"
-        assert pinned[4]["repo"] == (
+        assert pinned[2]["tag"] == "v0.4.0"
+        assert pinned[3]["repo"] == (
             "https://github.com/RandomGenericUsername/dotfiles-runtime"
         )
-        assert pinned[4]["tag"] == "v0.4.1"
+        assert pinned[3]["tag"] == "v0.4.1"
 
     def test_pinned_clone_is_shallow_single_branch_and_tag_qualified(self) -> None:
         task = self._clone_task()
@@ -1137,7 +1127,7 @@ class TestCliToolsPinnedCheckout:
         assert "install_dir is defined" in str(asserts[0].get("ansible.builtin.assert"))
 
     def test_verify_path_check_still_covers_all_entries(self) -> None:
-        """No regression for csg/weg: the `command -v` post-check loops the
+        """No regression for weg/itr/tpr: the `command -v` post-check loops the
         WHOLE cli_tools list, not just the pinned subset."""
         checks = [
             task
@@ -1162,8 +1152,8 @@ class TestCliToolsManifestSource:
             "kind": "cli-tools",
             "entries": [
                 {
-                    "name": "csg",
-                    "repo": "https://example.invalid/color-scheme-generator",
+                    "name": "alpha",
+                    "repo": "https://example.invalid/alpha",
                     "tag": "v9.9.1",
                 },
                 {
@@ -1177,7 +1167,7 @@ class TestCliToolsManifestSource:
         result = _run_manifest_tasks(
             tmp_path,
             manifest,
-            expected_tags={"csg": "v9.9.1", "weg": "v8.8.2"},
+            expected_tags={"alpha": "v9.9.1", "weg": "v8.8.2"},
         )
         assert result.returncode == 0, result.stdout + result.stderr
 
@@ -1326,27 +1316,27 @@ class TestCliToolsVars:
         assert argv[argv.index("--container-engine") + 1] == "{{ container_runtime_engine }}"
 
     def test_image_builds_list_contains_only_container_mode_clis(self) -> None:
-        """csg, weg and tpr are container-mode CLIs and must be image-built;
+        """weg and tpr are container-mode CLIs and must be image-built;
         itr/runtime have no container mode and must not be. Every selected
         entry carries the PINNED shape (repo+tag) — no CLI is source-only."""
         builds = _cli_tools_image_builds()
         names = {str(b["name"]) for b in builds}
-        assert names == {"csg", "weg", "tpr"}, (
+        assert names == {"weg", "tpr"}, (
             "image builds must be exactly the container-mode CLIs"
         )
         by_name = {str(b["name"]): b for b in builds}
-        expected_tags = {"csg": "v0.2.2", "weg": "v0.2.0", "tpr": "v0.4.0"}
-        for name in ("csg", "weg", "tpr"):
+        expected_tags = {"weg": "v0.2.0", "tpr": "v0.4.0"}
+        for name in ("weg", "tpr"):
             assert by_name[name].get("repo") and by_name[name].get("tag") == expected_tags[name], (
                 f"{name} is pinned — its build context is the tag-qualified "
                 f"checkout and its image tag is the pin"
             )
             assert not by_name[name].get("source"), (
-                f"{name} must not keep a source path (S6 moved csg out)"
+                f"{name} must not keep a source path (S6 moved it out)"
             )
 
     def test_no_cli_remains_a_source_entry(self) -> None:
-        """REQ-002 end state: every entry — csg, weg, itr and the runtime — is
+        """REQ-002 end state: every entry — weg, itr, tpr and the runtime — is
         pinned. The source-path branch remains as an extension point but selects
         nothing; a source entry reappearing silently reopens the mixed shape."""
         source_names = [

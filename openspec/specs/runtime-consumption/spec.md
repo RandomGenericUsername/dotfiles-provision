@@ -13,7 +13,7 @@ green `command -v`.
 ### Requirement: the runtime is a pinned CLI entry
 
 `roles/cli_tools` SHALL load `dotfiles-runtime` as `{name, repo, tag}` with no `source` key, like
-`csg`/`weg`/`itr`, from `{{ cli_tools_manifests_dir }}/cli-tools.yaml` at run time, not from an
+`weg`/`itr`/`tpr`, from `{{ cli_tools_manifests_dir }}/cli-tools.yaml` at run time, not from an
 in-role pin list. It SHALL install it from `<install>/cli-tools/dotfiles-runtime/<tag>/`, record
 the tag in `pinned` beside it, and publish `cli_tools_tags` (name → tag) for later plays.
 
@@ -67,7 +67,7 @@ Source: spine AD-10/AD-11; `dotfiles-runtime` `version` command.
 #### Scenario: the runtime is on PATH
 
 - **WHEN** `verify_cli_tools` is probed with the tool bin dir prepended
-- **THEN** `dotfiles-runtime` resolves, alongside `csg`, `weg` and `itr`
+- **THEN** `dotfiles-runtime` resolves, alongside `weg`, `itr` and `tpr`
 
 ### Requirement: the seed step runs the installed pinned runtime
 

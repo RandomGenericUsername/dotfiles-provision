@@ -177,7 +177,7 @@ class TestSeedPostconditionsExecution:
     def test_seed_resolves_tpr_from_config_despite_stale_env(self) -> None:
         """BUG-008: the seed must resolve tpr from the spine producer config. If
         the old single/double-underscore ambient env were authoritative, the
-        stale csg below would silently select csg."""
+        stale value below would silently select it."""
         import shutil
         import tempfile
 
@@ -185,8 +185,8 @@ class TestSeedPostconditionsExecution:
             pytest.skip("ansible-playbook not installed")
         with tempfile.TemporaryDirectory() as raw:
             env, bin_dir, state, install = self._env(Path(raw))
-            env["RUNTIME_PALETTE_PRODUCER"] = "csg"
-            env["RUNTIME__PALETTE__PRODUCER"] = "csg"
+            env["RUNTIME_PALETTE_PRODUCER"] = "stale"
+            env["RUNTIME__PALETTE__PRODUCER"] = "stale"
             env["RUNTIME__PALETTE__TPR_ENGINE"] = "matugen"
             current = state / "dotfiles" / "current"
             current.mkdir(parents=True)
@@ -220,7 +220,7 @@ class TestSeedPostconditionsExecution:
 
             result = self._run(env, install)
             assert result.returncode == 0, result.stdout + result.stderr
-            assert marker.read_text().strip() == "tpr csg csg", (
+            assert marker.read_text().strip() == "tpr stale stale", (
                 "the seed must resolve producer=tpr from producer.json even "
                 "with stale single/double-underscore ambient env present; got "
                 + marker.read_text()

@@ -14,7 +14,7 @@
 # links expose rofi/gtk/btop only AFTER this step created their palette
 # pointers (BUG-006). Requires: assets (default.png), cli_tools (the installed
 # pinned dotfiles-runtime), runtime_daemon (the producer config), settings
-# (ITR/CSG/WEG settings.toml).
+# (ITR/TPR/WEG settings.toml).
 #
 # User-scoped playbook: NO become (everything the runtime writes lives
 # under the user's XDG state dir; running as root would seed root's

@@ -34,7 +34,7 @@ cli_tools: "{{ cli_tools_manifest.entries | default([], true) }}"
 #   $XDG_BIN_HOME -> $HOME/.local/bin. The previous value hardcoded
 #   $HOME/.local/bin, which under a custom XDG layout ($XDG_DATA_HOME or
 #   $XDG_BIN_HOME set — as this project's own provisioning does) pointed at a
-#   dir uv never writes, so "Verify csg/weg/itr resolve on PATH" failed after a
+#   dir uv never writes, so "Verify weg/itr resolve on PATH" failed after a
 #   successful install. Uses ansible_facts.env (not the deprecated top-level
 #   ansible_env fact).
 cli_tools_bin_dir: >-
@@ -70,7 +70,7 @@ cli_tools_engine_smoke_image: "docker.io/library/alpine:3.20"
 
 # cli_tools_image_builds: the container-mode CLIs whose container images this
 #   role builds after `uv tool install`. `itr` is deliberately absent (no
-#   container mode). `csg`, `weg` and `tpr` all run containerized at runtime
+#   container mode). `weg` and `tpr` run containerized at runtime
 #   (settings.toml renders runtime.mode = "container"); the assets role's
 #   `weg dump-effects` is separate and runs locally.
 #
@@ -82,7 +82,6 @@ cli_tools_engine_smoke_image: "docker.io/library/alpine:3.20"
 #   the build loop below picks the new tag up — there is no hardcoded tag or
 #   in-role mirror to miss.
 cli_tools_image_build_names:
-  - csg
   - weg
   - tpr
 cli_tools_image_builds: "{{ cli_tools | selectattr('name', 'in', cli_tools_image_build_names) | list }}"
@@ -91,12 +90,9 @@ cli_tools_image_builds: "{{ cli_tools | selectattr('name', 'in', cli_tools_image
 #   its image tag (spine AD-7) — the tag value is always the manifest pin; only
 #   the TRANSPORT differs, because the build verbs do not share a flag:
 #     - `weg`'s `install` verb takes `--image-tag <tag>` on argv.
-#     - `csg`'s and `tpr`'s `install` verbs have NO `--image-tag`: the tag comes
-#       from their settings resolver env vars. `cli_tools_image_tag_env_keys`
-#       carries each tool's exact env key (REQ-010 generalized the old
-#       csg-only loop):
-#         csg -> COLORSCHEME__CONTAINER__IMAGE_TAG
-#                (prefix COLORSCHEME, key container.image_tag)
+#     - `tpr`'s `install` verb has NO `--image-tag`: the tag comes
+#       from its settings resolver env vars. `cli_tools_image_tag_env_keys`
+#       carries each tool's exact env key:
 #         tpr -> THEME__CONTAINER__IMAGE_TAG
 #                (prefix THEME, key container.image_tag)
 #   Both transports read `{{ item.tag }}`, so neither can carry a literal tag.
@@ -112,11 +108,9 @@ cli_tools_image_tag_env_builds: >-
 # asserts every env-build entry has a key here and that `{{ item.tag }}` is the
 # only value written to it.
 cli_tools_image_tag_env_keys:
-  csg: COLORSCHEME__CONTAINER__IMAGE_TAG
   tpr: THEME__CONTAINER__IMAGE_TAG
 
-# Context transport: csg's install verb takes the pinned checkout on argv
-# (`--context`), but tpr's install verb has NO --context option — it
+# Context transport: tpr's install verb has NO --context option — it
 # resolves the build context through oci_runtime, whose explicit override for
 # tpr is THEME_PRODUCER_SOURCE_ROOT. This map names the tools whose checkout is
 # passed by env instead of argv; the env-tag build loop is split on it so the

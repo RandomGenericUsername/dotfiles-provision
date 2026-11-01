@@ -1,8 +1,8 @@
 # Settings role vars (Story 2.11).
 #
 # The role renders the per-tool settings.toml files from role-authored
-# Jinja templates into the user config home (FR-21, chaining-spine.md) — CSG,
-# WEG, ITR, and TPR — baking the absolute install-spine paths from the install_dir
+# Jinja templates into the user config home (FR-21, chaining-spine.md) — WEG,
+# ITR, and TPR — baking the absolute install-spine paths from the install_dir
 # seam extra-var (AC 5, NFR-6). It is the ONLY authoring surface for these
 # files: default_palette (2.7), compositor_configs (2.9), and config_copies
 # (2.10) must NEVER author/modify a settings file.
@@ -22,9 +22,7 @@
 #       dependency).
 #   (c) vs 2.7 default_palette (settings-file NEGATIVE guard): 2.7 GENERATES
 #       the palette and MUST NOT author/modify settings; 2.11 is the ONLY
-#       settings author. The `overwrite = false` in the CSG template + 2.7's
-#       per-task COLORSCHEME__OUTPUT__OVERWRITE env override are a two-sided
-#       contract — do not change one side.
+#       settings author.
 #   (d) vs config_copies/assets/compositor_configs (repo_root + parity test):
 #       2.11 has NO repo_root and NO manifest parity (no settings manifest
 #       exists) — the templates + structural locks ARE the contract. Do not
@@ -49,14 +47,13 @@ settings_xdg_state_home: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_
 # defaults live under cache lifetime). Same F4/trim derivation family.
 settings_xdg_cache_home: "{{ ansible_facts.env.XDG_CACHE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.cache', true) }}"
 
-# settings_cache_dirs: WEG scratch/output + CSG/ITR/TPR manual-run output
+# settings_cache_dirs: WEG scratch/output + ITR/TPR manual-run output
 # defaults under the XDG cache home. Ensured as directories (ungated — `file
 # state: directory` is natively check-safe) so the verify spine-target
 # extraction (criterion 5 part 2) resolves them even before the first tool run.
 settings_cache_dirs:
   - "{{ settings_xdg_cache_home | trim }}/dotfiles/weg-output"
   - "{{ settings_xdg_cache_home | trim }}/dotfiles/weg-tmp"
-  - "{{ settings_xdg_cache_home | trim }}/dotfiles/csg-output"
   - "{{ settings_xdg_cache_home | trim }}/dotfiles/itr-output"
   - "{{ settings_xdg_cache_home | trim }}/dotfiles/tpr-output"
 
@@ -74,7 +71,6 @@ settings_spine_config_dir: "{{ install_dir | trim }}/config"
 #   these subdirs first (ungated — `file state: directory` is natively
 #   check-safe) to make a direct settings.yaml run self-contained.
 settings_config_dirs:
-  - "{{ settings_spine_config_dir }}/color-scheme-generator"
   - "{{ settings_spine_config_dir }}/weg"
   - "{{ settings_spine_config_dir }}/itr"
   - "{{ settings_spine_config_dir }}/theme-producer"
@@ -91,23 +87,11 @@ settings_config_dirs:
 #   test proves the template follows the value rather than a literal.
 settings_weg_image_tag: "{{ cli_tools_tags.weg }}"
 
-# settings_csg_image_tag: the container image tag the rendered CSG settings
-#   resolve (`[container] image_tag`). AD-7: the tag IS the pin — never
-#   `latest` — so a pin bump can never silently reuse the previous image. The
-#   cli_tools role builds csg's images at exactly this tag (its build passes
-#   the pin as `COLORSCHEME__CONTAINER__IMAGE_TAG`, the same value).
-#
-#   Same single-source discipline as the WEG var above: REQ-014 derives this
-#   from `cli_tools_tags.csg` (the fact the cli_tools role publishes from the
-#   composition manifest), so a pin bump cannot leave the rendered image tag
-#   behind. A two-pin render test proves the template follows the value.
-settings_csg_image_tag: "{{ cli_tools_tags.csg }}"
-
 # settings_tpr_image_tag: the container image tag the rendered TPR settings
 #   resolve (`[container] image_tag`). AD-7: the tag IS the pin — never
 #   `latest` — so a pin bump can never silently reuse the previous image.
 #
-#   Same single-source discipline as WEG/CSG: REQ-014 derives this from
+#   Same single-source discipline as WEG: REQ-014 derives this from
 #   `cli_tools_tags.tpr` (the fact the cli_tools role publishes from the
 #   composition manifest), so a pin bump cannot leave the rendered image tag
 #   behind. The cli_tools role builds tpr's images at exactly this tag (its
@@ -121,7 +105,6 @@ settings_tpr_image_tag: "{{ cli_tools_tags.tpr }}"
 #   install-spine value in the templates consumes the same validated
 #   `{{ install_dir | trim }}` value the fail-loud first-task assert enforces.
 settings_files:
-  - { name: csg, template: csg-settings.toml.j2, dest: "{{ settings_spine_config_dir }}/color-scheme-generator/settings.toml" }
   - { name: weg, template: weg-settings.toml.j2, dest: "{{ settings_spine_config_dir }}/weg/settings.toml" }
   - { name: itr, template: itr-settings.toml.j2, dest: "{{ settings_spine_config_dir }}/itr/settings.toml" }
   - { name: tpr, template: tpr-settings.toml.j2, dest: "{{ settings_spine_config_dir }}/theme-producer/settings.toml" }

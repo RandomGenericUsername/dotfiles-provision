@@ -118,11 +118,10 @@ def _manifest_entries() -> list[dict[str, str]]:
 
 # config-in-spine (2026-08-16): the assets role relocated its TOOL-CONFIG
 # outputs under <install>/config/. The domain AssetKind.spine_segment() still
-# returns the pre-relocation segments (csg-templates / weg-effects.yaml — the
+# returns the pre-relocation segments (tpr-templates / weg-effects.yaml — the
 # manifest is the pre-refactor layout), so the deploy-target derivation applies
 # these relocations on top of the domain mapping.
 _CONFIG_IN_SPINE_RELOCATIONS = {
-    AssetKind.CSG_TEMPLATE.spine_segment(): "config/color-scheme-generator/templates",
     AssetKind.TPR_TEMPLATE.spine_segment(): "config/theme-producer/templates",
     AssetKind.WEG_EFFECTS.spine_segment(): "config/weg",
 }
@@ -190,7 +189,7 @@ class TestAssetsTasks:
             assert isinstance(env, dict), "weg check must set environment"
             assert env.get("PATH", "").startswith("{{ assets_weg_bin_dir }}:"), (
                 "weg check must prepend assets_weg_bin_dir to PATH (mirror of "
-                "2.7 csg guard) so the guard finds weg even when ~/.local/bin "
+                "2.7 guard) so the guard finds weg even when ~/.local/bin "
                 "is not on the inherited playbook PATH (VM-verified 2026-08-19)"
             )
 
@@ -297,8 +296,8 @@ class TestAssetsTasks:
         must be pruned from the spine on the next apply, exactly as fresh
         installs see them; copy merged only and left stale templates behind.)
 
-        S6 adds a SECOND mirror loop for the one kind that lives in a pinned
-        CLI checkout (`csg-templates`, spine AD-10). Same module, same
+        S6 adds a SECOND mirror loop for the kinds that live in a pinned
+        CLI checkout (`tpr-templates`, spine AD-10). Same module, same
         delete/dest semantics — every source is already absolute."""
         loop_matches = [
             task
@@ -542,7 +541,7 @@ class TestAssetsTasks:
         Every corpus source is a var that derives from the install spine:
         `{{ item.source }}` (both copy loops; the values are
         `<install>/assets/<tag>/...`), `{{ assets_wallpapers_tarball }}`,
-        `{{ assets_csg_templates_source }}`, or `{{ assets_checkout_root }}` /
+        `{{ assets_tpr_templates_source }}`, or `{{ assets_checkout_root }}` /
         `{{ assets_pinned_file }}` on the fetch tasks. A source that starts
         with a literal `/` or names `dotfiles/` is the failure this locks
         (AC 13). Checks every task's module body, not a substring scan that
@@ -551,7 +550,7 @@ class TestAssetsTasks:
         allowed_prefixes = (
             "{{ item.source }}",
             "{{ assets_wallpapers_tarball }}",
-            "{{ assets_csg_templates_source }}",
+            "{{ assets_tpr_templates_source }}",
             "{{ assets_checkout_root }}",
             "{{ install_dir | trim }}",
             "{{ assets_pinned_file }}",
@@ -589,7 +588,6 @@ class TestAssetsVars:
         "assets_deploy_dirs",
         "assets_wallpapers_tarball",
         "assets_wallpapers_dest",
-        "assets_csg_templates_source",
         "assets_tpr_pinned_tag",
         "assets_tpr_templates_source",
         "assets_copies",
@@ -674,13 +672,13 @@ class TestAssetsVars:
         manifest. (assets_copies ∪ assets_checkout_copies) names ∪
         {wallpapers, weg-effects} == manifest entry names; copies match by
         (name, kind, source); every copy target equals the kind→spine-segment
-        mapping (with the config-in-spine relocation: csg-templates →
-        config/color-scheme-generator/templates); the wallpaper tarball var
+        mapping (with the config-in-spine relocation: tpr-templates →
+        config/theme-producer/templates); the wallpaper tarball var
         equals the manifest wallpapers source; the manifest weg-effects entry
         has kind weg-effects and no source.
 
-        S6: `csg-templates` reads the pinned csg checkout, so its source is an
-        ABSOLUTE `<install>/cli-tools/csg/<tag>/...` path. S1: the three corpus
+        S6: `tpr-templates` reads the pinned tpr checkout, so its source is an
+        ABSOLUTE `<install>/cli-tools/tpr/<tag>/...` path. S1: the three corpus
         entries read the pinned assets checkout (`{{ assets_checkout_root }}` →
         `<install>/assets/<tag>/...`), and the manifest carries the `assets:`
         block that names that pin. Parity compares the NORMALIZED paths
@@ -710,10 +708,6 @@ class TestAssetsVars:
             """Replace the install root, the role vars and the pins with placeholders."""
             text = str(source).rstrip("/")
             text = text.replace(
-                "{{ assets_csg_templates_source }}",
-                str(data["assets_csg_templates_source"]).rstrip("/"),
-            )
-            text = text.replace(
                 "{{ assets_tpr_templates_source }}",
                 str(data["assets_tpr_templates_source"]).rstrip("/"),
             )
@@ -721,9 +715,7 @@ class TestAssetsVars:
                 "{{ assets_checkout_root }}",
                 "{{ install_dir | trim }}/assets/{{ assets_pinned_tag }}",
             )
-            text = text.replace("{{ assets_csg_pinned_tag }}", "<tag>")
             text = text.replace("{{ assets_tpr_pinned_tag }}", "<tag>")
-            text = text.replace("{{ cli_tools_tags.csg }}", "<tag>")
             text = text.replace("{{ cli_tools_tags.tpr }}", "<tag>")
             text = text.replace("{{ assets_pinned_tag }}", "<tag>")
             text = text.replace("{{ install_dir | trim }}", "<install>")
@@ -737,10 +729,6 @@ class TestAssetsVars:
             for kind in AssetKind
             if kind is not AssetKind.WALLPAPER and kind is not AssetKind.WEG_EFFECTS
         }
-        csg_manifest_source = str(manifest["csg-templates"]["source"])
-        csg_pin = render_pin(
-            csg_manifest_source.split("/cli-tools/csg/")[1].split("/", 1)[0]
-        )
         tpr_manifest_source = str(manifest["tpr-templates"]["source"])
         tpr_pin = render_pin(
             tpr_manifest_source.split("/cli-tools/tpr/")[1].split("/", 1)[0]
@@ -750,9 +738,7 @@ class TestAssetsVars:
             assert entry["kind"] == manifest_entry["kind"], (
                 f"copy {entry['name']!r} kind diverges from the manifest"
             )
-            pin = {"csg-templates": csg_pin, "tpr-templates": tpr_pin}.get(
-                entry["name"], ""
-            )
+            pin = {"tpr-templates": tpr_pin}.get(entry["name"], "")
             assert _normalize(entry["source"], pin) == _normalize(
                 manifest_entry["source"], pin
             ), (
@@ -762,17 +748,9 @@ class TestAssetsVars:
             assert entry["target"] == kind_to_segment[entry["kind"]], (
                 f"copy {entry['name']!r} target must equal the kind→spine-segment "
                 "mapping (deferred #164 lock, derived from AssetKind with the "
-                "config-in-spine relocation for csg-templates)"
+                "config-in-spine relocation for tpr-templates)"
             )
 
-        assert str(data["assets_csg_pinned_tag"]) == "{{ cli_tools_tags.csg }}", (
-            "assets_csg_pinned_tag must DERIVE from the cli_tools_tags fact — "
-            "the csg-templates source is derived from it (spine AD-10/AD-11)"
-        )
-        assert render_pin(data["assets_csg_pinned_tag"]) == csg_pin, (
-            "rendering the derived csg pin must equal the tag in the manifest "
-            f"source ({csg_pin!r})"
-        )
         assert str(data["assets_tpr_pinned_tag"]) == "{{ cli_tools_tags.tpr }}", (
             "assets_tpr_pinned_tag must DERIVE from the cli_tools_tags fact — "
             "the tpr-templates source is derived from it (spine AD-10/AD-11)"
@@ -805,85 +783,10 @@ class TestAssetsVars:
                 f"{{{{ install_dir | trim }}}}/assets/{block['tag']}/"
             ), f"manifest entry {name!r} does not name the manifest assets tag"
 
-    def test_csg_templates_source_resolves_to_pinned_checkout(self) -> None:
-        """S6/AD-10: the csg-templates asset is copied FROM the pinned csg
-        checkout, not from the (deleted) in-tree package.
-
-        The catalog lives in the cli_tools checkout at
-        `<install>/cli-tools/csg/<tag>/src/color_scheme_generator/defaults/templates/`,
-        which exists by the time this role runs because cli-tools.yaml precedes
-        assets.yaml. This case renders the role vars with the csg pin and asserts
-        the resolved source (a) is the tag-qualified checkout, (b) does NOT name
-        the retired in-tree path, and (c) is backed by a fail-loud existence
-        assert so a missing/mis-pinned checkout cannot deploy nothing silently.
-        """
-        data = _vars()
-        manifest_entries = _manifest_entries()
-        csg_entry = next(e for e in manifest_entries if e["name"] == "csg-templates")
-        cli_manifest = yaml.safe_load(
-            (composition_root() / "dotfiles" / "provisioning" / "cli-tools.yaml").read_text()
-        )
-        csg_cli = next(e for e in cli_manifest["entries"] if e.get("name") == "csg")
-        pin = str(csg_cli["tag"])
-
-        assert str(data["assets_csg_pinned_tag"]) == "{{ cli_tools_tags.csg }}", (
-            "the assets role must derive the csg pin from the cli_tools_tags "
-            f"fact; got {data['assets_csg_pinned_tag']!r}"
-        )
-        assert render_pin(data["assets_csg_pinned_tag"]) == pin, (
-            "rendering the derived csg pin must equal the CLI manifest pin"
-        )
-
-        install = "/tmp/opencode/assets-pin-check"
-        source = render_pin(
-            data["assets_csg_templates_source"],
-            install_dir=install,
-            assets_csg_pinned_tag=render_pin(data["assets_csg_pinned_tag"]),
-        )
-        assert source == (
-            f"{install}/cli-tools/csg/{pin}/src/color_scheme_generator/defaults/templates"
-        ), f"resolved csg-templates source is wrong: {source!r}"
-        assert "src/cli-tools" not in source, (
-            "the csg-templates source must not name the retired in-tree tree"
-        )
-        assert "src/cli-tools" not in str(csg_entry["source"]), (
-            "the manifest csg-templates source must not name the retired tree"
-        )
-
-        checkout_copy = next(
-            e for e in data["assets_checkout_copies"] if e["name"] == "csg-templates"
-        )
-        assert str(checkout_copy["source"]).startswith("{{ assets_csg_templates_source }}"), (
-            "the copy must read the resolved checkout var (single source for the path)"
-        )
-        assert str(checkout_copy["target"]) == "config/color-scheme-generator/templates"
-
-        # The dependency is explicit: a stat + assert on the resolved dir, so a
-        # missing checkout (cli-tools never ran) fails loud instead of
-        # synchronizing nothing over the previous catalog.
-        asserts = [
-            task
-            for task in _tasks_with_module("ansible.builtin.assert")
-            if "assets_csg_templates_dir.stat.isdir" in str(_module(task).get("that", ""))
-        ]
-        assert asserts, (
-            "the assets role must assert the pinned csg template catalog exists "
-            "before copying from it (spine AD-10)"
-        )
-        stats = [
-            task
-            for task in _tasks_with_module("ansible.builtin.stat")
-            if str(_module(task).get("path", "")) == "{{ assets_csg_templates_source }}"
-        ]
-        assert stats, "the existence probe must stat the resolved checkout source"
-        for task in asserts:
-            assert task.get("when") == "not ansible_check_mode"
-
-
     def test_tpr_templates_source_resolves_to_pinned_checkout(self) -> None:
         """REQ-010: the tpr projection catalog is copied FROM the pinned tpr
         checkout into the runtime's spine path, with the same fail-loud
-        existence contract as csg.
+        existence contract as the other pinned-checkout assets.
 
         The catalog lives at
         `<install>/cli-tools/tpr/<tag>/src/theme_producer/defaults/templates/`

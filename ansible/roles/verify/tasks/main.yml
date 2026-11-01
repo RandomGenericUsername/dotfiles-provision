@@ -9,17 +9,17 @@
 #   1. install dir established      → install-dir subtree stat+assert (twenty
 #      spine dirs + weg-effects.yaml)
 #   2. system binaries on PATH      → command -v hyprland/hyprpaper/ags
-#   3. CLI tools on PATH            → command -v csg/weg/itr (with
+#   3. CLI tools on PATH            → command -v weg/itr/tpr (with
 #      verify_cli_bin_dir on PATH)
 #   4. assets deployed              → default.png + icon-templates/ +
-#      icon-mappings/ + csg-templates/ + weg-effects.yaml
+#      icon-mappings/ + tpr-templates/ + weg-effects.yaml
 #   4b. desktop entries deployed     → the six entries at
 #      $XDG_DATA_HOME/applications, every deployed Exec binary resolves on
 #      PATH, and every keybind-invoked script/launcher is executable (spine
 #      AD-10 layer 3; layer 1 is the corpus's validate-desktop, layer 2 is
 #      compositor_configs' requires/optional resolution)
 #   5. settings render and parse    → settings files exist AND spine targets
-#      resolve AND csg/weg/itr gates exit 0
+#      resolve AND weg/itr/tpr gates exit 0
 #   5b. btop config rendered+wired  → btop.conf selects
 #      colors.btop.theme, save_config_on_exit = false (the one non-cosmetic
 #      setting in the whole btop integration — see btop_config/vars), the
@@ -70,14 +70,8 @@
 # `dotfiles-provision verify`. Do NOT remove the gates "to make verify
 # stricter" — that breaks bootstrap.yaml --check.
 #
-# The csg-info vacuity note (deferred-work 2026-08-12, Story 2.11 review):
-# csg's `info` swallows ConfigResolutionError and exits 0 even on a
-# parse-broken file (info_cmd.py:43-44), so the csg parse-gate task is a
-# DOCUMENTED WEAK gate. The authoritative CSG parse proof is the dynamic
-# spine-target extraction below (reads the RENDERED settings.toml and asserts
-# every spine path it references resolves) + Story 3.3's settings-parity. The
-# WEG half can actually fail and stays a real gate; the ITR list gate pins
-# icons.yaml (SPEC.md#51).
+# The WEG parse gate can actually fail and stays a real gate; the ITR list
+# gate pins icons.yaml (SPEC.md#51).
 #
 # Config-copies symlink check (criterion 9, config-in-spine 2026-08-16): each
 # managed ~/.config/<name> must be a symlink into the spine. The 5-layer check
@@ -650,7 +644,7 @@
       - verify_cli_tool_checks.results | selectattr('rc', 'equalto', 0) | list | length == verify_cli_tools | length
       - verify_cli_tool_checks.results | map(attribute='stdout') | reject('equalto', '') | list | length == verify_cli_tools | length
     fail_msg: >-
-      not every CLI tool is on PATH (expected csg, weg, itr, dotfiles-runtime —
+      not every CLI tool is on PATH (expected weg, itr, tpr, dotfiles-runtime —
       done-criterion 3). The cli_tools role (Story 2.4) installs them via uv tool install
       into {{ verify_cli_bin_dir }}; the check prepends that dir to PATH. Run
       the cli-tools playbook first (direct-run prerequisite)
@@ -864,80 +858,7 @@
       cli-tools playbook
   when: not ansible_check_mode
 
-# S6: `csg` closes the pinned-CLI set. Same four legs as itr/weg, with FOUR
-# images instead of one: csg's `install` builds `base` + one per backend
-# (`custom`, `pywal`, `wallust`), each engine-qualified at the pin. The build
-# took the tag from `COLORSCHEME__CONTAINER__IMAGE_TAG` (its verb has no
-# `--image-tag`), so the images that exist at `<prefix>-<suffix>-<engine>:<pin>`
-# are exactly what the rendered settings resolve. A `latest`-only image (the
-# pre-S6 shape) or one left at the previous pin fails here.
-- name: Check the pinned csg checkout and its pin record
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop:
-    - "{{ verify_csg_checkout }}"
-    - "{{ verify_csg_pin_file }}"
-  register: verify_csg_checkout_checks
-
-- name: Read the csg pin record
-  ansible.builtin.slurp:
-    src: "{{ verify_csg_pin_file }}"
-  register: verify_csg_pin
-  when: not ansible_check_mode
-
-- name: Read the installed csg version handshake
-  ansible.builtin.command:
-    argv:
-      - "{{ verify_cli_bin_dir | trim }}/csg"
-      - --version
-  register: verify_csg_version_check
-  changed_when: false
-  failed_when: false
-  when: not ansible_check_mode
-
-- name: Check every pinned csg image exists at its tag-qualified reference
-  ansible.builtin.command:
-    argv:
-      - "{{ container_runtime_engine }}"
-      - image
-      - inspect
-      - "{{ item }}"
-  loop: "{{ verify_csg_image_references }}"
-  register: verify_csg_image_checks
-  changed_when: false
-  failed_when: false
-  when: not ansible_check_mode
-
-- name: Assert the csg checkout, pin, contract and all four images are the pinned tag
-  ansible.builtin.assert:
-    that:
-      - verify_csg_checkout_checks.results[0].stat.isdir
-      - verify_csg_checkout_checks.results[1].stat.isreg
-      - verify_csg_checkout is search(verify_csg_version)
-      - verify_csg_pin.content | b64decode | trim == verify_csg_version
-      - verify_csg_version_check.rc == 0
-      - "'contract ' ~ verify_csg_contract_version in verify_csg_version_check.stdout"
-      - verify_csg_image_checks.results | selectattr('rc', 'equalto', 0) | list | length == verify_csg_image_references | length
-    fail_msg: >-
-      the pinned csg install is not the tag `verify` mirrors (spine
-      AD-10/AD-11). Expected the checkout at {{ verify_csg_checkout }}/ (path
-      naming {{ verify_csg_version }}), the pin record
-      {{ verify_csg_pin_file }} containing exactly {{ verify_csg_version }},
-      `csg --version` reporting `contract {{ verify_csg_contract_version }}`
-      (the `contracts` tag this repo pins, AD-4), and ALL FOUR images
-      ({{ verify_csg_image_references | join(', ') }}) present — base plus the
-      custom/pywal/wallust backends at the pin (AD-7: the image tag IS the pin,
-      never `latest`). Observed:
-      rc={{ verify_csg_version_check.rc | default('n/a', true) }},
-      stdout={{ verify_csg_version_check.stdout | default('', true) | trim }},
-      pin={{ verify_csg_pin.content | default('', true) | b64decode | trim }},
-      missing_images={{ verify_csg_image_checks.results | rejectattr('rc', 'equalto', 0) | map(attribute='item') | list }}.
-      A stale local-path install, a pin-file/checkout mismatch, or an image
-      left at another tag means provisioning never re-pinned csg; re-run the
-      cli-tools playbook
-  when: not ansible_check_mode
-
-# REQ-010: `tpr` follows the same execution-asserted pin as csg, with THREE
+# REQ-010: `tpr` follows the same execution-asserted pin as weg, with THREE
 # images (base + the matugen/native engines). tpr has no `contract <x>`
 # token in `--version`, so the assertion is the exact package version (the tag
 # without its leading `v`) plus the tag-qualified image set. The rendered
@@ -1014,7 +935,7 @@
 # generate. When producer.json selects tpr, assert the selected engine image
 # exists and run a REAL bounded tpr generate into a temp dir — never live
 # state. Container mode ships tpr + tpr-native inside the image, so no host
-# tpr-native helper is required. A csg selection skips the tpr smoke (its own
+# tpr-native helper is required. A non-tpr selection skips the tpr smoke (its own
 # parse/image gates above still run).
 - name: Check the selected tpr engine image exists at the pinned reference
   ansible.builtin.command:
@@ -1463,27 +1384,6 @@
       deploys their content; re-run the assets playbook.
   when: not ansible_check_mode
 
-- name: Check required CSG color-format templates exist in the spine
-  ansible.builtin.stat:
-    path: "{{ install_dir | trim }}/config/color-scheme-generator/templates/{{ item }}"
-  loop: "{{ verify_csg_template_files }}"
-  register: verify_csg_template_checks
-
-- name: Assert every CSG color-format template is deployed
-  ansible.builtin.assert:
-    that:
-      - verify_csg_template_checks.results | selectattr('stat.isreg') | list | length == verify_csg_template_files | length
-    fail_msg: >-
-      a CSG color-format template is missing under
-      {{ install_dir | trim }}/config/color-scheme-generator/templates/
-      (expected {{ verify_csg_template_files | join(', ') }}). The assets role
-      (2.6) mirrors the CSG defaults; csg silently OMITS a format whose
-      template is missing, so the runtime fails a palette entry with "csg did
-      not write expected artifact" (a missing colors.kitty.j2 leaves
-      current/colors.kitty dangling and kitty never re-themes). Re-run the
-      assets playbook.
-  when: not ansible_check_mode
-
 - name: Check assets deployed
   ansible.builtin.stat:
     path: "{{ install_dir | trim }}/{{ item }}"
@@ -1498,7 +1398,7 @@
     fail_msg: >-
       not every asset outcome is present with the right inode type under
       {{ install_dir | trim }} (expected icon-templates/, icon-mappings/,
-      csg-templates/ as DIRS and wallpapers/default.png + weg-effects.yaml as
+      tpr-templates/ as DIRS and wallpapers/default.png + weg-effects.yaml as
       regular FILES — done-criterion 4). The assets role (Story 2.6) deploys
       them; run the assets playbook first
   when: not ansible_check_mode
@@ -1750,7 +1650,7 @@
     that: verify_settings_file_checks.results | selectattr('stat.isreg') | list | length == verify_settings_files | length
     fail_msg: >-
       not every rendered settings file exists under {{ verify_xdg_config_home }}
-      (expected color-scheme-generator/weg/itr settings.toml — done-criterion 5
+      (expected weg/itr/theme-producer settings.toml — done-criterion 5
       part 1). The settings role (Story 2.11) renders them; run the settings
       playbook first
   when: not ansible_check_mode
@@ -1821,31 +1721,13 @@
       roles and the runtime seed (Epic 4)
   when: not ansible_check_mode
 
-# Settings parse gate (AC 3, done-criterion 5): the three CLI gates over the
-# rendered settings files. NOTE the deferred-work finding (Story 2.11 review):
-# csg's `info` swallows ConfigResolutionError and exits 0 even on a
-# parse-broken file (info_cmd.py:43-44) — the csg gate below is therefore a
-# DOCUMENTED WEAK gate; the authoritative CSG parse proof is the spine-target
-# resolution assert above + Story 3.3's settings-parity. The WEG half can
-# actually fail and stays a real gate. The ITR list gate pins icons.yaml
-# (SPEC.md#51 — NOT defaults.yaml). All three command tasks AND their assert
-# are gated `when: not ansible_check_mode` (command tasks are skipped under
-# --check in ansible-core 2.20.3; the assert would otherwise fail a
-# bootstrap.yaml --check on a partially-provisioned host).
-
-- name: Gate csg settings parse
-  ansible.builtin.command:
-    argv:
-      - csg
-      - info
-      - --config
-      - "{{ verify_xdg_config_home }}/color-scheme-generator/settings.toml"
-  environment:
-    PATH: "{{ verify_cli_bin_dir }}:{{ ansible_facts.env.PATH }}"
-  register: verify_csg_gate
-  changed_when: false
-  failed_when: false
-  when: not ansible_check_mode
+# Settings parse gate (AC 3, done-criterion 5): the CLI gates over the
+# rendered settings files. WEG's `info` can actually fail and stays a real
+# gate. The ITR list gate pins icons.yaml (SPEC.md#51 — NOT defaults.yaml).
+# All command tasks AND their assert are gated `when: not ansible_check_mode`
+# (command tasks are skipped under --check in ansible-core 2.20.3; the assert
+# would otherwise fail a bootstrap.yaml --check on a partially-provisioned
+# host).
 
 - name: Gate weg settings parse
   ansible.builtin.command:
@@ -1880,14 +1762,12 @@
 - name: Assert settings parse gates exited cleanly
   ansible.builtin.assert:
     that:
-      - verify_csg_gate.rc == 0
       - verify_weg_gate.rc == 0
       - verify_itr_gate.rc == 0
     fail_msg: >-
-      one of the rendered settings parse gates failed (csg info / weg info /
+      one of the rendered settings parse gates failed (weg info /
       itr list icons.yaml) — done-criterion 5. Inspect the registered
-      verify_csg_gate/verify_weg_gate/verify_itr_gate results; note the csg
-      half is a documented weak gate (see the comment block above)
+      verify_weg_gate/verify_itr_gate results
   when: not ansible_check_mode
 
 - name: Check compositor configs and skeletons

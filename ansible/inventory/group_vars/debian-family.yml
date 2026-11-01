@@ -78,7 +78,7 @@ packages:
   # (verified against the Debian archive's madison API 2026-10-04:
   # xdg-utils 1.2.1-2 in stable/testing, architecture all).
   xdg-utils: xdg-utils
-  # Container engine for the csg container-mode chain (same rationale as Arch).
+  # Container engine for the tpr container-mode chain (same rationale as Arch).
   # Debian package names; rootless podman deps.
   container_engine:
     - podman
