@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.29
+
+Consume dotfiles-assets v0.6.3 (semantic-role icon mappings, REQ-008 Phase B).
+
+- Every corpus pin mirror moves to `v0.6.3`: `assets`, `verify`,
+  `btop_config`, `compositor_configs`, `config_copies`, `display_manager`,
+  `kitty_config`, `wlogout_config`, `zsh_config`; plus the composition
+  fixtures (assets, program-tuple) and test expectations.
+- `v0.6.3` replaces all `colorN` icon pins with semantic tpr roles, adds
+  `on_backdrop` for wallpaper-floating glyphs, declares `surface:` classes and
+  empties the legacy baseline (`legacy_baseline=0`).
+- The `v0.6.2` autostart fixture filename is kept; its content is unchanged in
+  v0.6.3.
+
 Notable changes to the `dotfiles-provision` repo. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the git tags
 (`vMAJOR.MINOR.PATCH`, annotated, never moved).

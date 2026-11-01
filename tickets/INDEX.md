@@ -11,6 +11,7 @@
 ## Requirements
 
 - [REQ-014-cli-tools-manifest-source/ticket.md](./REQ-014-cli-tools-manifest-source/ticket.md) — `cli_tools`: consume the composition manifest as the single pin source | `done` | tag: v0.1.28 | live: tpr/runtime v0.5.0 installed from manifest
+- [REQ-015-assets-pin-v063/ticket.md](./REQ-015-assets-pin-v063/ticket.md) — Consume dotfiles-assets v0.6.3 (semantic-role icon mappings) | `in-progress` | mirrors: assets/verify/btop/compositor/config/display/kitty/wlogout/zsh
 
 ## Bugs
 

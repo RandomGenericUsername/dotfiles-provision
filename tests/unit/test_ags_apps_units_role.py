@@ -157,7 +157,7 @@ class TestAllStandaloneFixture:
         assert "launcher" not in apps["bar"]
         assert "launcher" not in apps["notifications"]
 
-        # dotfiles-assets v0.6.2 owns the autostart content: the always-on bar
+        # dotfiles-assets v0.6.3 owns the autostart content: the always-on bar
         # and notifications overlay plus the boot-staggered capture and
         # clipboard overlays. The on-demand selector/icme/studio do not appear.
         assert apps["bar"]["autostart"] == "ags"
@@ -587,7 +587,7 @@ def _write_composition(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v0.3.0\ncontracts: v0.3.0\ndotfiles-assets: v0.6.2\n",
+        "schemaVersion: 1\nags-platform: v0.3.0\ncontracts: v0.3.0\ndotfiles-assets: v0.6.3\n",
         encoding="utf-8",
     )
     return provisioning
