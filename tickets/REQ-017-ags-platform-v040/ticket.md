@@ -2,7 +2,7 @@
 id: REQ-017
 title: "Bump ags-platform pin to v0.4.0 (theme-provider Phase A)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -81,3 +81,15 @@ this ticket stays a mechanical bump.
 ## Outcome
 
 Pending. Status stays `in-progress`; no tag/push/merge.
+
+## Outcome
+
+Released engine `v0.1.31` and deployed with PIN-0123 on 2026-11-01 (bootstrap
+verify green, 291 tasks):
+- `~/.local/share/dotfiles/ags-platform/v0.4.0` installed; the shared apps
+  `node_modules/ags-platform` shortcut resolves it;
+- legacy `@color_*` sheet still applied byte-for-byte (58 `@define-color
+  color_*` lines), so current apps are visually unchanged;
+- platform provides typed `palette()` (56 live roles incl. `on_backdrop`) and a
+  single `subscribe()` subscription for Phase B;
+- `doctor` clean; always-on AGS instances running.
