@@ -2,7 +2,7 @@
 id: REQ-015
 title: "Consume dotfiles-assets v0.6.3 (semantic-role icon mappings)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -48,3 +48,14 @@ tracked separately so this pin bump stays mechanical.
 - Evidence: dotfiles-assets tag `v0.6.3`; `make validate-icons` →
   `legacy_baseline=0`, 51 roles, 58 wallpaper variants held to `on_backdrop`.
 - Verify: `rg -n 'v0\.6\.2' ansible tests`; `make gates`; bootstrap + `itr render`.
+
+## Outcome
+
+Released engine `v0.1.29` and deployed via PIN-0121 (bootstrap verify green,
+299 tasks, 2026-10-31):
+- `~/.local/share/dotfiles/assets/pinned` = `v0.6.3`; deployed
+  `icon-mappings/icons.yaml` has zero `colorN` tokens;
+- live icons resolve to roles (`primary` `#b9c3ff`, `on_backdrop` `#e3e1e9`);
+- runtime `v0.5.1` deployed in the same pin (guard deleted, tpr-only producer);
+- `rg -n 'v0\.6\.2' ansible tests` returns only the intentional autostart
+  fixture references.
