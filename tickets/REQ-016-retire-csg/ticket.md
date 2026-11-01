@@ -2,7 +2,7 @@
 id: REQ-016
 title: "Retire CSG from provisioning (tpr is the sole palette producer)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -74,3 +74,16 @@ the engine still reads all tool lists from the composition manifests, so a
 manifest without csg is the supported shape.
 
 No tag, push or merge.
+
+## Outcome
+
+Released engine `v0.1.30` (tag pushed) and deployed with PIN-0122 on 2026-10-31
+(bootstrap verify green, 291 tasks; no csg gates/paths remain):
+- provisioning no longer installs, renders, links or verifies csg; engine
+  defaults `runtime_palette_producer` to `tpr` and asserts tpr-only;
+- host leftovers removed: `~/.local/bin/csg`, the uv tool
+  `color-scheme-generator`, `cli-tools/csg/*` checkouts, the
+  `color-scheme-generator` config link + spine dir, and all `csg-*` images;
+- live state: producer `tpr/native/container`, palette `palette.v1` conforming,
+  icons still role-based (`primary` `#b9c3ff`, `on_backdrop` `#e3e1e9`),
+  `doctor` clean; `rg -ni 'csg' ansible src` → comments only.
