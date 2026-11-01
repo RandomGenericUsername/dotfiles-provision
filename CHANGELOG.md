@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.31] - 2026-11-01
+
+### Changed
+
+- **ags-platform pin moves `v0.3.0` → `v0.4.0` (REQ-017):** the `ags_platform`
+  role and its `verify` mirror install `v0.4.0`, and the composition
+  `program-tuple.yaml` fixture follows. v0.4.0 ships theme-provider Phase A (the
+  typed `palette()` role API and one subscription); legacy `@color_*` CSS
+  behavior is byte-identical, so no app-code or role changes are required.
+  `contracts` stays `v0.3.0` and `dotfiles-assets` stays `v0.6.3`.
+
 ## [0.1.30] - 2026-10-31
 
 ### Changed

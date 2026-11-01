@@ -683,7 +683,7 @@ verify_compositor_skeleton_files:
 #   shared app-install shortcut (<install>/apps/node_modules/ags-platform) is
 #   created by ags_apps_units. A rollback repoints that shortcut to a sibling
 #   version dir. The pin file records the installed version on the host.
-verify_ags_platform_version: v0.3.0
+verify_ags_platform_version: v0.4.0
 verify_ags_platform_unit_dir: "{{ install_dir | trim }}/ags-platform/{{ verify_ags_platform_version }}"
 verify_ags_platform_pin_file: "{{ install_dir | trim }}/ags-platform/pinned"
 
