@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.33
+
+Consume `ags-platform` `v0.5.0` (capture-cluster request contract).
+
+- The `ags_platform` role installs `v0.5.0`; the `verify` mirror follows.
+- The composition fixture `program-tuple.yaml` and the platform unit tests move
+  to `v0.5.0`. `contracts` stays `v0.3.0`; `dotfiles-assets` is unchanged.
+- v0.5.0 adds `ports/capture-cluster.ts` (validation, migration/response shape)
+  used by `ags-bar v0.3.0` and `ags-capture-tool v0.3.x`. No other role behavior
+  changes.
+
 ## 0.1.32
 
 Consume dotfiles-assets v0.6.4 (rofi + wlogout static configs on roles).
