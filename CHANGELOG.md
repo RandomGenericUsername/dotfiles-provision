@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.32
+
+Consume dotfiles-assets v0.6.4 (rofi + wlogout static configs on roles).
+
+- Every `*_assets_pinned_tag` mirror, fixture manifest and test expectation
+  moves to `v0.6.4`.
+- v0.6.4 fixes rofi's invariant error-red window by migrating its config to
+  `palette.v1` roles; wlogout's template follows the same roles.
+- The wlogout wiring gate and its unit tests now assert the semantic roles
+  (`@on_surface`, `@primary_container`) instead of the retired `@color_1x`
+  carrier tokens. The `v0.6.2` autostart fixture is unchanged.
+
 ## [0.1.31] - 2026-11-01
 
 ### Changed

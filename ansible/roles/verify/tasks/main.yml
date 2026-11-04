@@ -2170,7 +2170,7 @@
     argv:
       - grep
       - -E
-      - "@import url|@color_1[0-5]"
+      - "@import url|@on_surface|@primary_container"
       - "{{ verify_xdg_config_home }}/wlogout/style.css"
   register: verify_wlogout_wiring
   changed_when: false
@@ -2181,10 +2181,11 @@
   ansible.builtin.assert:
     that: verify_wlogout_wiring.rc == 0
     fail_msg: >-
-      the rendered wlogout style.css does not import the palette colors
-      (expected `@import url(...)` and an @color_1x usage — done-criterion 13,
-      shell wiring). The wlogout_config role renders style.css.tpl → style.css;
-      run the wlogout-config playbook (needs assets + default_palette first)
+      the rendered wlogout style.css does not wire the palette
+      (expected `@import url(...)` and a palette.v1 semantic role such as
+      `@on_surface` / `@primary_container` — done-criterion 13, shell wiring).
+      The wlogout_config role renders style.css.tpl → style.css; run the
+      wlogout-config playbook (needs assets + default_palette first)
   when: not ansible_check_mode
 
 # S3: the template SOURCE moved to the pinned corpus, so the pre-S3 copy in the

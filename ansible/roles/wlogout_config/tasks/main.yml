@@ -8,8 +8,8 @@
 # Previously the .tpl was COPIED VERBATIM by config_copies, so wlogout loaded a
 # template with unresolved {{VARS}} and nonexistent @color16/@color10/@color7
 # names. This role renders it with vars resolved to the actual provisioned
-# paths, and the template now consumes the palette's real @color_00..@color_15
-# names (fixed 2026-08-16 — the palette defines 0-15, not a 16th color).
+# paths; since assets v0.6.4 the template consumes palette.v1 semantic roles
+# (`@on_surface`, `@primary_container`) instead of the retired carrier tokens.
 #
 # Design:
 # - Runs AFTER assets (icons + wallpaper exist) + default_palette (colors.css

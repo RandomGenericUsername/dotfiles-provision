@@ -4495,7 +4495,7 @@ def _build_provisioned_layout(
     # the spine-rendered .zshrc through the symlink.
     (home / ".zshenv").write_text(f'export ZDOTDIR="{xdg}/zsh"\n')
     (install / "config" / "wlogout" / "style.css").write_text(
-        '@import url("<INSTALL>/config/ags/colors.css");\nbutton { color: @color_15; }\n'
+        '@import url("<INSTALL>/config/ags/colors.css");\nbutton { color: @on_surface; }\n'
     )
     # Rendered kitty config (kitty_config role): verify checks the FINAL
     # kitty.conf (through the ~/.config/kitty link) and greps the runtime

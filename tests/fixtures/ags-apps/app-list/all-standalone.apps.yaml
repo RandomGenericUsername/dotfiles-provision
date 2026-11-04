@@ -11,7 +11,7 @@
 # `repo`/`tag` are overridden by the execution harness; the checked-in values
 # only document the shape. The bar keeps the ONE stable palette pointer
 # (colors.css -> the runtime-owned XDG state pointer); its v0.1.1 tag is the
-# state-migration release. Autostart identities mirror dotfiles-assets v0.6.3:
+# state-migration release. Autostart identities mirror dotfiles-assets v0.6.4:
 # only the always-on bar and notification overlay plus the boot-staggered
 # capture and clipboard overlays appear there; the on-demand launchers carry no
 # autostart entry.

@@ -152,14 +152,14 @@ class TestWlogoutConfigTasks:
 
 
 class TestWlogoutConfigTemplate:
-    def test_template_uses_palette_color_names(self) -> None:
-        """The template must consume the palette's REAL @color_00..@color_15
-        names — the nonexistent @color16/@color10/@color7 are gone."""
+    def test_template_uses_palette_semantic_roles(self) -> None:
+        """v0.6.4: the template consumes palette.v1 semantic roles, not the
+        retired CSG carrier tokens (`@color_00..@color_15`)."""
         text = _template().read_text()
-        for bad in ("@color16", "@color10", "@color7;"):
-            assert bad not in text, f"template still uses nonexistent color {bad}"
-        for good in ("@color_15", "@color_12", "@color_07"):
-            assert good in text, f"template must use real palette color {good}"
+        for bad in ("@color_", "@color16", "@color10", "@color7;"):
+            assert bad not in text, f"template still uses retired carrier token {bad}"
+        for good in ("@on_surface", "@primary_container"):
+            assert good in text, f"template must use palette role {good}"
 
     def test_template_has_no_stale_paths(self) -> None:
         """gt-4-2 follow-up lock: style.css.tpl must reference the RUNTIME
@@ -292,7 +292,9 @@ class TestWlogoutConfigPlaybook:
             text = rendered.read_text()
             assert "{{" not in text and "{%" not in text, "unresolved Jinja: " + text
             assert "@import" in text, "rendered style.css must import colors.css"
-            assert "@color_15" in text, "rendered style.css must use real palette colors"
+            assert "@on_surface" in text, (
+                "rendered style.css must use palette.v1 semantic roles"
+            )
             assert not (wlogout_dir / "style.css.tpl").exists(), (
                 "the pre-S3 style.css.tpl residue must be pruned on the same pass — a "
                 "template nobody renders must not survive in the directory wlogout loads"

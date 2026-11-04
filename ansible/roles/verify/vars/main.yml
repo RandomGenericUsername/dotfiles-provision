@@ -167,7 +167,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.6.3
+verify_assets_pinned_tag: v0.6.4
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
