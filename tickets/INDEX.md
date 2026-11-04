@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- [REQ-018-assets-pin-v064/ticket.md](./REQ-018-assets-pin-v064/ticket.md) — Consume dotfiles-assets v0.6.4 (rofi/wlogout roles) | `in-progress`
+- [REQ-018-assets-pin-v064/ticket.md](./REQ-018-assets-pin-v064/ticket.md) — Consume dotfiles-assets v0.6.4 (rofi/wlogout roles) | `done` | tag: v0.1.32 | live: rofi follows wallpaper
 - [REQ-014-cli-tools-manifest-source/ticket.md](./REQ-014-cli-tools-manifest-source/ticket.md) — `cli_tools`: consume the composition manifest as the single pin source | `done` | tag: v0.1.28 | live: tpr/runtime v0.5.0 installed from manifest
 - [REQ-015-assets-pin-v063/ticket.md](./REQ-015-assets-pin-v063/ticket.md) — Consume dotfiles-assets v0.6.3 (semantic-role icon mappings) | `done` | tag: v0.1.29 | live: assets v0.6.3, no colorN
 - [REQ-016-retire-csg/ticket.md](./REQ-016-retire-csg/ticket.md) — Retire CSG from provisioning; tpr is the sole palette producer | `in-progress` | worktree: .worktrees/REQ-016/ | branch: ticket/REQ-016-retire-csg
