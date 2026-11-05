@@ -244,7 +244,7 @@ class TestPinMirrorsMatchTheManifest:
 
         Every role that reads the pinned corpus keeps its own literal mirror
         (spine AD-6), and the fixture manifest repeats the tag in its checkout
-        sources. This guard fails while any leg still says v0.6.3.
+        sources. This guard fails while any leg still drifts from the pin.
         """
         mirrors = {
             "assets": "assets_pinned_tag",
