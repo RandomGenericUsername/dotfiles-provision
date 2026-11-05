@@ -13,8 +13,8 @@
 - [REQ-018-assets-pin-v064/ticket.md](./REQ-018-assets-pin-v064/ticket.md) — Consume dotfiles-assets v0.6.4 (rofi/wlogout roles) | `done` | tag: v0.1.32 | live: rofi follows wallpaper
 - [REQ-014-cli-tools-manifest-source/ticket.md](./REQ-014-cli-tools-manifest-source/ticket.md) — `cli_tools`: consume the composition manifest as the single pin source | `done` | tag: v0.1.28 | live: tpr/runtime v0.5.0 installed from manifest
 - [REQ-015-assets-pin-v063/ticket.md](./REQ-015-assets-pin-v063/ticket.md) — Consume dotfiles-assets v0.6.3 (semantic-role icon mappings) | `done` | tag: v0.1.29 | live: assets v0.6.3, no colorN
-- [REQ-016-retire-csg/ticket.md](./REQ-016-retire-csg/ticket.md) — Retire CSG from provisioning; tpr is the sole palette producer | `in-progress` | worktree: .worktrees/REQ-016/ | branch: ticket/REQ-016-retire-csg
-- [REQ-017-ags-platform-v040/ticket.md](./REQ-017-ags-platform-v040/ticket.md) — Bump ags-platform pin to v0.4.0 (theme-provider Phase A) | `in-progress` | worktree: .worktrees/REQ-017/ | branch: ticket/REQ-017-ags-platform-v040
+- [REQ-016-retire-csg/ticket.md](./REQ-016-retire-csg/ticket.md) — Retire CSG from provisioning; tpr is the sole palette producer | `done` | tag: v0.1.30 | deployed PIN-0122
+- [REQ-017-ags-platform-v040/ticket.md](./REQ-017-ags-platform-v040/ticket.md) — Bump ags-platform pin to v0.4.0 (theme-provider Phase A) | `done` | tag: v0.1.31 | deployed PIN-0123
 - [REQ-019-ags-platform-v050/ticket.md](./REQ-019-ags-platform-v050/ticket.md) — Bump ags-platform pin to v0.5.0 (capture-cluster contract) | `done` | tag: v0.1.33 | worktree: .worktrees/REQ-019/ | branch: ticket/REQ-019-ags-platform-v050
 
 ## Bugs
@@ -41,6 +41,7 @@
 ## Ops tasks
 
 - [OPS-001-bootstrap-order-tpr-path](./OPS-001-bootstrap-order-tpr-path/ticket.md) — Fix bootstrap order and the tpr checkout path | `done` | worktree none, branch main | tag: v0.1.24
+- [OPS-002-index-status-sync](./OPS-002-index-status-sync/ticket.md) — Sync REQ-016/REQ-017 INDEX status with their shipped tags | `done` | worktree: .worktrees/OPS-002/ | branch: ticket/OPS-002-index-status-sync
 
 ## Spikes
 
