@@ -89,10 +89,33 @@ ags_apps_units_autostart_file: "{{ ags_apps_units_spine_config_dir }}/hypr/autos
 #   the lock). Provisioning start paths invoke this, never raw `ags run`.
 ags_apps_units_run_locked: "{{ ags_apps_units_bin_dir | trim }}/ags-run-locked"
 
+# ags_apps_units_ags_bin: the AGS executable the units exec and the ExecStop
+#   uses for `quit -i`. The package installs it at /usr/bin/ags; keep it a var
+#   so a test host (or a future distro path) overrides one value, not every
+#   unit/template.
+ags_apps_units_ags_bin: /usr/bin/ags
+
 # Bounded waits, matching the runtime's shared-lock contract (AD-28):
 # 10 s to acquire the launch lock, 10 s for the instance name to register.
 ags_apps_units_lock_timeout: 10
 ags_apps_units_register_timeout: 10
+
+# ── systemd --user supervision for always-on apps (REQ-023) ────────────────
+# Only `launch: always` entries get a unit. On-demand apps keep their launchers
+# and are never unit-ized.
+ags_apps_units_unit_prefix: dotfiles-ags
+ags_apps_units_unit_name: "{{ ags_apps_units_unit_prefix }}-{{ app.app }}.service"
+ags_apps_units_systemd_user_dir: >-
+  {{ ansible_facts.env.HOME | default(ansible_facts.user_dir) }}/.config/systemd/user
+ags_apps_units_unit_file: "{{ ags_apps_units_systemd_user_dir }}/{{ ags_apps_units_unit_name }}"
+# WantedBy=default.target means `systemctl --user enable` creates this link.
+# The manager-less path creates the same link directly (R-6).
+ags_apps_units_unit_wants_dir: "{{ ags_apps_units_systemd_user_dir }}/default.target.wants"
+ags_apps_units_unit_wants_link: "{{ ags_apps_units_unit_wants_dir }}/{{ ags_apps_units_unit_name }}"
+ags_apps_units_restart_sec: 2
+ags_apps_units_timeout_stop_sec: 10
+ags_apps_units_start_limit_interval_sec: 60
+ags_apps_units_start_limit_burst: 3
 
 # ags_apps_units_cutover: when true, on-demand standalone apps are also
 #   started during the run so the epoch can verify identity + handler, then

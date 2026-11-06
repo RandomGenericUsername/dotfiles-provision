@@ -82,6 +82,31 @@ Provisioning guarantees only the spine data and each AGS app's config dir +
 `$XDG_CONFIG_HOME` link, so a fresh install is green before the first
 reconcile; `verify` checks the pointers only when they exist.
 
+## Always-on AGS supervision (REQ-023)
+
+The two always-on apps are supervised `systemd --user` units, not raw
+`ags run` processes:
+
+| App | Unit | Instance | Config dir |
+| --- | --- | --- | --- |
+| bar | `dotfiles-ags-bar.service` | `ags` | `ags` |
+| notifications | `dotfiles-ags-notifications.service` | `notifications` | `ags-notifications` |
+
+`ags_apps_units` renders each unit from the one composition app list into
+`~/.config/systemd/user/`, enables it (a live manager uses
+`systemctl --user enable --now`; a manager-less run creates the
+`default.target.wants/` symlink and starts it at the next login), and starts it.
+On-demand apps keep their launchers and have no unit.
+
+`ExecStart` goes through the shared launch lock:
+`ags-run-locked --exec ... -- /usr/bin/ags run -d <install>/config/<configDir>`.
+`--exec` refuses a start when the expected instance is already on the bus (a
+delegated `ags run` would otherwise exit 0 and leave the `Restart=on-failure`
+unit inactive), then closes its flock fd (`9>&-`) and execs the real command in
+the foreground. `ExecStop` is `/usr/bin/ags quit -i <instance>`; no provisioning
+path kills the `ags run` parent. Provisioning checks the static unit contract;
+the runtime doctor owns live unit/PID/bus-owner/orphan checks (RFC §4.3).
+
 ## Install from a checkout (development)
 
 ```bash

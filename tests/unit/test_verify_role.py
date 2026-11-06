@@ -2488,8 +2488,8 @@ class TestVerifyVars:
         warn = next(
             t for t in tasks if "without Hyprland" in str(t.get("name", ""))
         )
-        assert "autostart" in str(warn.get("msg", warn)), (
-            "the skip must name the first-login autostart that launches them"
+        assert "systemd --user units" in str(warn.get("msg", warn)), (
+            "the skip must name the units that own the always-on apps"
         )
 
     def test_system_binaries_are_compositors(self) -> None:
@@ -2595,6 +2595,41 @@ class TestVerifyVars:
             "the autostart identity must appear exactly once (no duplicate process)"
         )
 
+    def test_verify_derives_the_always_on_apps_from_the_same_list(self) -> None:
+        tasks = _load_tasks()
+        derive = [
+            task
+            for task in tasks
+            if "verify_ags_always_on_apps" in str(task.get("ansible.builtin.set_fact", ""))
+        ]
+        assert derive, "verify must derive verify_ags_always_on_apps"
+        fact = str(derive[0]["ansible.builtin.set_fact"]["verify_ags_always_on_apps"])
+        assert "launch', 'equalto', 'always'" in fact
+        assert _vars()["verify_ags_always_on_apps"] == []
+
+    def test_verify_checks_the_static_unit_contract(self) -> None:
+        text = (_ROLES_DIR / "tasks" / "_verify_units.yml").read_text()
+        assert "ExecStop=" in text
+        assert "quit -i " in text
+        assert "--expect-instance " in text
+        assert "/usr/bin/ags run -d " in text
+        assert "WantedBy=default.target" in text
+        assert "Restart=on-failure" in text
+        assert "verify_ags_unit_wants_link" in text
+        assert "default.target.wants" in _vars()["verify_ags_units_wants_dir"]
+        # Live unit/PID/bus/orphan state belongs to the runtime doctor (RFC
+        # §4.3): this file must not run systemctl or read live PIDs.
+        assert "systemctl" not in text
+        main = (_ROLES_DIR / "tasks" / "main.yml").read_text()
+        assert "_verify_units.yml" in main
+
+    def test_unit_vars_derive_from_home_and_the_fixed_ags_bin(self) -> None:
+        data = _vars()
+        assert data["verify_ags_units_ags_bin"] == "/usr/bin/ags"
+        assert data["verify_ags_units_prefix"] == "dotfiles-ags"
+        assert "ansible_facts.env.HOME" in str(data["verify_ags_units_dir"])
+        assert str(data["verify_ags_units_wants_dir"]).endswith("default.target.wants")
+
     def test_vars_use_non_deprecated_env_fact(self) -> None:
         """F4 lock: vars read ansible_facts.env, never the deprecated top-level
         ansible_env fact (INJECT_FACTS_AS_VARS injection that hard-breaks on
@@ -2682,6 +2717,11 @@ class TestVerifyVars:
             "verify_ags_apps_units_autostart_file",
             "verify_ags_apps_units_colors_pointer",
             "verify_ags_apps_units_state_root",
+            # Fixed package path, not a user/spine path: AGS ships /usr/bin/ags
+            # and the unit's ExecStart/ExecStop must name it (REQ-023).
+            "verify_ags_units_ags_bin",
+            "verify_ags_units_dir",
+            "verify_ags_units_wants_dir",
             "verify_xdg_data_home",
             "verify_desktop_entry_files",
             "verify_assets_desktop_paths",
@@ -4705,6 +4745,37 @@ def _build_provisioned_layout(
     (install / "config" / "hypr" / "autostart.lua").write_text(
         (Path(__file__).resolve().parents[1] / "fixtures" / "ags-apps" / "autostart" / "v0.6.2.lua").read_text()
     )
+    # REQ-023: the two always-on apps are systemd --user units. verify checks
+    # the STATIC contract (file, enabled wants link, ExecStop, manifest
+    # identity); live unit/PID/bus state is the runtime doctor's job.
+    user_units = home / ".config" / "systemd" / "user"
+    wants = user_units / "default.target.wants"
+    wants.mkdir(parents=True)
+    for entry in app_fixture["apps"]:
+        if entry["launch"] != "always":
+            continue
+        unit_name = f"dotfiles-ags-{entry['app']}.service"
+        unit_file = user_units / unit_name
+        unit_file.write_text(
+            "[Unit]\n"
+            "PartOf=graphical-session.target\n"
+            "After=graphical-session.target\n"
+            "\n"
+            "[Service]\n"
+            "Type=simple\n"
+            f"ExecStart={home}/.local/bin/ags-run-locked --exec "
+            f"--expect-instance {entry['instance']} -- /usr/bin/ags run -d "
+            f"{install}/config/{entry['configDir']}\n"
+            f"ExecStop=/usr/bin/ags quit -i {entry['instance']}\n"
+            "Restart=on-failure\n"
+            "RestartSec=2\n"
+            "TimeoutStopSec=10\n"
+            "KillMode=mixed\n"
+            "\n"
+            "[Install]\n"
+            "WantedBy=default.target\n"
+        )
+        (wants / unit_name).symlink_to(unit_file)
 
     # NOTE: no palette fragments are placed (Epic 4 — the runtime seeder
     # owns the R2 consumer symlink, created above).

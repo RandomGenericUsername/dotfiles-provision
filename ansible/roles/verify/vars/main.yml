@@ -978,3 +978,18 @@ verify_ags_apps_units_state_root: >-
   {{ ansible_facts.env.XDG_STATE_HOME
      | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}
 verify_ags_apps_units_colors_pointer: "{{ verify_ags_apps_units_state_root }}/dotfiles/current/colors.gtk.css"
+
+# ── Always-on AGS supervision (REQ-023) ─────────────────────────────────────
+# The installer renders one systemd --user unit per `launch: always` entry.
+# verify checks the STATIC unit contract (file, enabled wants link, ExecStop,
+# manifest config/instance). Live unit/PID/bus-owner/orphan checks are the
+# runtime doctor leg (RFC §4.3), not duplicated here.
+verify_ags_units_ags_bin: /usr/bin/ags
+verify_ags_units_prefix: dotfiles-ags
+verify_ags_units_dir: >-
+  {{ ansible_facts.env.HOME | default(ansible_facts.user_dir) }}/.config/systemd/user
+verify_ags_units_wants_dir: "{{ verify_ags_units_dir }}/default.target.wants"
+# Static placeholder so an empty/legacy app list fails the non-empty guard
+# instead of silently passing; tasks/main.yml derives the real list from the
+# ONE composition app list (`launch: always`).
+verify_ags_always_on_apps: []

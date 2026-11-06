@@ -2,8 +2,8 @@
 # playbook for the generic per-app AGS installer.
 #
 # The role reads the composition's apps.yaml + program-tuple.yaml and acts only
-# on `owner: standalone` entries. With the current all-legacy composition it is
-# a no-op; the old ags-apps playbook remains the only owner until an entry flips.
+# on `owner: standalone` entries. It installs every app, and renders/enables the
+# systemd --user units for the `launch: always` subset (bar, notifications).
 #
 # User-scoped: NO become (everything lands under the user's install_dir).
 # Distro-agnostic: git clone + symlinks are identical on Arch and Debian-family.

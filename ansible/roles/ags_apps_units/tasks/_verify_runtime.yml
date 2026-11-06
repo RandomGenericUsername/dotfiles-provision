@@ -5,6 +5,25 @@
 #
 # The caller sets `app`, `ags_apps_units_started_this_run` and the path facts.
 
+# A unit start returns as soon as systemd has exec'd the command; the AGS name
+# registers a moment later. Bound the wait so a delegated/failed start still
+# fails the identity assert below instead of racing it.
+- name: "{{ app.app }} : wait for the instance to register on the AGS bus"
+  ansible.builtin.shell:
+    cmd: |
+      for _ in $(seq 1 50); do
+          if ags list 2>/dev/null | grep -qx "$AGS_INSTANCE"; then
+              exit 0
+          fi
+          sleep 0.2
+      done
+      exit 1
+    executable: /bin/bash
+  environment:
+    AGS_INSTANCE: "{{ app.instance }}"
+  changed_when: false
+  failed_when: false
+
 - name: "{{ app.app }} : list running AGS instances"
   ansible.builtin.command:
     cmd: ags list

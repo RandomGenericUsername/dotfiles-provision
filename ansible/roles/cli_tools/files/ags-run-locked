@@ -13,21 +13,37 @@
 # (holding it forever would deadlock the login sequence). The app runs in the
 # background with the lock fd closed, so a later wrapper can start the next app.
 #
+# --exec (systemd --user units; REQ-023). Acquire the same shared lock, REFUSE a
+# start when the expected instance is already on the bus (systemd would see
+# `ags run` delegate and exit 0, leaving the Restart=on-failure unit inactive),
+# then close fd 9 and `exec` the supplied command in the foreground. The unit's
+# ExecStart passes the real command after `--`, e.g.
+#   ags-run-locked --exec --expect-instance ags -- /usr/bin/ags run -d ...
+# Closing fd 9 BEFORE the exec is mandatory: an inherited lock would be held for
+# the app's whole lifetime and deadlock every later launch (AD-28).
+#
 # USAGE
 #   ags-run-locked [--expect-instance NAME] [--lock-timeout SEC]
-#                  [--register-timeout SEC] [--] <ags run args...>
+#                  [--register-timeout SEC] [--exec] [--] <ags run args...>
+#   ags-run-locked --exec --expect-instance NAME [options] -- <command...>
 #
 # `--expect-instance` is the app-list/manifest instance name. Without it the
 # wrapper treats any new name on `ags list` as registration. A non-zero exit
-# means the lock timed out, `ags run` failed, or the name never registered.
+# means the lock timed out, `ags run` failed, the name never registered, or (in
+# --exec mode) the expected instance was already running.
 set -uo pipefail
 
 expect_instance=""
 lock_timeout="${AGS_LAUNCH_LOCK_TIMEOUT:-10}"
 register_timeout="${AGS_LAUNCH_REGISTER_TIMEOUT:-10}"
+exec_mode=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --exec)
+            exec_mode=1
+            shift
+            ;;
         --expect-instance)
             expect_instance="${2:-}"
             shift 2 || shift
@@ -68,8 +84,26 @@ list_instances() {
 
 before="$(list_instances)"
 if [ -n "$expect_instance" ] && printf '%s\n' "$before" | grep -qx "$expect_instance"; then
-    # Already running: `ags run` would delegate (exit 0). Nothing to bundle.
+    if [ "$exec_mode" -eq 1 ]; then
+        # REQ-023: a unit must not be handed a delegated start. `ags run`
+        # would exit 0 here (nothing to bundle), systemd would mark the unit
+        # inactive, and Restart=on-failure would never fire.
+        echo "ags-run-locked: '$expect_instance' is already running; refusing a delegated --exec start (the unit would go inactive)" >&2
+        exit 1
+    fi
+    # Background mode: `ags run` would delegate (exit 0). Nothing to bundle.
     exit 0
+fi
+
+if [ "$exec_mode" -eq 1 ]; then
+    if [ "$#" -eq 0 ]; then
+        echo "ags-run-locked: --exec requires a command after --" >&2
+        exit 2
+    fi
+    # Foreground exec so systemd tracks the real process. 9>&- closes the
+    # inherited flock descriptor; without it the app would hold the launch
+    # lock for its entire lifetime.
+    exec "$@" 9>&-
 fi
 
 setsid ags run "$@" 9>&- </dev/null >/dev/null 2>&1 &
@@ -104,6 +138,15 @@ while [ "$SECONDS" -lt "$deadline" ]; do
 done
 
 echo "ags-run-locked: '${expect_instance:-new instance}' did not register on the AGS bus within ${register_timeout}s" >&2
-kill "$child" 2>/dev/null || true
+# Graceful cleanup only: never kill the `ags run` parent (RFC §4.2) — a killed
+# wrapper can orphan a gjs child that still owns the bus name. Quit by instance
+# name when known, then give the wrapper a bounded moment to leave on its own.
+if [ -n "$expect_instance" ]; then
+    ags quit -i "$expect_instance" >/dev/null 2>&1 || true
+fi
+for _ in $(seq 1 10); do
+    kill -0 "$child" 2>/dev/null || break
+    sleep 0.2
+done
 wait "$child" 2>/dev/null || true
 exit 1

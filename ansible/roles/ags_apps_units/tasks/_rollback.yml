@@ -1,8 +1,9 @@
 # Rollback one standalone app to its previous owner state (AD-32 step 6).
 #
 # Restores exactly the surfaces captured before the cutover and restarts the
-# previous instance when it was running. The immutable tag is never modified:
-# rollback is a link repoint plus an external process start.
+# previous instance when it was running: an always-on app through its systemd
+# --user unit, an on-demand app through the shared launch lock. The immutable
+# tag is never modified: rollback is a link repoint plus an external start.
 
 - name: "{{ app.app }} : ROLLBACK — quiesce the new instance"
   ansible.builtin.include_tasks: _quiesce.yml
@@ -83,7 +84,25 @@
     - app.launcher is defined
     - not (ags_apps_units_previous_launcher.stat.exists | default(false))
 
-- name: "{{ app.app }} : ROLLBACK — restart the previous instance when it was running"
+# REQ-023: always-on apps have ONE owner — their systemd unit. A rollback
+# restarts them through systemd (which runs the same ExecStart/ExecStop), never
+# through a raw wrapper process that would escape supervision.
+- name: "{{ app.app }} : ROLLBACK — restart the previous always-on unit when it was running"
+  ansible.builtin.systemd:
+    name: "{{ ags_apps_units_unit_name }}"
+    scope: user
+    daemon_reload: true
+    state: restarted
+  register: ags_apps_units_rollback_unit_start
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - app.launch == 'always'
+    - ags_apps_units_manager_probe.rc | default(1) == 0
+    - ags_apps_units_was_running | default(false)
+    - ags_apps_units_previous_spine_target | default('') | length > 0
+
+- name: "{{ app.app }} : ROLLBACK — restart an on-demand previous instance when it was running"
   ansible.builtin.command:
     argv:
       - "{{ ags_apps_units_run_locked }}"
@@ -102,6 +121,7 @@
   failed_when: false
   when:
     - not ansible_check_mode
+    - app.launch == 'on-demand'
     - ags_apps_units_was_running | default(false)
     - ags_apps_units_previous_spine_target | default('') | length > 0
 

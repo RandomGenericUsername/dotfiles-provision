@@ -135,6 +135,11 @@
          | selectattr('owner', 'equalto', 'standalone')
          | selectattr('launch', 'equalto', 'always')
          | map(attribute='instance') | list }}
+    verify_ags_always_on_apps: >-
+      {{ verify_ags_apps_document.apps
+         | selectattr('owner', 'equalto', 'standalone')
+         | selectattr('launch', 'equalto', 'always')
+         | list }}
 
 - name: Assert every AGS app is standalone and the surfaces are unique
   ansible.builtin.assert:
@@ -1203,9 +1208,10 @@
 - name: Warn when the AGS gate is skipped without Hyprland
   ansible.builtin.debug:
     msg: >-
-      no Hyprland IPC in this session — the bar and notifications overlay
-      start at first Hyprland login via autostart.lua; the always-on AGS gate
-      below is skipped meanwhile.
+      no Hyprland IPC in this session — the bar and notifications overlay are
+      systemd --user units (dotfiles-ags-bar.service /
+      dotfiles-ags-notifications.service) that start at the next graphical
+      login; the always-on AGS gate below is skipped meanwhile.
   when: not ansible_check_mode and verify_hyprland_check.rc != 0
 
 - name: List running AGS instances
@@ -1226,12 +1232,12 @@
          | length) == 0)
     fail_msg: >-
       not running: {{ verify_ags_always_on_instances | join(', ') }} — a
-      provision run must leave the session's always-on AGS instances up. The
-      gui_tools role quits every instance to re-bundle its sources, then
-      restarts this subset (start-if-down, detached); run the gui-tools
-      playbook. Without the notifications overlay nothing owns
-      org.freedesktop.Notifications (dunst is masked on purpose) and every
-      notification is dropped silently
+      provision run must leave the session's always-on AGS instances up.
+      dotfiles-ags-bar.service / dotfiles-ags-notifications.service are the
+      ONE owner of those instances; start them with
+      `systemctl --user start`, never a raw `ags run`. Without the
+      notifications overlay nothing owns org.freedesktop.Notifications (dunst
+      is masked on purpose) and every notification is dropped silently
   when: not ansible_check_mode
 
 # "Show in folder" opens a DIRECTORY through xdg-open, so the desktop default
@@ -2027,6 +2033,19 @@
   when:
     - not ansible_check_mode
     - verify_ags_standalone_apps | default([]) | length > 0
+
+# REQ-023: the always-on apps are owned by systemd --user units. This is the
+# STATIC contract only; the runtime doctor owns live unit/PID/bus/orphan state
+# (RFC §4.3).
+- name: Verify each always-on app's systemd --user unit contract
+  ansible.builtin.include_tasks: _verify_units.yml
+  loop: "{{ verify_ags_always_on_apps | default([]) }}"
+  loop_control:
+    loop_var: app
+    label: "{{ app.app }}"
+  when:
+    - not ansible_check_mode
+    - verify_ags_always_on_apps | default([]) | length > 0
 
 # verify_gui_tools_app_files is EMPTY since slice 8 (the last per-file app moved
 # into the ags-apps unit), so this pair is a no-op on a stock install. It stays

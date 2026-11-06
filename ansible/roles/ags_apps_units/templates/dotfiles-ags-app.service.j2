@@ -1,0 +1,33 @@
+[Unit]
+Description=dotfiles AGS {{ app.app }} (instance {{ app.instance }})
+# Session-scoped: the app needs the user bus and the graphical session. The
+# unit is enabled into the user default target so it also starts for sessions
+# that do not import graphical-session.target explicitly (R-6).
+PartOf=graphical-session.target
+After=graphical-session.target
+# Start limits are [Unit] directives (systemd.unit(5)); backoff + limits keep a
+# persistent failure from hot-looping instead of silently pinning the unit.
+StartLimitIntervalSec={{ ags_apps_units_start_limit_interval_sec }}
+StartLimitBurst={{ ags_apps_units_start_limit_burst }}
+
+[Service]
+Type=simple
+# The shared launch-lock wrapper acquires the serialized AGS lock, refuses an
+# already-running instance (so a delegated `ags run` exit 0 becomes a unit
+# failure instead of a silent inactive unit), closes its flock fd (9>&-) and
+# execs the real command in the foreground for systemd to track.
+ExecStart={{ ags_apps_units_run_locked }} --exec --expect-instance {{ app.instance }} --lock-timeout {{ ags_apps_units_lock_timeout }} --register-timeout {{ ags_apps_units_register_timeout }} -- {{ ags_apps_units_ags_bin }} run -d {{ ags_apps_units_spine_link }}
+# Graceful D-Bus quit. NEVER kill the `ags run` parent (RFC §4.2): killing the
+# wrapper can orphan a gjs child that still owns the bus name.
+ExecStop={{ ags_apps_units_ags_bin }} quit -i {{ app.instance }}
+# Frozen policy: a crash/non-zero/failed startup restarts; a clean stop does
+# not. The delegated-exit guard above turns delegation into a failure.
+Restart=on-failure
+RestartSec={{ ags_apps_units_restart_sec }}
+# Bounded graceful stop; KillMode=mixed lets systemd reap the whole cgroup
+# only after ExecStop has had its chance to release the bus name (R-7).
+TimeoutStopSec={{ ags_apps_units_timeout_stop_sec }}
+KillMode=mixed
+
+[Install]
+WantedBy=default.target

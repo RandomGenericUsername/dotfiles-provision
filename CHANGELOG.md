@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.37
+
+Supervise the two always-on AGS apps with systemd `--user` units (REQ-023).
+
+- `ags_apps_units` now renders `dotfiles-ags-bar.service` and
+  `dotfiles-ags-notifications.service` from the one composition app list into
+  `~/.config/systemd/user/`. `launch: always` selects the units; the unit's
+  `configDir`/`instance` come straight from the manifest. On-demand apps keep
+  their launchers and are never unit-ized.
+- Units use `Type=simple`, `ExecStart` via the shared launch lock,
+  `ExecStop=/usr/bin/ags quit -i <instance>`, `Restart=on-failure`,
+  `RestartSec=2`, `TimeoutStopSec=10`, `KillMode=mixed`,
+  `After=graphical-session.target` and `WantedBy=default.target`.
+- The installer enables and starts each unit when a live `systemctl --user`
+  manager exists; without one it creates the `default.target.wants/` symlink
+  (R-6) and verify/doctor is the loud check. The previous raw always-on start
+  is gone, and rollback restarts an always-on previous instance through its
+  unit.
+- `ags-run-locked` gains `--exec`: acquire the shared lock, refuse an
+  already-running expected instance (non-zero, so a delegated `ags run` exit 0
+  becomes a unit failure), close the flock fd (`9>&-`) and exec the real
+  command in the foreground. The existing background/register-and-exit mode is
+  unchanged.
+- `verify` asserts the static unit contract: both files exist, the enabled
+  wants link exists, `ExecStop` uses `ags quit -i`, and the unit's config path
+  and instance match the app list. Live unit/PID/bus-owner/orphan checks are
+  handed to the runtime doctor (RFC §4.3).
+
 ## 0.1.36
 
 Mirror `ags-platform` v0.8.0 in the engine pins (REQ-022).

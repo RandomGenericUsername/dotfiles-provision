@@ -1,0 +1,66 @@
+# Verify one always-on app's systemd --user unit contract (REQ-023).
+# READ-ONLY. The caller sets `app` from the composition app list.
+#
+# This is the STATIC contract the installer renders. Live unit state (is-active,
+# MainPID, bus owner in the unit cgroup, orphan detection) belongs to the
+# runtime doctor leg (RFC §4.3) and is deliberately not duplicated here.
+
+- name: "{{ app.app }} : materialize the expected unit paths"
+  ansible.builtin.set_fact:
+    verify_ags_unit_name: "{{ verify_ags_units_prefix }}-{{ app.app }}.service"
+    verify_ags_unit_file: "{{ verify_ags_units_dir }}/{{ verify_ags_units_prefix }}-{{ app.app }}.service"
+    verify_ags_unit_wants_link: "{{ verify_ags_units_wants_dir }}/{{ verify_ags_units_prefix }}-{{ app.app }}.service"
+    verify_ags_unit_config_dir: "{{ verify_ags_apps_units_spine_config_dir }}/{{ app.configDir }}"
+
+- name: "{{ app.app }} : stat the unit, its enabled link and resolved targets"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ verify_ags_unit_file }}"
+    - "{{ verify_ags_unit_wants_link }}"
+  register: verify_ags_unit_links
+
+- name: "{{ app.app }} : resolve the enabled link target"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_unit_wants_link }}"
+    follow: true
+  register: verify_ags_unit_wants_target
+
+- name: "{{ app.app }} : read the installed unit"
+  ansible.builtin.slurp:
+    src: "{{ verify_ags_unit_file }}"
+  register: verify_ags_unit_raw
+
+- name: "{{ app.app }} : assert the unit is installed, enabled and manifest-matched"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_unit_links.results[0].stat.isreg
+      - verify_ags_unit_links.results[1].stat.islnk
+      - verify_ags_unit_links.results[1].stat.lnk_target is search(verify_ags_unit_name ~ '$')
+      - verify_ags_unit_wants_target.stat.exists
+      - verify_ags_unit_wants_target.stat.isreg
+      - "'PartOf=graphical-session.target' in verify_ags_unit_text"
+      - "'After=graphical-session.target' in verify_ags_unit_text"
+      - "'ExecStart=' ~ verify_ags_apps_units_run_locked in verify_ags_unit_text"
+      - "'--exec' in verify_ags_unit_text"
+      - "'--expect-instance ' ~ app.instance in verify_ags_unit_text"
+      - "'/usr/bin/ags run -d ' ~ verify_ags_unit_config_dir in verify_ags_unit_text"
+      - "'ExecStop=' ~ verify_ags_units_ags_bin ~ ' quit -i ' ~ app.instance in verify_ags_unit_text"
+      - "'Restart=on-failure' in verify_ags_unit_text"
+      - "'RestartSec=' in verify_ags_unit_text"
+      - "'TimeoutStopSec=' in verify_ags_unit_text"
+      - "'KillMode=mixed' in verify_ags_unit_text"
+      - "'WantedBy=default.target' in verify_ags_unit_text"
+      - verify_ags_unit_config_dir == verify_ags_apps_units_spine_config_dir ~ '/' ~ app.configDir
+    fail_msg: >-
+      {{ app.app }}'s always-on systemd --user unit is missing or violates the
+      REQ-023 contract: expected {{ verify_ags_unit_file }} installed and
+      enabled through {{ verify_ags_unit_wants_link }}, ExecStart via
+      {{ verify_ags_apps_units_run_locked }} --exec ... /usr/bin/ags run -d
+      {{ verify_ags_unit_config_dir }} (the manifest's configDir), and
+      ExecStop={{ verify_ags_units_ags_bin }} quit -i {{ app.instance }}.
+      The ags_apps_units role owns the unit; re-run the ags-apps-units
+      playbook. Live unit/PID/bus/orphan checks belong to the runtime doctor.
+  vars:
+    verify_ags_unit_text: "{{ verify_ags_unit_raw.content | b64decode }}"

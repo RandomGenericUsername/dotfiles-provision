@@ -26,6 +26,8 @@
       {{ ags_apps_units_install_root ~ '/' ~ app.installDir ~ '/.rollback/' ~ app.launcher
          if app.launcher is defined else '' }}
     ags_apps_units_log_file: "{{ ags_apps_units_state_root }}/ags/{{ app.instance }}.log"
+    ags_apps_units_unit_file: "{{ ags_apps_units_systemd_user_dir }}/{{ ags_apps_units_unit_name }}"
+    ags_apps_units_unit_wants_link: "{{ ags_apps_units_unit_wants_dir }}/{{ ags_apps_units_unit_name }}"
     ags_apps_units_started_this_run: false
 
 - name: "{{ app.app }} : capture the pre-cutover running state"
@@ -216,7 +218,68 @@
         - not ansible_check_mode
         - (app.launch == 'always') or (ags_apps_units_cutover | bool)
 
-    - name: "{{ app.app }} : start the new instance through the shared launch lock"
+    # REQ-023: the two always-on apps are supervised by systemd --user. The
+    # installer renders/enables the unit and starts it; it never starts them
+    # through the raw wrapper path. On-demand cutover proofs keep the wrapper.
+    - name: "{{ app.app }} : ensure the user systemd unit directory exists"
+      ansible.builtin.file:
+        path: "{{ ags_apps_units_systemd_user_dir }}"
+        state: directory
+        mode: "0755"
+      when: app.launch == 'always'
+
+    - name: "{{ app.app }} : ensure the default.target wants directory exists"
+      ansible.builtin.file:
+        path: "{{ ags_apps_units_unit_wants_dir }}"
+        state: directory
+        mode: "0755"
+      when: app.launch == 'always'
+
+    - name: "{{ app.app }} : render the always-on systemd --user unit"
+      ansible.builtin.template:
+        src: dotfiles-ags-app.service.j2
+        dest: "{{ ags_apps_units_unit_file }}"
+        mode: "0644"
+      when: app.launch == 'always'
+
+    - name: "{{ app.app }} : clear a previous start-limit failure on the unit"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - reset-failed
+          - "{{ ags_apps_units_unit_name }}"
+      changed_when: false
+      failed_when: false
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : reload, enable and start the always-on unit"
+      ansible.builtin.systemd:
+        name: "{{ ags_apps_units_unit_name }}"
+        scope: user
+        daemon_reload: true
+        enabled: true
+        state: started
+      register: ags_apps_units_unit_start
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : enable the always-on unit without a live manager (R-6)"
+      ansible.builtin.file:
+        src: "{{ ags_apps_units_unit_file }}"
+        dest: "{{ ags_apps_units_unit_wants_link }}"
+        state: link
+        force: true
+      when:
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) != 0
+
+    - name: "{{ app.app }} : start an on-demand cutover proof through the launch lock"
       ansible.builtin.command:
         argv:
           - "{{ ags_apps_units_run_locked }}"
@@ -235,14 +298,24 @@
       register: ags_apps_units_start
       when:
         - not ansible_check_mode
-        - (app.launch == 'always') or (ags_apps_units_cutover | bool)
+        - app.launch == 'on-demand'
+        - ags_apps_units_cutover | bool
 
-    - name: "{{ app.app }} : record that this run started the instance"
+    - name: "{{ app.app }} : record that this run started the always-on unit"
       ansible.builtin.set_fact:
         ags_apps_units_started_this_run: true
       when:
         - not ansible_check_mode
-        - (app.launch == 'always') or (ags_apps_units_cutover | bool)
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : record that this run started the on-demand proof"
+      ansible.builtin.set_fact:
+        ags_apps_units_started_this_run: true
+      when:
+        - not ansible_check_mode
+        - app.launch == 'on-demand'
+        - ags_apps_units_cutover | bool
 
     - name: "{{ app.app }} : verify the running identity, handler and ownership surfaces"
       ansible.builtin.include_tasks: _verify_runtime.yml

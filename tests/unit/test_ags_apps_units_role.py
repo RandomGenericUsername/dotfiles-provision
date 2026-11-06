@@ -395,6 +395,90 @@ class TestLauncherTemplate:
             assert needle in verify_one, f"verify mirror misses {needle!r}"
 
 
+class TestAlwaysOnUnits:
+    """REQ-023: the two always-on apps are systemd --user units."""
+
+    @staticmethod
+    def _all_nested_tasks(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        flattened: list[dict[str, Any]] = []
+        for task in tasks:
+            flattened.append(task)
+            for key in ("block", "rescue", "always"):
+                if isinstance(task.get(key), list):
+                    flattened.extend(TestAlwaysOnUnits._all_nested_tasks(task[key]))
+        return flattened
+
+    def test_role_renders_enables_and_starts_always_on_units(self) -> None:
+        one = self._all_nested_tasks(_tasks_file("_one.yml"))
+        text = (_ROLE / "tasks" / "_one.yml").read_text()
+        assert "dotfiles-ags-app.service.j2" in text
+        assert "ags_apps_units_unit_file" in text
+        assert "ags_apps_units_unit_wants_link" in text
+        assert "default.target.wants" in (_ROLE / "vars" / "main.yml").read_text()
+        systemd_tasks = [
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.systemd"
+        ]
+        assert len(systemd_tasks) == 1, "expected one enable/start unit task"
+        module = _module(systemd_tasks[0])
+        assert module.get("enabled") is True
+        assert module.get("state") == "started"
+        assert module.get("scope") == "user"
+        when = " ".join(str(clause) for clause in systemd_tasks[0].get("when", []))
+        assert "app.launch == 'always'" in when
+
+        template_tasks = [
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.template"
+            and _module(task).get("src") == "dotfiles-ags-app.service.j2"
+        ]
+        assert len(template_tasks) == 1
+        assert "app.launch == 'always'" in str(template_tasks[0].get("when"))
+
+    def test_no_raw_always_on_start_remains(self) -> None:
+        one = self._all_nested_tasks(_tasks_file("_one.yml"))
+        raw_start = [
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and "ags_apps_units_run_locked" in str(_module(task).get("argv", []))
+        ]
+        assert len(raw_start) == 1, "expected only the on-demand cutover start"
+        when = " ".join(str(clause) for clause in raw_start[0].get("when", []))
+        assert "app.launch == 'on-demand'" in when
+        assert "app.launch == 'always'" not in when
+
+    def test_rollback_uses_the_unit_for_always_on_apps(self) -> None:
+        rollback = _tasks_file("_rollback.yml")
+        unit_restart = [
+            task
+            for task in rollback
+            if _module_key(task) == "ansible.builtin.systemd"
+        ]
+        assert len(unit_restart) == 1
+        when = " ".join(str(clause) for clause in unit_restart[0].get("when", []))
+        assert "app.launch == 'always'" in when
+        raw_restart = [
+            task
+            for task in rollback
+            if _module_key(task) == "ansible.builtin.command"
+            and "ags_apps_units_run_locked" in str(_module(task).get("argv", []))
+        ]
+        assert len(raw_restart) == 1
+        when = " ".join(str(clause) for clause in raw_restart[0].get("when", []))
+        assert "app.launch == 'on-demand'" in when
+
+    def test_unit_vars_pin_the_frozen_policy(self) -> None:
+        data = yaml.safe_load((_ROLE / "vars" / "main.yml").read_text())
+        assert data["ags_apps_units_ags_bin"] == "/usr/bin/ags"
+        assert data["ags_apps_units_restart_sec"] == 2
+        assert data["ags_apps_units_timeout_stop_sec"] == 10
+        assert data["ags_apps_units_unit_prefix"] == "dotfiles-ags"
+        assert data["ags_apps_units_unit_name"] == "{{ ags_apps_units_unit_prefix }}-{{ app.app }}.service"
+
+
 # ── GUI-free execution harness ──────────────────────────────────────────────
 
 
@@ -507,6 +591,19 @@ esac
 def _write_wrapper(bin_dir: Path) -> None:
     shutil.copy(_ROLES_DIR / "cli_tools" / "files" / "ags-run-locked", bin_dir / "ags-run-locked")
     (bin_dir / "ags-run-locked").chmod(0o755)
+
+
+def _force_managerless(bin_dir: Path) -> None:
+    """Make the role's `systemctl --user` probe deterministic.
+
+    These tests exercise the manager-less enablement path (the R-6 case): the
+    unit is rendered and linked into default.target.wants, but nothing calls a
+    real user manager. A stub that always fails keeps a developer's live
+    session out of the test and avoids starting real units on the host.
+    """
+    path = bin_dir / "systemctl"
+    path.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+    path.chmod(0o755)
 
 
 def _make_app_repo(
@@ -628,6 +725,7 @@ def _run_role(
         path.mkdir(exist_ok=True)
     _fake_ags(bin_dir)
     _write_wrapper(bin_dir)
+    _force_managerless(bin_dir)
     registry = tmp_path / "fake-ags-registry"
     env = dict(
         os.environ,
@@ -765,12 +863,29 @@ class TestRoleExecution:
             )
             assert (bar_unit / "icons.json").read_bytes() == bar_icons.encode()
 
-            # Always-on apps remain on the bus; every on-demand app was started
-            # for the cutover proof and stopped again.
-            assert sorted(Path(paths["registry"]).read_text().splitlines()) == [
-                "ags",
-                "notifications",
-            ]
+            # REQ-023: always-on apps are systemd --user units. This harness
+            # forces the manager-less path, so the units are installed and
+            # enabled (wants link) but not started; no raw wrapper launch may
+            # leave them on the bus. Every on-demand app was started for the
+            # cutover proof and stopped again.
+            user_units = Path(paths["home"]) / ".config" / "systemd" / "user"
+            for unit_name, config_dir in (
+                ("dotfiles-ags-bar.service", "ags"),
+                ("dotfiles-ags-notifications.service", "ags-notifications"),
+            ):
+                unit_file = user_units / unit_name
+                wants = user_units / "default.target.wants" / unit_name
+                assert unit_file.is_file(), unit_name
+                assert wants.is_symlink(), unit_name
+                assert os.readlink(wants) == str(unit_file)
+                text = unit_file.read_text()
+                assert "--exec" in text
+                assert f"/usr/bin/ags run -d {install}/config/{config_dir}" in text
+                assert "ExecStop=/usr/bin/ags quit -i " in text
+            assert (
+                not Path(paths["registry"]).exists()
+                or Path(paths["registry"]).read_text().strip() == ""
+            ), "manager-less install must not raw-start an always-on app"
             # No legacy monorepo surface was created by any role.
             assert not (install / "ags-apps").exists()
             assert not (install / "config" / "ags-hypr-pano").exists()
