@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.35
+
+Consume `dotfiles-assets` v0.11.0 (per-app skin templates).
+
+- Every `*_assets_pinned_tag` mirror and the composition fixture
+  (`assets.yaml` tag + checkout sources, `program-tuple.yaml`) move to
+  **v0.11.0**.
+- v0.11.0 adds six per-app GTK templates beside the bar template:
+  `ags-clipboard`, `ags-notifications`, `ags-wallpaper-selector`,
+  `ags-capture`, `ags-icme` and `ags-btop-studio`. The `skins` class now ships
+  seven `<configDir>.gtk.css.j2` files; the manifests, contracts/PIN and local
+  `schema.json` bytes are otherwise unchanged (contracts stay at v0.6.0).
+- `assets` keeps mirroring the `skins/` class to `<install>/skins` as data
+  only. The class map and manifest reader still accept the sixth `skins`
+  class with the new tag.
+- `verify` now checks all seven deployed templates, not just `ags`: every file
+  is non-empty, carries `{{SKIN_` placeholders, and every placeholder maps to
+  one of the 24 frozen v1 tokens. Each manifest must carry all 24 tokens
+  (including `hairline-w`), so every placeholder resolves on glass/flat/paper.
+  The manifest presence check now tolerates a missing path cleanly instead of
+  erroring on a missing `stat` attribute. The vendored contracts still re-hash
+  against `contracts/PIN` v0.6.0.
+- Runtime-owned `config/<configDir>/skin.{css,json}` checks remain
+  optional-when-present, so a fresh install is green before the first
+  reconcile.
+
 ## 0.1.34
 
 Deploy the assets skin plane into the spine (REQ-020).

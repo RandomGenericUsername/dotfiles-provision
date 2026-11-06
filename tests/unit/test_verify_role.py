@@ -271,11 +271,12 @@ _SKIN_CONTRACT_BODIES = {
 
 
 def _skin_manifest_body(name: str) -> str:
-    """A minimal v1-shape manifest: schema_major, name and the six groups."""
+    """A minimal v1-shape manifest: schema_major, name and the 24 tokens."""
     return (
         "schema_major = 1\n"
         f'name = "{name}"\n\n'
-        "[shape]\nradius-panel = 12\nborder-w = 1.5\nhairline-w = 1\n\n"
+        "[shape]\nradius-panel = 12\nradius-card = 9\nradius-cell = 7\n"
+        "radius-pill = 20\nborder-w = 1.5\nhairline-w = 1\n\n"
         "[rhythm]\ngap = 8\ncell-pad = \"8px 9px\"\n\n"
         "[surface]\nbg-panel = \"transparent\"\nbg-card = \"transparent\"\n"
         "border = \"transparent\"\nshadow = \"none\"\nblur = \"none\"\n\n"
@@ -287,8 +288,19 @@ def _skin_manifest_body(name: str) -> str:
     )
 
 
+_SKIN_TEMPLATE_FILES = (
+    "ags.gtk.css.j2",
+    "ags-clipboard.gtk.css.j2",
+    "ags-notifications.gtk.css.j2",
+    "ags-wallpaper-selector.gtk.css.j2",
+    "ags-capture.gtk.css.j2",
+    "ags-icme.gtk.css.j2",
+    "ags-btop-studio.gtk.css.j2",
+)
+
+
 def _write_deployed_skins(spine: Path) -> None:
-    """Materialize the deployed <spine>/skins data verify reads (REQ-020)."""
+    """Materialize the deployed <spine>/skins data verify reads (REQ-020/021)."""
     skins = spine / "skins"
     manifests = skins / "manifests"
     templates = skins / "templates"
@@ -297,9 +309,10 @@ def _write_deployed_skins(spine: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
     for name in ("glass", "flat", "paper"):
         (manifests / f"{name}.toml").write_text(_skin_manifest_body(name))
-    (templates / "ags.gtk.css.j2").write_text(
-        ".skin { border-radius: {{SKIN_RADIUS_PANEL}}px; }\n"
-    )
+    for template in _SKIN_TEMPLATE_FILES:
+        (templates / template).write_text(
+            ".skin { border-radius: {{SKIN_RADIUS_PANEL}}px; }\n"
+        )
     (skins / "schema.json").write_text('{"schema_major": 1}\n')
     pin_lines = ["contracts=v0.6.0\n"]
     for name, body in _SKIN_CONTRACT_BODIES.items():
@@ -1707,6 +1720,7 @@ class TestVerifyVars:
         "verify_skins_schema_file",
         "verify_skins_manifest_paths",
         "verify_skins_template_paths",
+        "verify_skins_token_names",
         "verify_skins_contract_paths",
         "verify_skins_consumer_pointer_names",
         "verify_assets_configs_dirs",
@@ -1771,6 +1785,26 @@ class TestVerifyVars:
         assert len(dirs) == 6
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
+
+    def test_skins_pin_is_v011_with_seven_templates(self) -> None:
+        """REQ-021: v0.11.0 ships the bar template plus six per-app targets."""
+        data = _vars()
+        assert str(data["verify_assets_pinned_tag"]) == "v0.11.0"
+        assert str(data["verify_skins_expected_contract_tag"]) == "v0.6.0"
+        assert [str(item) for item in data["verify_skins_template_files"]] == [
+            "ags.gtk.css.j2",
+            "ags-clipboard.gtk.css.j2",
+            "ags-notifications.gtk.css.j2",
+            "ags-wallpaper-selector.gtk.css.j2",
+            "ags-capture.gtk.css.j2",
+            "ags-icme.gtk.css.j2",
+            "ags-btop-studio.gtk.css.j2",
+        ]
+        assert "verify_skins_templates_dir" in str(
+            data["verify_skins_template_paths"]
+        )
+        assert len(data["verify_skins_token_names"]) == 24
+        assert "hairline-w" in data["verify_skins_token_names"]
 
     def test_wlogout_legacy_template_path_is_the_spine_residue(self) -> None:
         """S3: the probe points at the SPINE copy a pre-S3 `config_copies` run left
@@ -2968,8 +3002,9 @@ _SKIN_VERIFY_TASK_NAMES = (
     "Assert the deployed skin plane data has the pinned types",
     "Read the deployed skin manifests",
     "Assert the deployed skin manifests have the pinned v1 shape",
-    "Read the deployed skin template",
-    "Assert the deployed skin template carries the token placeholders",
+    "Assert the deployed skin manifests carry every frozen token",
+    "Read the deployed skin templates",
+    "Assert every deployed skin template carries resolvable token placeholders",
     "Stat the deployed vendored skin contracts with sha256 checksums",
     "Read the deployed skin contracts PIN",
     "Assert the deployed skin contracts match the PIN tag and sha256 values",
@@ -3031,6 +3066,34 @@ class TestVerifySkinPlane:
         assert result.returncode == 0, output
         assert "changed=0" in output
         assert "failed=0" in output
+
+    def test_skin_plane_rejects_a_missing_per_app_template(
+        self, tmp_path: Path
+    ) -> None:
+        """REQ-021: all seven <configDir> templates must be deployed."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        (install / "skins" / "templates" / "ags-clipboard.gtk.css.j2").unlink()
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a missing per-app template must fail verify"
+        assert "deployed skin plane" in output, output
+        assert "incomplete" in output, output
+
+    def test_skin_plane_rejects_a_tampered_template(self, tmp_path: Path) -> None:
+        """A template placeholder that names no frozen token must fail verify."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        template = install / "skins" / "templates" / "ags-capture.gtk.css.j2"
+        template.write_text(".capture { color: {{SKIN_NOT_A_TOKEN}}; }\n")
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "an unknown placeholder must fail verify"
+        assert "placeholder" in output, output
 
     def test_skin_plane_rejects_a_tampered_contract(self, tmp_path: Path) -> None:
         """A vendored contract byte change must fail the PIN hash gate."""

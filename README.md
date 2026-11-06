@@ -70,17 +70,17 @@ dotfiles-provision apply -e runtime_palette_producer=tpr
 # or export RUNTIME_PALETTE_PRODUCER=tpr for the run
 ```
 
-## Skin plane (REQ-020)
+## Skin plane (REQ-020, REQ-021)
 
 The `assets` role mirrors the pinned `dotfiles-assets` `skins/` class to
 `<install>/skins` — the runtime's first skin root, ahead of `<install>/config/skins`
 and the `<install>/assets/<tag>/skins` checkout. The copy is data only
-(manifests, templates, the vendored `contracts/` + PIN and `schema.json`); the
-runtime derives, caches and reconciles skins, and owns
-`config/<configDir>/skin.css` / `skin.json`. Provisioning guarantees only the
-spine data and each AGS app's config dir + `$XDG_CONFIG_HOME` link, so a fresh
-install is green before the first reconcile; `verify` checks the pointers only
-when they exist.
+(manifests, the seven `<configDir>.gtk.css.j2` templates, the vendored
+`contracts/` + PIN and `schema.json`); the runtime derives, caches and
+reconciles skins, and owns `config/<configDir>/skin.css` / `skin.json`.
+Provisioning guarantees only the spine data and each AGS app's config dir +
+`$XDG_CONFIG_HOME` link, so a fresh install is green before the first
+reconcile; `verify` checks the pointers only when they exist.
 
 ## Install from a checkout (development)
 

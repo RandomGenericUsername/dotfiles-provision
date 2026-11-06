@@ -100,17 +100,15 @@
             and item.0.stat.lnk_target is search('(skins/[^/]+\.css|skin\.json)$')
             and item.1.stat.exists
             and item.1.stat.isreg)
-    loop: >-
-      {{ verify_ags_skin_pointer_links.results
-         | zip(verify_ags_skin_pointer_targets.results) | list }}
-    loop_control:
-      label: "{{ item.0.item }}"
     fail_msg: >-
       {{ app.app }} has a runtime skin pointer under {{ verify_ags_skin_dir }}
       that is not the expected `current/` symlink (or does not resolve). The
       runtime seeder owns skin.css/skin.json; provisioning only guarantees the
       config dir + XDG link. Reconcile the runtime (or remove a stale
       provisioning copy) — do not hand-write these pointers.
+  loop: >-
+    {{ verify_ags_skin_pointer_links.results
+       | zip(verify_ags_skin_pointer_targets.results) | list }}
 
 - name: "{{ app.app }} : assert app.tsx declares the manifest instance"
   ansible.builtin.command:

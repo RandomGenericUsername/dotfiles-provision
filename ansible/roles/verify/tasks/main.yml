@@ -1634,10 +1634,12 @@
   ansible.builtin.assert:
     that:
       - >-
-        verify_skins_data_checks.results | selectattr('stat.isdir') | list | length
+        verify_skins_data_checks.results
+        | map(attribute='stat.isdir', default=false) | select | list | length
         == 4
       - >-
-        verify_skins_data_checks.results | selectattr('stat.isreg') | list | length
+        verify_skins_data_checks.results
+        | map(attribute='stat.isreg', default=false) | select | list | length
         == (verify_skins_manifest_paths | length)
            + (verify_skins_template_paths | length)
            + (verify_skins_contract_paths | length) + 1
@@ -1677,27 +1679,59 @@
       | regex_replace('\\.toml$', '') }}", the 24-token vocabulary with
       `hairline-w`, and exactly the six groups
       ({{ verify_skins_manifest_groups | join(', ') }}). Re-run the assets
-      playbook against the pinned v0.10.0 corpus.
+      playbook against the pinned v0.11.0 corpus.
   loop: "{{ verify_skins_manifest_raw.results | default([]) }}"
   loop_control:
     label: "{{ item.item | basename }}"
   when: not ansible_check_mode
 
-- name: Read the deployed skin template
+- name: Assert the deployed skin manifests carry every frozen token
+  ansible.builtin.assert:
+    that:
+      - >-
+        (verify_skins_token_names
+         | difference(item.content | b64decode
+           | regex_findall('(?m)^([a-z0-9-]+) = ') | list)) | length == 0
+    fail_msg: >-
+      {{ item.item | basename }} is missing frozen v1 token(s)
+      {{ verify_skins_token_names
+         | difference(item.content | b64decode
+           | regex_findall('(?m)^([a-z0-9-]+) = ') | list) | join(', ') }} —
+      every template placeholder must resolve against every manifest
+      (glass/flat/paper), so a partial token set is an unresolvable skin.
+      Re-run the assets playbook against the pinned v0.11.0 corpus.
+  loop: "{{ verify_skins_manifest_raw.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item | basename }}"
+  when: not ansible_check_mode
+
+- name: Read the deployed skin templates
   ansible.builtin.slurp:
-    src: "{{ verify_skins_template_paths[0] }}"
+    src: "{{ item }}"
+  loop: "{{ verify_skins_template_paths }}"
   register: verify_skins_template_raw
   when: not ansible_check_mode
 
-- name: Assert the deployed skin template carries the token placeholders
+- name: Assert every deployed skin template carries resolvable token placeholders
   ansible.builtin.assert:
     that:
-      - (verify_skins_template_raw.content | b64decode | length) > 0
-      - verify_skins_template_raw.content | b64decode is search('\{\{SKIN_')
+      - (item.content | b64decode | length) > 0
+      - item.content | b64decode is search('\{\{SKIN_')
+      - >-
+        ((item.content | b64decode
+          | regex_findall('\{\{(SKIN_[A-Z0-9_]+)\}\}') | unique
+          | map('lower') | map('regex_replace', '^skin_', '')
+          | map('regex_replace', '_', '-') | list)
+         | difference(verify_skins_token_names) | length) == 0
     fail_msg: >-
-      {{ verify_skins_template_paths[0] }} is empty or has no {{ '{{SKIN_' }}
-      placeholders — the assets skins template must be the real expander input
-      (the runtime renders <configDir>.css from it). Re-run the assets playbook.
+      {{ item.item }} is empty, has no {{ '{{SKIN_' }} placeholders, or names a
+      placeholder that is not a frozen v1 token. The seven
+      <configDir>.gtk.css.j2 templates must all be real expander inputs whose
+      placeholders resolve against every manifest (glass/flat/paper). Re-run
+      the assets playbook against the pinned v0.11.0 corpus.
+  loop: "{{ verify_skins_template_raw.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
   when: not ansible_check_mode
 
 - name: Stat the deployed vendored skin contracts with sha256 checksums

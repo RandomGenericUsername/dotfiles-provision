@@ -587,7 +587,7 @@ def _write_composition(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v0.5.0\ncontracts: v0.3.0\ndotfiles-assets: v0.10.0\n",
+        "schemaVersion: 1\nags-platform: v0.5.0\ncontracts: v0.3.0\ndotfiles-assets: v0.11.0\n",
         encoding="utf-8",
     )
     return provisioning

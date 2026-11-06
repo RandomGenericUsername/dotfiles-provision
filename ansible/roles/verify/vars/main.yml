@@ -167,7 +167,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.10.0
+verify_assets_pinned_tag: v0.11.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -194,7 +194,7 @@ verify_assets_schema_support:
 # verify_skins_*: the DEPLOYED skin plane under <install>/skins (REQ-020). This
 #   is the runtime's FIRST skin root (dotfiles-runtime derive._skin_roots), so
 #   verify checks the data the runtime reads, not just the pinned checkout.
-#   Manifests + template + vendored contracts/PIN + the local schema envelope
+#   Manifests + templates + vendored contracts/PIN + the local schema envelope
 #   are data; provisioning never renders or reconciles. The contract PIN fixes
 #   the canonical tag and the sha256 of the three vendored files, which verify
 #   re-hashes on the host.
@@ -210,11 +210,48 @@ verify_skins_manifest_names:
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
+#: v0.11.0 ships one `<configDir>.gtk.css.j2` per AGS app: the bar/settings
+#: template plus the six per-app targets. The expander renders `<configDir>.css`;
+#: a missing per-app template would leave that app's XDG skin pointer unbacked.
 verify_skins_template_files:
   - ags.gtk.css.j2
+  - ags-clipboard.gtk.css.j2
+  - ags-notifications.gtk.css.j2
+  - ags-wallpaper-selector.gtk.css.j2
+  - ags-capture.gtk.css.j2
+  - ags-icme.gtk.css.j2
+  - ags-btop-studio.gtk.css.j2
 verify_skins_template_paths: >-
   {{ verify_skins_template_files | map('regex_replace', '^',
      verify_skins_templates_dir ~ '/') | list }}
+#: The 24 frozen v1 token names. A template placeholder expands to one of these
+#: (`{{SKIN_RADIUS_PANEL}}` -> `radius-panel`); every manifest carries all 24,
+#: so a placeholder that maps outside this set is unresolvable on every skin.
+verify_skins_token_names:
+  - radius-panel
+  - radius-card
+  - radius-cell
+  - radius-pill
+  - border-w
+  - hairline-w
+  - gap
+  - cell-pad
+  - bg-panel
+  - bg-card
+  - border
+  - shadow
+  - blur
+  - ink
+  - ink-dim
+  - accent
+  - ink-over
+  - font-family
+  - title-size
+  - text-size
+  - panel-width
+  - bt-list-spacing
+  - bar-row-height
+  - chip-min
 verify_skins_contract_files:
   - PIN
   - skin-token.schema.json
