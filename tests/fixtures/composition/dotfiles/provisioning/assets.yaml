@@ -4,7 +4,7 @@
 # and the destination class map. The assets role clones repo@tag ONCE into
 # <install>/assets/<tag>/ and every corpus entry below reads from that checkout;
 # nothing reads a composition-repo tree. A pin bump edits `assets.tag` AND the
-# three checkout sources below (the role + verify mirrors are parity-locked by
+# four checkout sources below (the role + verify mirrors are parity-locked by
 # tests, and the sources are checked against `assets.tag`).
 #
 # Each entry is tagged with an AssetKind; `AssetKind.spine_segment()` resolves
@@ -17,24 +17,32 @@ kind: assets
 
 assets:
   repo: https://github.com/RandomGenericUsername/dotfiles-assets
-  tag: v0.6.4
+  tag: v0.10.0
   classes:
     icons:     { dest: icons,     schema: icons/schema.json }
     templates: { dest: templates, schema: "**/*.vars.schema.json" }
     configs:   { dest: configs,   schema: null }
     content:   { dest: content,   schema: null }
     desktop:   { dest: desktop,   schema: desktop/desktop.yaml }
+    skins:     { dest: skins,     schema: skins/schema.json }
 
 entries:
   - name: wallpapers
     kind: wallpaper
-    source: "{{ install_dir | trim }}/assets/v0.6.4/content/wallpapers/wallpapers.tar.gz"
+    source: "{{ install_dir | trim }}/assets/v0.10.0/content/wallpapers/wallpapers.tar.gz"
   - name: icon-templates
     kind: icon-template
-    source: "{{ install_dir | trim }}/assets/v0.6.4/icons/templates/"
+    source: "{{ install_dir | trim }}/assets/v0.10.0/icons/templates/"
   - name: icon-mappings
     kind: icon-mapping
-    source: "{{ install_dir | trim }}/assets/v0.6.4/icons/mappings/"
+    source: "{{ install_dir | trim }}/assets/v0.10.0/icons/mappings/"
+  - name: skins
+    kind: skins
+    # REQ-020: the skin plane is root-level DATA deployed to <install>/skins,
+    # the runtime's first skin root. Manifests + templates + the vendored
+    # contracts/PIN and local schema envelope all ride the class mirror; no
+    # render, no validate script, no runtime reconcile.
+    source: "{{ install_dir | trim }}/assets/v0.10.0/skins/"
   - name: tpr-templates
     kind: tpr-template
     # REQ-010: the sole palette producer's projection catalog, copied FROM

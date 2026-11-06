@@ -211,6 +211,7 @@ class TestYamlManifestReaderPerKindSchemas:
             "    configs: { dest: configs, schema: null }\n"
             "    content: { dest: content, schema: null }\n"
             "    desktop: { dest: desktop, schema: desktop/desktop.yaml }\n"
+            "    skins: { dest: skins, schema: skins/schema.json }\n"
             "entries:\n"
             "  - name: wallpapers\n    kind: wallpaper\n    source: x\n",
             encoding="utf-8",
@@ -218,6 +219,49 @@ class TestYamlManifestReaderPerKindSchemas:
         manifest = READER.read(path)
         assert manifest.kind is ManifestKind.ASSETS
         assert manifest.entries == (Spec(name="wallpapers"),)
+
+    def test_assets_pin_block_accepts_a_pre_skins_composition(self, tmp_path: Path) -> None:
+        """REQ-020 transition: a composition still pinned before assets v0.10.0
+        carries the original five classes. The reader accepts it (the optional
+        sixth `skins` class is additive) so the engine can ship before the
+        composition pin bump; the engine's own role still deploys skins."""
+        path = tmp_path / "assets.yaml"
+        path.write_text(
+            "kind: assets\n"
+            "assets:\n"
+            "  repo: https://github.com/RandomGenericUsername/dotfiles-assets\n"
+            "  tag: v0.6.4\n"
+            "  classes:\n"
+            "    icons: { dest: icons, schema: icons/schema.json }\n"
+            "    templates: { dest: templates, schema: '**/*.vars.schema.json' }\n"
+            "    configs: { dest: configs, schema: null }\n"
+            "    content: { dest: content, schema: null }\n"
+            "    desktop: { dest: desktop, schema: desktop/desktop.yaml }\n"
+            "entries: []\n",
+            encoding="utf-8",
+        )
+        manifest = READER.read(path)
+        assert manifest.kind is ManifestKind.ASSETS
+
+    def test_assets_pin_block_rejects_an_unknown_class(self, tmp_path: Path) -> None:
+        path = tmp_path / "assets.yaml"
+        path.write_text(
+            "kind: assets\n"
+            "assets:\n"
+            "  repo: https://github.com/RandomGenericUsername/dotfiles-assets\n"
+            "  tag: v0.10.0\n"
+            "  classes:\n"
+            "    icons: { dest: icons, schema: icons/schema.json }\n"
+            "    templates: { dest: templates, schema: '**/*.vars.schema.json' }\n"
+            "    configs: { dest: configs, schema: null }\n"
+            "    content: { dest: content, schema: null }\n"
+            "    desktop: { dest: desktop, schema: desktop/desktop.yaml }\n"
+            "    bogus: { dest: bogus, schema: null }\n"
+            "entries: []\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ManifestReadError, match="bogus"):
+            READER.read(path)
 
     @pytest.mark.parametrize(
         ("block", "match"),

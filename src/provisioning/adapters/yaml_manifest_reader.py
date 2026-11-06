@@ -29,7 +29,11 @@ _ALLOWED_MANIFEST_KEYS = frozenset({"kind", "entries"})
 #: domain view (most roles mirror their manifest and a parity test locks the
 #: mirror; `cli_tools` reads `cli-tools.yaml` directly at run time, REQ-014).
 _ASSETS_BLOCK_KIND = "assets"
-_ASSET_CLASSES = ("icons", "templates", "configs", "content", "desktop")
+_ASSET_CLASSES = ("icons", "templates", "configs", "content", "desktop", "skins")
+#: The classes every assets manifest must carry. `skins` joined the corpus in
+#: assets v0.10.0 (REQ-020); an older composition that has not been re-pinned
+#: yet (five classes) is still readable, while an unknown class is rejected.
+_ASSET_REQUIRED_CLASSES = frozenset({"icons", "templates", "configs", "content", "desktop"})
 _TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 
 _EntrySchema = tuple[frozenset[str], frozenset[str]]
@@ -117,8 +121,9 @@ def _validate_assets_block(block: object, path: Path) -> None:
     """Validate the assets pin block; the domain view deliberately omits it.
 
     The block is the manifest's single source of truth for the pinned corpus:
-    `repo` + semver `tag` + a `classes` map whose keys are exactly the five
-    asset classes. `dest` is class-local (never an absolute path); `schema` is
+    `repo` + semver `tag` + a `classes` map containing the five required asset
+    classes and any known optional class (today `skins`). `dest` is class-local
+    (never an absolute path); `schema` is
     the class's contract file, or null for a class with no contract.
     """
     if not isinstance(block, dict):
@@ -140,10 +145,13 @@ def _validate_assets_block(block: object, path: Path) -> None:
     classes = block.get("classes")
     if not isinstance(classes, dict):
         raise ManifestReadError(f"manifest {path} 'assets.classes' must be a mapping")
-    if set(classes) != set(_ASSET_CLASSES):
+    unknown_classes = set(classes) - set(_ASSET_CLASSES)
+    missing_classes = _ASSET_REQUIRED_CLASSES - set(classes)
+    if unknown_classes or missing_classes:
         raise ManifestReadError(
-            f"manifest {path} 'assets.classes' must name exactly {list(_ASSET_CLASSES)}; "
-            f"got {sorted(classes)}"
+            f"manifest {path} 'assets.classes' must name the required classes "
+            f"{sorted(_ASSET_REQUIRED_CLASSES)} plus only known classes "
+            f"{list(_ASSET_CLASSES)}; got {sorted(classes)}"
         )
     for name, entry in classes.items():
         if not isinstance(entry, dict):

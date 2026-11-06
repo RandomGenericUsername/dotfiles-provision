@@ -81,6 +81,7 @@ class AssetKind(StrEnum):
     ICON_MAPPING = "icon-mapping"
     TPR_TEMPLATE = "tpr-template"
     WEG_EFFECTS = "weg-effects"
+    SKINS = "skins"
 
     def spine_segment(self) -> str:
         """The install-spine deploy target for this asset kind.
@@ -99,6 +100,7 @@ _SPINE_SEGMENT: dict[AssetKind, str] = {
     AssetKind.ICON_MAPPING: "icon-mappings",
     AssetKind.TPR_TEMPLATE: "tpr-templates",
     AssetKind.WEG_EFFECTS: "weg-effects.yaml",
+    AssetKind.SKINS: "skins",
 }
 
 

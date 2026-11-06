@@ -1404,7 +1404,7 @@
   when: not ansible_check_mode
 
 # S1 (spine AD-6/AD-7): the corpus is a pinned checkout, so verify asserts the
-# pin FILE and the five class dirs the assets role materialized. S5 strengthens
+# pin FILE and the six class dirs the assets role materialized. S5 strengthens
 # it: the pin file's CONTENT must equal the manifest tag (a half bump can leave
 # a stale `pinned` beside a new <tag>/ dir), and every DEPLOYED class contract's
 # `schema_major` must be inside the same support window the fetch enforced.
@@ -1421,7 +1421,7 @@
       - verify_assets_checks.results | selectattr('stat.isdir') | list | length == (verify_assets_class_dirs | length) + 1
     fail_msg: >-
       the pinned assets checkout is incomplete under {{ verify_assets_dir }}
-      (expected the `pinned` file and the five class dirs under
+      (expected the `pinned` file and the six class dirs under
       {{ verify_assets_tag_dir }}). The assets role fetches repo@tag before
       copying; re-run the assets playbook and check the pin.
   when: not ansible_check_mode
@@ -1479,6 +1479,12 @@
   register: verify_assets_desktop_schema
   when: not ansible_check_mode
 
+- name: Read the deployed skins schema contract
+  ansible.builtin.slurp:
+    src: "{{ verify_assets_tag_dir }}/skins/schema.json"
+  register: verify_assets_skins_schema
+  when: not ansible_check_mode
+
 - name: Read every deployed template schema contract
   ansible.builtin.slurp:
     src: "{{ item.path }}"
@@ -1513,6 +1519,21 @@
       {{ (verify_assets_desktop_schema.content | b64decode | from_yaml).schema_major }},
       but this consumer supports desktop schema_major
       {{ verify_assets_schema_support.desktop }} (assets {{ verify_assets_pinned_tag }}).
+      The deployed corpus is not the one the fetch accepted — re-run the assets
+      playbook so the pinned checkout is re-fetched, and check for a hand-edited
+      or partial tree under {{ verify_assets_tag_dir }}
+  when: not ansible_check_mode
+
+- name: Assert the deployed skins schema_major is in the consumer support window
+  ansible.builtin.assert:
+    that: >-
+      (verify_assets_skins_schema.content | b64decode | from_json).schema_major
+      == verify_assets_schema_support.skins
+    fail_msg: >-
+      {{ verify_assets_skins_schema.source }} declares schema_major
+      {{ (verify_assets_skins_schema.content | b64decode | from_json).schema_major }},
+      but this consumer supports skins schema_major
+      {{ verify_assets_schema_support.skins }} (assets {{ verify_assets_pinned_tag }}).
       The deployed corpus is not the one the fetch accepted — re-run the assets
       playbook so the pinned checkout is re-fetched, and check for a hand-edited
       or partial tree under {{ verify_assets_tag_dir }}
@@ -1593,6 +1614,137 @@
       entries and the helper from this tree and resolves desktop.yaml before the
       copy, so a missing piece means the pin is wrong or the checkout is partial;
       re-run the assets playbook and check the pin.
+  when: not ansible_check_mode
+
+# REQ-020: the DEPLOYED skin plane at <install>/skins (the runtime's first
+# skin root). The pinned checkout's skins/ class is the source; this is what
+# `dotfiles-runtime derive._skin_roots` actually reads. Data only — verify
+# never runs the runtime's skin derivation/reconcile.
+- name: Check the deployed skin plane data is present
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: >-
+    {{ [verify_skins_dir, verify_skins_manifests_dir,
+        verify_skins_templates_dir, verify_skins_contracts_dir]
+       + verify_skins_manifest_paths + verify_skins_template_paths
+       + verify_skins_contract_paths + [verify_skins_schema_file] }}
+  register: verify_skins_data_checks
+
+- name: Assert the deployed skin plane data has the pinned types
+  ansible.builtin.assert:
+    that:
+      - >-
+        verify_skins_data_checks.results | selectattr('stat.isdir') | list | length
+        == 4
+      - >-
+        verify_skins_data_checks.results | selectattr('stat.isreg') | list | length
+        == (verify_skins_manifest_paths | length)
+           + (verify_skins_template_paths | length)
+           + (verify_skins_contract_paths | length) + 1
+    fail_msg: >-
+      the deployed skin plane under {{ verify_skins_dir }} is incomplete. The
+      assets role mirrors the pinned skins/ class to <install>/skins
+      (manifests/, templates/, contracts/ + schema.json); the runtime reads
+      manifests and templates from there before config/skins or the pinned
+      checkout. Re-run the assets playbook (and check the assets pin).
+  when: not ansible_check_mode
+
+- name: Read the deployed skin manifests
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop: "{{ verify_skins_manifest_paths }}"
+  register: verify_skins_manifest_raw
+  when: not ansible_check_mode
+
+- name: Assert the deployed skin manifests have the pinned v1 shape
+  ansible.builtin.assert:
+    that:
+      - item.content | b64decode is search('(?m)^schema_major = 1$')
+      - >-
+        item.content | b64decode
+        is search('(?m)^name = "' ~ (item.item | basename
+        | regex_replace('\\.toml$', '')) ~ '"$')
+      - item.content | b64decode is search('(?m)^hairline-w = ')
+      - item.content | b64decode is search('(?m)^\[shape\]$')
+      - item.content | b64decode is search('(?m)^\[rhythm\]$')
+      - item.content | b64decode is search('(?m)^\[surface\]$')
+      - item.content | b64decode is search('(?m)^\[ink\]$')
+      - item.content | b64decode is search('(?m)^\[type\]$')
+      - item.content | b64decode is search('(?m)^\[layout\]$')
+    fail_msg: >-
+      {{ item.item | basename }} is not the pinned skin manifest shape:
+      expected schema_major = 1, name = "{{ item.item | basename
+      | regex_replace('\\.toml$', '') }}", the 24-token vocabulary with
+      `hairline-w`, and exactly the six groups
+      ({{ verify_skins_manifest_groups | join(', ') }}). Re-run the assets
+      playbook against the pinned v0.10.0 corpus.
+  loop: "{{ verify_skins_manifest_raw.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item | basename }}"
+  when: not ansible_check_mode
+
+- name: Read the deployed skin template
+  ansible.builtin.slurp:
+    src: "{{ verify_skins_template_paths[0] }}"
+  register: verify_skins_template_raw
+  when: not ansible_check_mode
+
+- name: Assert the deployed skin template carries the token placeholders
+  ansible.builtin.assert:
+    that:
+      - (verify_skins_template_raw.content | b64decode | length) > 0
+      - verify_skins_template_raw.content | b64decode is search('\{\{SKIN_')
+    fail_msg: >-
+      {{ verify_skins_template_paths[0] }} is empty or has no {{ '{{SKIN_' }}
+      placeholders — the assets skins template must be the real expander input
+      (the runtime renders <configDir>.css from it). Re-run the assets playbook.
+  when: not ansible_check_mode
+
+- name: Stat the deployed vendored skin contracts with sha256 checksums
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: true
+    checksum_algorithm: sha256
+  loop: "{{ verify_skins_contract_paths }}"
+  register: verify_skins_contract_checks
+  when: not ansible_check_mode
+
+- name: Read the deployed skin contracts PIN
+  ansible.builtin.slurp:
+    src: "{{ verify_skins_contracts_dir }}/PIN"
+  register: verify_skins_pin_raw
+  when: not ansible_check_mode
+
+- name: Assert the deployed skin contracts match the PIN tag and sha256 values
+  ansible.builtin.assert:
+    that:
+      - >-
+        verify_skins_pin_raw.content | b64decode
+        is search('(?m)^contracts=' ~ verify_skins_expected_contract_tag ~ '$')
+      - >-
+        verify_skins_contract_checks.results | selectattr('stat.isreg') | list | length
+        == verify_skins_contract_files | length
+      - >-
+        (verify_skins_pin_raw.content | b64decode
+         | regex_findall('(?m)^sha256\\s+([0-9a-f]{64})\\s+skin-token\\.schema\\.json$')
+         | first)
+        == verify_skins_contract_checks.results[1].stat.checksum
+      - >-
+        (verify_skins_pin_raw.content | b64decode
+         | regex_findall('(?m)^sha256\\s+([0-9a-f]{64})\\s+skin-manifest\\.schema\\.json$')
+         | first)
+        == verify_skins_contract_checks.results[2].stat.checksum
+      - >-
+        (verify_skins_pin_raw.content | b64decode
+         | regex_findall('(?m)^sha256\\s+([0-9a-f]{64})\\s+skin-json\\.schema\\.json$')
+         | first)
+        == verify_skins_contract_checks.results[3].stat.checksum
+    fail_msg: >-
+      the deployed vendored skin contracts under
+      {{ verify_skins_contracts_dir }} do not match their PIN
+      ({{ verify_skins_expected_contract_tag }}, three sha256 values). A
+      hand-edited or half-copied contract tree would let a consumer validate
+      against the wrong shape; re-run the assets playbook.
   when: not ansible_check_mode
 
 - name: Check runtime palette files exist under the runtime current dir

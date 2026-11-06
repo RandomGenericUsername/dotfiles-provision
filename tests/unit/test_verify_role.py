@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -220,9 +221,11 @@ _VERIFY_ASSETS_TASK_NAMES = (
     "Find the deployed template schema contracts",
     "Read the deployed icons schema contract",
     "Read the deployed desktop schema contract",
+    "Read the deployed skins schema contract",
     "Read every deployed template schema contract",
     "Assert the deployed icons schema_major is in the consumer support window",
     "Assert the deployed desktop schema_major is in the consumer support window",
+    "Assert the deployed skins schema_major is in the consumer support window",
     "Assert the deployed templates ship at least one schema contract",
     "Assert every deployed template schema_major is in the consumer support window",
 )
@@ -253,7 +256,58 @@ def _write_deployed_assets(spine: Path, pin: str, majors: dict[str, int]) -> Non
     (tag_dir / "desktop" / "desktop.yaml").write_text(
         f"schema_major: {majors['desktop']}\n"
     )
+    (tag_dir / "skins").mkdir()
+    (tag_dir / "skins" / "schema.json").write_text(
+        json.dumps({"schema_major": majors["skins"]}) + "\n"
+    )
     (assets_dir / "pinned").write_text(pin + "\n")
+
+
+_SKIN_CONTRACT_BODIES = {
+    "skin-token.schema.json": '{"title": "skin token"}\n',
+    "skin-manifest.schema.json": '{"title": "skin manifest"}\n',
+    "skin-json.schema.json": '{"title": "resolved skin"}\n',
+}
+
+
+def _skin_manifest_body(name: str) -> str:
+    """A minimal v1-shape manifest: schema_major, name and the six groups."""
+    return (
+        "schema_major = 1\n"
+        f'name = "{name}"\n\n'
+        "[shape]\nradius-panel = 12\nborder-w = 1.5\nhairline-w = 1\n\n"
+        "[rhythm]\ngap = 8\ncell-pad = \"8px 9px\"\n\n"
+        "[surface]\nbg-panel = \"transparent\"\nbg-card = \"transparent\"\n"
+        "border = \"transparent\"\nshadow = \"none\"\nblur = \"none\"\n\n"
+        "[ink]\nink = \"@on_surface\"\nink-dim = \"alpha(@on_surface, 0.62)\"\n"
+        "accent = \"@primary\"\nink-over = \"auto\"\n\n"
+        "[type]\nfont-family = \"inherit\"\ntitle-size = 12.5\ntext-size = 13\n\n"
+        "[layout]\npanel-width = 312\nbt-list-spacing = 4\n"
+        "bar-row-height = 0\nchip-min = 0\n"
+    )
+
+
+def _write_deployed_skins(spine: Path) -> None:
+    """Materialize the deployed <spine>/skins data verify reads (REQ-020)."""
+    skins = spine / "skins"
+    manifests = skins / "manifests"
+    templates = skins / "templates"
+    contracts = skins / "contracts"
+    for directory in (manifests, templates, contracts):
+        directory.mkdir(parents=True, exist_ok=True)
+    for name in ("glass", "flat", "paper"):
+        (manifests / f"{name}.toml").write_text(_skin_manifest_body(name))
+    (templates / "ags.gtk.css.j2").write_text(
+        ".skin { border-radius: {{SKIN_RADIUS_PANEL}}px; }\n"
+    )
+    (skins / "schema.json").write_text('{"schema_major": 1}\n')
+    pin_lines = ["contracts=v0.6.0\n"]
+    for name, body in _SKIN_CONTRACT_BODIES.items():
+        (contracts / name).write_text(body)
+        pin_lines.append(
+            f"sha256 {hashlib.sha256(body.encode()).hexdigest()} {name}\n"
+        )
+    (contracts / "PIN").write_text("".join(pin_lines))
 
 
 def _verify_assets_extra_vars(spine: Path) -> dict[str, object]:
@@ -1565,6 +1619,15 @@ class TestVerifyTasks:
             "verify_xdg_dirs",
             "verify_install_spine_dirs",
             "verify_install_spine_files",
+            "verify_skins_dir",
+            "verify_skins_manifests_dir",
+            "verify_skins_templates_dir",
+            "verify_skins_contracts_dir",
+            "verify_skins_schema_file",
+            "verify_skins_manifest_paths",
+            "verify_skins_template_paths",
+            "verify_skins_contract_paths",
+            "verify_skins_consumer_pointer_names",
             "verify_assets_dir",
             "verify_assets_tag_dir",
             "verify_assets_pinned_file",
@@ -1637,6 +1700,15 @@ class TestVerifyVars:
         "verify_xdg_dirs",
         "verify_install_spine_dirs",
         "verify_install_spine_files",
+        "verify_skins_dir",
+        "verify_skins_manifests_dir",
+        "verify_skins_templates_dir",
+        "verify_skins_contracts_dir",
+        "verify_skins_schema_file",
+        "verify_skins_manifest_paths",
+        "verify_skins_template_paths",
+        "verify_skins_contract_paths",
+        "verify_skins_consumer_pointer_names",
         "verify_assets_configs_dirs",
         "verify_assets_desktop_paths",
         "verify_xdg_data_home",
@@ -1686,7 +1758,7 @@ class TestVerifyVars:
 
     def test_assets_pin_mirrors_the_manifest(self) -> None:
         """AD-6: verify's pin mirror equals `assets.tag`, and the class dirs are
-        the five class names under the tag dir."""
+        the six class names under the tag dir."""
         data = _vars()
         manifest = yaml.safe_load(
             (
@@ -1696,8 +1768,8 @@ class TestVerifyVars:
         assert str(data["verify_assets_pinned_tag"]) == manifest["assets"]["tag"]
         assert str(data["verify_assets_pinned_file"]) == "{{ verify_assets_dir }}/pinned"
         dirs = [str(item) for item in data["verify_assets_class_dirs"]]
-        assert len(dirs) == 5
-        for name in ("icons", "templates", "configs", "content", "desktop"):
+        assert len(dirs) == 6
+        for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_wlogout_legacy_template_path_is_the_spine_residue(self) -> None:
@@ -2509,6 +2581,15 @@ class TestVerifyVars:
             "verify_xdg_dirs",
             "verify_install_spine_dirs",
             "verify_install_spine_files",
+            "verify_skins_dir",
+            "verify_skins_manifests_dir",
+            "verify_skins_templates_dir",
+            "verify_skins_contracts_dir",
+            "verify_skins_schema_file",
+            "verify_skins_manifest_paths",
+            "verify_skins_template_paths",
+            "verify_skins_contract_paths",
+            "verify_skins_consumer_pointer_names",
             "verify_assets_dir",
             "verify_assets_tag_dir",
             "verify_assets_pinned_file",
@@ -2797,8 +2878,8 @@ class TestVerifyAssetsSchemaWindow:
         assert module.get("patterns") == "*.vars.schema.json"
         assert module.get("hidden") is True, "the zsh contract is hidden"
         slurps = [task for task in tasks if _module_key(task) == "ansible.builtin.slurp"]
-        assert len(slurps) == 4, (
-            "the pin file + icons + desktop + the template loop are slurped"
+        assert len(slurps) == 5, (
+            "the pin file + icons + desktop + skins + the template loop are slurped"
         )
         for task in slurps:
             src = str(_module(task).get("src"))
@@ -2817,6 +2898,7 @@ class TestVerifyAssetsSchemaWindow:
         for name in (
             "Assert the deployed icons schema_major is in the consumer support window",
             "Assert the deployed desktop schema_major is in the consumer support window",
+            "Assert the deployed skins schema_major is in the consumer support window",
             "Assert every deployed template schema_major is in the consumer support window",
         ):
             assertion = tasks[[str(t.get("name")) for t in tasks].index(name)]
@@ -2832,7 +2914,7 @@ class TestVerifyAssetsSchemaWindow:
         """Positive control: an in-window deployed corpus passes read-only."""
         spine = tmp_path / "spine"
         pin = str(_vars()["verify_assets_pinned_tag"])
-        _write_deployed_assets(spine, pin, {"icons": 1, "templates": 1, "desktop": 1})
+        _write_deployed_assets(spine, pin, {"icons": 1, "templates": 1, "desktop": 1, "skins": 1})
         result = _run_verify_assets_tasks(
             tmp_path, _selected_verify_assets_tasks(), _verify_assets_extra_vars(spine)
         )
@@ -2845,7 +2927,7 @@ class TestVerifyAssetsSchemaWindow:
         """S5 negative: `pinned` recording another tag must fail verify."""
         spine = tmp_path / "spine"
         pin = str(_vars()["verify_assets_pinned_tag"])
-        _write_deployed_assets(spine, "v0.4.0", {"icons": 1, "templates": 1, "desktop": 1})
+        _write_deployed_assets(spine, "v0.4.0", {"icons": 1, "templates": 1, "desktop": 1, "skins": 1})
         result = _run_verify_assets_tasks(
             tmp_path, _selected_verify_assets_tasks(), _verify_assets_extra_vars(spine)
         )
@@ -2859,7 +2941,7 @@ class TestVerifyAssetsSchemaWindow:
         """S5 negative: a deployed contract ahead of the window must fail."""
         spine = tmp_path / "spine"
         pin = str(_vars()["verify_assets_pinned_tag"])
-        _write_deployed_assets(spine, pin, {"icons": 2, "templates": 1, "desktop": 1})
+        _write_deployed_assets(spine, pin, {"icons": 2, "templates": 1, "desktop": 1, "skins": 1})
         result = _run_verify_assets_tasks(
             tmp_path, _selected_verify_assets_tasks(), _verify_assets_extra_vars(spine)
         )
@@ -2879,6 +2961,89 @@ class TestVerifyAssetsSchemaWindow:
         output = result.stdout + result.stderr
         assert result.returncode == 0, output
         assert f"skipped={len(tasks)}" in output, output
+
+
+_SKIN_VERIFY_TASK_NAMES = (
+    "Check the deployed skin plane data is present",
+    "Assert the deployed skin plane data has the pinned types",
+    "Read the deployed skin manifests",
+    "Assert the deployed skin manifests have the pinned v1 shape",
+    "Read the deployed skin template",
+    "Assert the deployed skin template carries the token placeholders",
+    "Stat the deployed vendored skin contracts with sha256 checksums",
+    "Read the deployed skin contracts PIN",
+    "Assert the deployed skin contracts match the PIN tag and sha256 values",
+)
+
+
+def _selected_verify_skin_tasks() -> list[dict[str, object]]:
+    by_name = {str(task.get("name")): task for task in _load_tasks()}
+    missing = [name for name in _SKIN_VERIFY_TASK_NAMES if name not in by_name]
+    assert not missing, f"role is missing the REQ-020 skin tasks {missing}"
+    return [by_name[name] for name in _SKIN_VERIFY_TASK_NAMES]
+
+
+def _run_verify_skin_tasks(
+    tmp_path: Path, tasks: list[dict[str, object]], install: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run the real skin-plane tasks with the role vars against a temp spine."""
+    ansible_playbook = shutil.which("ansible-playbook")
+    if ansible_playbook is None:
+        pytest.skip("ansible-playbook not installed; skipping task execution")
+    playbook = tmp_path / "play-skins.yml"
+    playbook.write_text(
+        yaml.safe_dump(
+            [
+                {
+                    "name": "REQ-020 skin verify probe",
+                    "hosts": "localhost",
+                    "gather_facts": False,
+                    "vars_files": [str(_ROLES_DIR / "vars" / "main.yml")],
+                    "vars": {"install_dir": str(install)},
+                    "tasks": tasks,
+                }
+            ],
+            sort_keys=False,
+        )
+    )
+    env = dict(os.environ)
+    env["ANSIBLE_CONFIG"] = str(_ANSIBLE_DIR / "ansible.cfg")
+    return subprocess.run(
+        [ansible_playbook, "-i", "localhost,", "-c", "local", str(playbook)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+
+class TestVerifySkinPlane:
+    """REQ-020: the deployed skin data is verified on the host, read-only."""
+
+    def test_deployed_skin_plane_passes_the_shape_and_hash_checks(
+        self, tmp_path: Path
+    ) -> None:
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, output
+        assert "changed=0" in output
+        assert "failed=0" in output
+
+    def test_skin_plane_rejects_a_tampered_contract(self, tmp_path: Path) -> None:
+        """A vendored contract byte change must fail the PIN hash gate."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        contract = install / "skins" / "contracts" / "skin-token.schema.json"
+        contract.write_text('{"tampered": true}\n')
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a tampered contract must fail verify"
+        assert "do not match their PIN" in output, output
 
 
 class TestVerifyDisplayManagerGreeter:
@@ -4221,14 +4386,15 @@ def _build_provisioned_layout(
     # S1: the six per-concern duplicates were retired; only the vocabulary ships
     # beside the single group map.
     (install / "icon-mappings" / "defaults.yaml").write_text("{}\n")
+    _write_deployed_skins(install)
     # S1/S2: the pinned assets checkout the assets role materializes (AD-6/AD-7).
-    # verify asserts the pin file, the five class dirs and (S2) the configs
+    # verify asserts the pin file, the six class dirs and (S2) the configs
     # subdirectories the two config roles copy FROM. The tag comes from the var,
     # so a pin bump never leaves this fixture behind.
     assets_tag = str(_vars()["verify_assets_pinned_tag"])
     (install / "assets").mkdir(parents=True, exist_ok=True)
     (install / "assets" / "pinned").write_text(f"{assets_tag}\n")
-    for class_name in ("icons", "templates", "configs", "content", "desktop"):
+    for class_name in ("icons", "templates", "configs", "content", "desktop", "skins"):
         (install / "assets" / assets_tag / class_name).mkdir(parents=True, exist_ok=True)
     for configs_subdir in ("hypr", "hyprpaper", "nvim", "rofi", "starship", "wlogout"):
         (install / "assets" / assets_tag / "configs" / configs_subdir).mkdir(
@@ -4245,6 +4411,9 @@ def _build_provisioned_layout(
     # S5 (AD-12): the deployed class contracts verify re-reads. Each carries an
     # in-window schema_major, so the fixture proves the pass path.
     (install / "assets" / assets_tag / "icons" / "schema.json").write_text(
+        '{"schema_major": 1}\n'
+    )
+    (install / "assets" / assets_tag / "skins" / "schema.json").write_text(
         '{"schema_major": 1}\n'
     )
     # Pinned CLI checkouts (AD-10): the cli_tools role materializes one

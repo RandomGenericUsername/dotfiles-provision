@@ -27,7 +27,7 @@
 #   (e) vs 2.6 assets (asset kind → spine-segment mapping): verify re-checks
 #       the deployed asset outcomes (default.png, icon-templates/, icon-mappings/,
 #       tpr-templates/, weg-effects.yaml) read-only, plus the pinned assets
-#       checkout (`assets/pinned` + the five class dirs, spine AD-6/AD-7).
+#       checkout (`assets/pinned` + the six class dirs, spine AD-6/AD-7).
 #   (f) vs 2.9 compositor_configs (skeleton/fragment target map): verify
 #       re-checks the placed skeletons + fragments read-only; the AGS
 #       fragment is colors.css (renamed from colors.gtk.css on copy).
@@ -160,14 +160,14 @@ verify_install_spine_dirs:
 # verify_assets_dir / verify_assets_pinned_file / verify_assets_pinned_tag:
 #   the PINNED assets checkout (spine AD-6/AD-7). The assets role fetches
 #   repo@tag once into <install>/assets/<tag>/ and records the tag in
-#   <install>/assets/pinned; verify re-checks the pin and the five class dirs
+#   <install>/assets/pinned; verify re-checks the pin and the six class dirs
 #   read-only. `verify_assets_pinned_tag` is the mirror of the manifest
 #   `assets.tag` (locked by TestVerifyAssetsPinParity); since S5 verify also
 #   asserts the pin FILE's content equals this tag and re-reads the deployed
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.6.4
+verify_assets_pinned_tag: v0.10.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -175,6 +175,7 @@ verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/configs"
   - "{{ verify_assets_tag_dir }}/content"
   - "{{ verify_assets_tag_dir }}/desktop"
+  - "{{ verify_assets_tag_dir }}/skins"
 
 # verify_assets_schema_support: the AD-12 consumer support window, mirrored from
 #   the assets role's `assets_schema_support` (deploy-coverage asserts the two
@@ -188,6 +189,61 @@ verify_assets_schema_support:
   icons: 1
   templates: 1
   desktop: 1
+  skins: 1
+
+# verify_skins_*: the DEPLOYED skin plane under <install>/skins (REQ-020). This
+#   is the runtime's FIRST skin root (dotfiles-runtime derive._skin_roots), so
+#   verify checks the data the runtime reads, not just the pinned checkout.
+#   Manifests + template + vendored contracts/PIN + the local schema envelope
+#   are data; provisioning never renders or reconciles. The contract PIN fixes
+#   the canonical tag and the sha256 of the three vendored files, which verify
+#   re-hashes on the host.
+verify_skins_dir: "{{ install_dir | trim }}/skins"
+verify_skins_manifests_dir: "{{ verify_skins_dir }}/manifests"
+verify_skins_templates_dir: "{{ verify_skins_dir }}/templates"
+verify_skins_contracts_dir: "{{ verify_skins_dir }}/contracts"
+verify_skins_schema_file: "{{ verify_skins_dir }}/schema.json"
+verify_skins_manifest_names:
+  - glass
+  - flat
+  - paper
+verify_skins_manifest_paths: >-
+  {{ verify_skins_manifest_names | map('regex_replace', '^',
+     verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
+verify_skins_template_files:
+  - ags.gtk.css.j2
+verify_skins_template_paths: >-
+  {{ verify_skins_template_files | map('regex_replace', '^',
+     verify_skins_templates_dir ~ '/') | list }}
+verify_skins_contract_files:
+  - PIN
+  - skin-token.schema.json
+  - skin-manifest.schema.json
+  - skin-json.schema.json
+verify_skins_contract_paths: >-
+  {{ verify_skins_contract_files | map('regex_replace', '^',
+     verify_skins_contracts_dir ~ '/') | list }}
+verify_skins_expected_contract_tag: v0.6.0
+#: The manifest groups the frozen v1 envelope requires (assets skins/schema.json
+#: and the vendored canonical manifest schema). A missing group means the
+#: deployed copy is not the pinned shape even though the file exists.
+verify_skins_manifest_groups:
+  - shape
+  - rhythm
+  - surface
+  - ink
+  - type
+  - layout
+
+# verify_skins_consumer_pointers: the runtime-owned per-configDir pointers.
+#   Provisioning NEVER creates these and a fresh install has none before the
+#   first reconcile/seed — verify checks them only WHEN PRESENT (stat follow:
+#   false first, then follow), so an absent pointer is not a failure while a
+#   dangling or foreign one is. Derived from the ONE composition app list; the
+#   runtime's app-scoped pointer set is owned by dotfiles-runtime, not here.
+verify_skins_consumer_pointer_names:
+  - skin.css
+  - skin.json
 
 # verify_assets_configs_dirs: the configs SUBDIRECTORIES inside the pinned
 #   checkout (S2). compositor_configs and config_copies copy FROM this tree, so

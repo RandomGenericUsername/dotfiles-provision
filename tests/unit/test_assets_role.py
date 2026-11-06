@@ -783,6 +783,31 @@ class TestAssetsVars:
                 f"{{{{ install_dir | trim }}}}/assets/{block['tag']}/"
             ), f"manifest entry {name!r} does not name the manifest assets tag"
 
+    def test_skins_class_deploys_to_the_runtime_first_root(self) -> None:
+        """REQ-020: the skins class mirrors to <install>/skins.
+
+        `dotfiles-runtime derive._skin_roots` tries <install>/skins FIRST, then
+        config/skins, then <install>/assets/<tag>/skins. Provisioning must
+        deploy the class to the first (stable) root, not rely on the pinned
+        checkout being discovered. It is data only: a directory mirror with no
+        render/validate/reconcile task.
+        """
+        data = _vars()
+        skins = next(item for item in data["assets_copies"] if item["name"] == "skins")
+        assert skins["kind"] == AssetKind.SKINS.value
+        assert skins["source"] == "{{ assets_checkout_root }}/skins/"
+        assert skins["target"] == AssetKind.SKINS.spine_segment() == "skins"
+        assert "skins" in {str(item) for item in data["assets_deploy_dirs"]}
+        assert "skins" in data["assets_classes"]
+        assert data["assets_classes"]["skins"]["schema"] == "skins/schema.json"
+        assert data["assets_schema_support"]["skins"] == 1
+
+        manifest = yaml.safe_load(_MANIFEST_PATH.read_text())
+        assert "skins" in manifest["assets"]["classes"]
+        entry = next(item for item in manifest["entries"] if item["name"] == "skins")
+        assert entry["kind"] == AssetKind.SKINS.value
+        assert str(entry["source"]).endswith("/skins/")
+
     def test_tpr_templates_source_resolves_to_pinned_checkout(self) -> None:
         """REQ-010: the tpr projection catalog is copied FROM the pinned tpr
         checkout into the runtime's spine path, with the same fail-loud
@@ -860,9 +885,11 @@ _SCHEMA_FETCH_TASK_NAMES = (
     "Find the pinned template schema contracts",
     "Read the pinned icons schema contract",
     "Read the pinned desktop schema contract",
+    "Read the pinned skins schema contract",
     "Read every pinned template schema contract",
     "Assert the pinned icons schema_major is in the consumer support window",
     "Assert the pinned desktop schema_major is in the consumer support window",
+    "Assert the pinned skins schema_major is in the consumer support window",
     "Assert the pinned templates ship at least one schema contract",
     "Assert every pinned template schema_major is in the consumer support window",
 )
@@ -897,6 +924,10 @@ def _write_schema_checkout(root: Path, majors: dict[str, int]) -> None:
     (root / "desktop").mkdir()
     (root / "desktop" / "desktop.yaml").write_text(
         f"schema_major: {majors['desktop']}\n"
+    )
+    (root / "skins").mkdir()
+    (root / "skins" / "schema.json").write_text(
+        json.dumps({"schema_major": majors["skins"]}) + "\n"
     )
 
 
@@ -954,14 +985,14 @@ class TestAssetsSchemaContract:
     def test_schema_support_window_is_declared_per_schema_bearing_class(self) -> None:
         """The window exists for exactly the classes that ship a contract.
 
-        catalog.yaml: icons/templates/desktop carry a schema; configs/content
-        are `schema: null`. An entry for a schema-less class would be a claim
-        nothing backs, and a missing entry for a schema-bearing one would let
-        the fetch accept any major.
+        catalog.yaml: icons/templates/desktop/skins carry a schema; configs/
+        content are `schema: null`. An entry for a schema-less class would be a
+        claim nothing backs, and a missing entry for a schema-bearing one would
+        let the fetch accept any major.
         """
         data = _vars()
         support = data.get("assets_schema_support")
-        assert support == {"icons": 1, "templates": 1, "desktop": 1}, support
+        assert support == {"icons": 1, "templates": 1, "desktop": 1, "skins": 1}, support
         schema_bearing = {
             name
             for name, entry in data["assets_classes"].items()
@@ -1037,6 +1068,10 @@ class TestAssetsSchemaContract:
                 "assets_desktop_schema.source",
                 "assets_schema_support.desktop",
             ),
+            "Assert the pinned skins schema_major is in the consumer support window": (
+                "assets_skins_schema.source",
+                "assets_schema_support.skins",
+            ),
             "Assert every pinned template schema_major is in the consumer support window": (
                 "item.source",
                 "assets_schema_support.templates",
@@ -1062,7 +1097,7 @@ class TestAssetsSchemaContract:
         """
         checkout = tmp_path / "checkout"
         _write_schema_checkout(
-            checkout, {"icons": 1, "templates": 1, "desktop": 1}
+            checkout, {"icons": 1, "templates": 1, "desktop": 1, "skins": 1}
         )
         result = _run_role_tasks(
             tmp_path,
@@ -1080,6 +1115,7 @@ class TestAssetsSchemaContract:
             ("icons", "icons/schema.json"),
             ("templates", "templates/zsh/.zshrc.vars.schema.json"),
             ("desktop", "desktop/desktop.yaml"),
+            ("skins", "skins/schema.json"),
         ],
     )
     def test_fetch_rejects_an_out_of_window_schema(
@@ -1087,7 +1123,7 @@ class TestAssetsSchemaContract:
     ) -> None:
         """AD-12 negative: schema_major too high → the fetch assert fails,
         naming the file and the accepted window, before any copy."""
-        majors = {"icons": 1, "templates": 1, "desktop": 1}
+        majors = {"icons": 1, "templates": 1, "desktop": 1, "skins": 1}
         majors[schema_class] = 2
         checkout = tmp_path / "checkout"
         _write_schema_checkout(checkout, majors)

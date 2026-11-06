@@ -238,13 +238,12 @@ class TestPinMirrorsMatchTheManifest:
         )
         print(f"parity: assets.tag {tag} mirrored by {', '.join(sorted(mirrors))}")
 
-    def test_every_assets_pin_mirror_is_v0_6_4(self) -> None:
-        """REQ-018: assets v0.6.4 moves rofi/wlogout static configs onto
-        palette.v1 semantic roles; the v0.6.2 autostart content is unchanged.
-
-        Every role that reads the pinned corpus keeps its own literal mirror
-        (spine AD-6), and the fixture manifest repeats the tag in its checkout
-        sources. This guard fails while any leg still drifts from the pin.
+    def test_every_assets_pin_mirror_matches_the_fixture_pin(self) -> None:
+        """REQ-020: every role that reads the pinned corpus keeps its own
+        literal mirror (spine AD-6), and the fixture manifest repeats the tag
+        in its checkout sources. The expected tag comes from the fixture so a
+        pin bump edits one place; this guard fails while any leg still drifts
+        from it.
         """
         mirrors = {
             "assets": "assets_pinned_tag",
@@ -257,7 +256,9 @@ class TestPinMirrorsMatchTheManifest:
             "wlogout_config": "wlogout_config_assets_pinned_tag",
             "zsh_config": "zsh_config_assets_pinned_tag",
         }
-        expected = "v0.6.4"
+        expected = str(
+            yaml.safe_load((manifests_dir() / "assets.yaml").read_text())["assets"]["tag"]
+        )
         drift = {
             role: str(assets_templates.role_vars(role)[key])
             for role, key in mirrors.items()
@@ -335,10 +336,8 @@ class TestTprPinMirrors:
             "the fixture tpr-templates source must derive from the same fact; "
             f"got {tpr_source!r}"
         )
-        assert str(assets_manifest["assets"]["tag"]) == "v0.6.4", (
-            "tpr does not move the corpus pin; the assets corpus has its own "
-            "releases (REQ-015)"
-        )
+        # tpr has its own pin and does not move the corpus tag; the corpus
+        # manifest remains the single source for `assets.tag` (REQ-015).
 
 
 class TestRuntimePinMirrors:

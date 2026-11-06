@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.34
+
+Deploy the assets skin plane into the spine (REQ-020).
+
+- `dotfiles-assets` moves to **v0.10.0**: every `*_assets_pinned_tag` mirror,
+  the fixture manifests/tuple and the pin tests follow. v0.10.0 adds the
+  `skins` class (three v1 manifests, the `ags.gtk.css.j2` template, the
+  contracts v0.6.0 vendored schemas + PIN and the local schema envelope); the
+  existing icons/templates/configs/content/desktop bytes are unchanged.
+- `assets` mirrors the `skins` class to `<install>/skins` as data. This is the
+  runtime's FIRST skin root (`dotfiles-runtime derive._skin_roots`), ahead of
+  `config/skins` and the pinned `<install>/assets/<tag>/skins` checkout. No
+  template is rendered and no skin is reconciled by provisioning.
+- `assets`/`verify` treat `skins/schema.json` as a schema-bearing class window
+  (`schema_major: 1`), read before the first copy and re-read from the deployed
+  checkout.
+- `verify` checks the deployed skin plane: the three manifests keep the pinned
+  v1 shape (`schema_major`, `name`, `hairline-w`, six groups), the template
+  carries `{{SKIN_` placeholders, and the vendored contracts re-hash against
+  `contracts/PIN` (v0.6.0, three sha256 values).
+- `verify` checks the runtime-owned AGS skin pointers
+  (`config/<configDir>/skin.css`, `skin.json`) ONLY when present: a fresh
+  install has none before the first reconcile/seed, while a dangling or
+  non-`current/` pointer fails. Provisioning still owns only the AGS config
+  dir + XDG spine link (`ags_apps_units`); `config_links`/`config_copies` do
+  not claim an AGS basename.
+- Domain: `AssetKind.SKINS` maps to the `skins` spine segment; the assets
+  manifest reader accepts the sixth `skins` class.
+
 ## 0.1.33
 
 Consume `ags-platform` `v0.5.0` (capture-cluster request contract).

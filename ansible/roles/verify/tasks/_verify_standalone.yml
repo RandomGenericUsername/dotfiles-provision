@@ -7,6 +7,7 @@
   ansible.builtin.set_fact:
     verify_ags_unit_dir: "{{ verify_ags_apps_units_install_root }}/{{ app.installDir }}/{{ app.tag }}"
     verify_ags_spine_link: "{{ verify_ags_apps_units_spine_config_dir }}/{{ app.spineLink }}"
+    verify_ags_skin_dir: "{{ verify_ags_apps_units_spine_config_dir }}/{{ app.configDir }}"
     verify_ags_xdg_link: "{{ verify_xdg_config_home }}/{{ app.xdgLink }}"
     verify_ags_bin_link: >-
       {{ (verify_cli_bin_dir | trim) ~ '/' ~ app.binLink
@@ -67,6 +68,49 @@
       tuple platform, {{ verify_ags_spine_link }} -> the unit, and
       {{ verify_ags_xdg_link }} -> the spine link. Manifest identity must match
       the app list (app/instance/configDir/configLink).
+
+# REQ-020: the runtime owns config/<configDir>/skin.css + skin.json (the
+# app-scoped skin pointers). Provisioning NEVER creates them and a fresh
+# install has none before the first runtime reconcile/seed — so this pair
+# tolerates ABSENT pointers and checks only what is present: a present pointer
+# must be a symlink into the runtime's current/ dir (skins/<configDir>.css or
+# skin.json) and must resolve. That catches a stale provisioning copy or a
+# dangling pointer without making the first install depend on runtime state.
+- name: "{{ app.app }} : stat the runtime skin pointers (link metadata)"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_skin_dir }}/{{ item }}"
+    follow: false
+  loop: "{{ verify_skins_consumer_pointer_names }}"
+  register: verify_ags_skin_pointer_links
+
+- name: "{{ app.app }} : stat the runtime skin pointer targets (followed)"
+  ansible.builtin.stat:
+    path: "{{ verify_ags_skin_dir }}/{{ item }}"
+    follow: true
+  loop: "{{ verify_skins_consumer_pointer_names }}"
+  register: verify_ags_skin_pointer_targets
+
+- name: "{{ app.app }} : assert present runtime skin pointers are current/ links"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (item.0.stat.exists is false)
+        or (item.0.stat.islnk
+            and item.0.stat.lnk_target is search('/dotfiles/current/')
+            and item.0.stat.lnk_target is search('(skins/[^/]+\.css|skin\.json)$')
+            and item.1.stat.exists
+            and item.1.stat.isreg)
+    loop: >-
+      {{ verify_ags_skin_pointer_links.results
+         | zip(verify_ags_skin_pointer_targets.results) | list }}
+    loop_control:
+      label: "{{ item.0.item }}"
+    fail_msg: >-
+      {{ app.app }} has a runtime skin pointer under {{ verify_ags_skin_dir }}
+      that is not the expected `current/` symlink (or does not resolve). The
+      runtime seeder owns skin.css/skin.json; provisioning only guarantees the
+      config dir + XDG link. Reconcile the runtime (or remove a stale
+      provisioning copy) — do not hand-write these pointers.
 
 - name: "{{ app.app }} : assert app.tsx declares the manifest instance"
   ansible.builtin.command:

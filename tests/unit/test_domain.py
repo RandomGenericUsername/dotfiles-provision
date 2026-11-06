@@ -78,6 +78,7 @@ class TestAssetKind:
 
         assert AssetKind.TPR_TEMPLATE.value == "tpr-template"
         assert AssetKind.WEG_EFFECTS.value == "weg-effects"
+        assert AssetKind.SKINS.value == "skins"
 
     def test_spine_segment_maps_to_install_spine_paths(self) -> None:
         assert AssetKind.WALLPAPER.spine_segment() == "wallpapers"
@@ -86,6 +87,7 @@ class TestAssetKind:
 
         assert AssetKind.TPR_TEMPLATE.spine_segment() == "tpr-templates"
         assert AssetKind.WEG_EFFECTS.spine_segment() == "weg-effects.yaml"
+        assert AssetKind.SKINS.spine_segment() == "skins"
 
 
 class TestSpec:

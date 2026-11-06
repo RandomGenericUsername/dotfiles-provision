@@ -26,7 +26,7 @@
 #   1. ansible.builtin.file `state: directory` (AC 9) owns idempotency +
 #      check-mode natively. Exists because unarchive does NOT create its
 #      `dest` ("The given path must exist. Base directory is not created by
-#      this module") — the four deploy targets are re-ensured here so the role
+#      this module") — the deploy targets are re-ensured here so the role
 #      is self-contained on a direct assets.yaml run.
 #   2. ansible.builtin.unarchive (AC 2) with remote_src: true (the tarball is
 #      already on the target — the repo is local). DELIBERATELY NO `creates:`
@@ -177,6 +177,16 @@
   register: assets_desktop_schema
   when: not ansible_check_mode
 
+# REQ-020: the skins class ships its local schema envelope at skins/schema.json
+# (schema_major 1, delegating token types to the vendored contracts/PIN). Read
+# it with the other class contracts before the first copy so a tag carrying an
+# unreadable skin plane fails before any data lands.
+- name: Read the pinned skins schema contract
+  ansible.builtin.slurp:
+    src: "{{ assets_checkout_root }}/skins/schema.json"
+  register: assets_skins_schema
+  when: not ansible_check_mode
+
 - name: Read every pinned template schema contract
   ansible.builtin.slurp:
     src: "{{ item.path }}"
@@ -215,6 +225,22 @@
       contract's major moves independently of the repo tag, so this is a corpus
       the installer cannot read — pin an assets tag whose desktop contract is
       {{ assets_schema_support.desktop }}, or widen `assets_schema_support`
+      deliberately (a MAJOR bump of the consumer contract)
+  when: not ansible_check_mode
+
+- name: Assert the pinned skins schema_major is in the consumer support window
+  ansible.builtin.assert:
+    that: >-
+      (assets_skins_schema.content | b64decode | from_json).schema_major
+      == assets_schema_support.skins
+    fail_msg: >-
+      {{ assets_skins_schema.source }} declares schema_major
+      {{ (assets_skins_schema.content | b64decode | from_json).schema_major }},
+      but this consumer supports skins schema_major
+      {{ assets_schema_support.skins }} (assets {{ assets_pinned_tag }}). The
+      contract's major moves independently of the repo tag, so this is a corpus
+      the installer cannot read — pin an assets tag whose skins contract is
+      {{ assets_schema_support.skins }}, or widen `assets_schema_support`
       deliberately (a MAJOR bump of the consumer contract)
   when: not ansible_check_mode
 
