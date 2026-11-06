@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.41
+
+Pin the final seven-app AGS release tags in the engine fixtures (REQ-027).
+
+- The final all-standalone app-list fixture and the composition fixture
+  `apps.yaml` now pin the released generation: bar **v0.5.0**, notifications
+  **v0.4.0**, capture **v0.6.1**, clipboard **v0.5.0**, and
+  wallpaper-selector/icme/btop-theme-studio **v0.4.1**. Fixture repos remain
+  placeholders.
+- The `ags_apps_units` execution tests create each fake app repo at the
+  fixture tag and assert install paths, `pinned` records, rollback re-tags and
+  tag bumps from `entry["tag"]`; no stale `v0.1.0` topology assumption
+  remains. A test asserts the seven-app inventory equals the final tag map.
+- The verify provisioned-layout simulation already builds each AGS unit from
+  `entry["tag"]`, so it now installs and verifies the same final inventory.
+  `dotfiles-v3` is not edited here.
+
 ## 0.1.40
 
 Consume dotfiles-assets v0.13.0: the fourth built-in skin and layout cleanup

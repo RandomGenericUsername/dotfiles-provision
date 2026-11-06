@@ -78,6 +78,17 @@ _SEVEN_APPS = [
     "btop-theme-studio",
 ]
 
+#: The released tags of the final all-standalone epoch (REQ-027).
+_FINAL_APP_TAGS = {
+    "bar": "v0.5.0",
+    "notifications": "v0.4.0",
+    "capture": "v0.6.1",
+    "clipboard": "v0.5.0",
+    "wallpaper-selector": "v0.4.1",
+    "icme": "v0.4.1",
+    "btop-theme-studio": "v0.4.1",
+}
+
 
 def _tasks_file(name: str = "main.yml") -> list[dict[str, Any]]:
     data = yaml.safe_load((_ROLE / "tasks" / name).read_text())
@@ -120,6 +131,15 @@ class TestAllStandaloneFixture:
         apps = _app_list()
         assert [entry["app"] for entry in apps] == _SEVEN_APPS
         assert {entry["owner"] for entry in apps} == {"standalone"}
+
+    def test_fixture_pins_the_final_released_tags(self) -> None:
+        """REQ-027: the final inventory is exactly the released generation.
+
+        `dotfiles-v3` deploy-coverage compares the composition to this fixture;
+        a stale tag here makes the composition/engine final topology disagree.
+        """
+        inventory = {entry["app"]: entry["tag"] for entry in _app_list()}
+        assert inventory == _FINAL_APP_TAGS
 
     def test_every_app_has_exactly_one_owner_and_unique_surfaces(self) -> None:
         apps = _app_list()
@@ -637,6 +657,7 @@ def _make_app_repo(
     colors_pointer: Path | None = None,
     include_bin_tool: bool = True,
     icons_json: str | None = None,
+    tag: str,
 ) -> Path:
     app = app or name
     instance = instance or name
@@ -677,7 +698,7 @@ def _make_app_repo(
         ],
         check=True,
     )
-    subprocess.run(["git", "-C", str(repo), "tag", "v0.1.0"], check=True)
+    subprocess.run(["git", "-C", str(repo), "tag", tag], check=True)
     return repo
 
 
@@ -815,6 +836,7 @@ def _stage_seven_app_repos(tmp_path: Path) -> tuple[dict[str, Path], Path]:
             bin_link=entry.get("binLink"),
             colors_pointer=colors if entry.get("barPalettePointer") else None,
             icons_json=icons_json if app_id == "bar" else None,
+            tag=entry["tag"],
         )
     return repos, icons or ""
 
@@ -857,12 +879,12 @@ class TestRoleExecution:
             assert result.returncode == 0, result.stdout + result.stderr
             apps = {entry["app"]: entry for entry in _app_list()}
             for app_id, entry in apps.items():
-                unit = install / "apps" / entry["installDir"] / "v0.1.0"
+                unit = install / "apps" / entry["installDir"] / entry["tag"]
                 spine = install / "config" / entry["spineLink"]
                 xdg = Path(paths["xdg"]) / entry["xdgLink"]
                 assert (unit / "app.tsx").is_file(), app_id
                 assert not (unit / ".git").exists(), app_id
-                assert (install / "apps" / entry["installDir"] / "pinned").read_text().strip() == "v0.1.0"
+                assert (install / "apps" / entry["installDir"] / "pinned").read_text().strip() == entry["tag"]
                 assert spine.is_symlink() and os.readlink(spine) == str(unit), app_id
                 assert xdg.is_symlink() and os.readlink(xdg) == str(spine), app_id
                 if "binLink" in entry:
@@ -880,10 +902,11 @@ class TestRoleExecution:
             assert shortcut.is_symlink()
             assert os.readlink(shortcut) == str(install / "ags-platform" / "v0.9.0")
 
+            bar_tag = apps["bar"]["tag"]
             assert os.readlink(install / "config" / "ags") == str(
-                install / "apps" / "bar" / "v0.1.0"
+                install / "apps" / "bar" / bar_tag
             )
-            bar_unit = install / "apps" / "bar" / "v0.1.0"
+            bar_unit = install / "apps" / "bar" / bar_tag
             assert (bar_unit / "colors.css").is_symlink()
             assert os.readlink(bar_unit / "colors.css") == str(
                 Path(paths["state"]) / "dotfiles" / "current" / "colors.gtk.css"
@@ -930,7 +953,7 @@ class TestRoleExecution:
         try:
             assert first.returncode == 0, first.stdout + first.stderr
             units = [
-                install / "apps" / entry["installDir"] / "v0.1.0"
+                install / "apps" / entry["installDir"] / entry["tag"]
                 for entry in _app_list()
             ]
             before = {str(path): _sha256_tree(path) for path in units}
@@ -988,7 +1011,8 @@ class TestRoleExecution:
             ],
             check=True,
         )
-        subprocess.run(["git", "-C", str(capture), "tag", "-f", "v0.1.0"], check=True)
+        capture_tag = next(entry["tag"] for entry in _app_list() if entry["app"] == "capture")
+        subprocess.run(["git", "-C", str(capture), "tag", "-f", capture_tag], check=True)
         provisioning = _write_composition(tmp_path, repos)
         _stage_fake_platform(install, icons_json=bar_icons)
         _stage_autostart(install)
@@ -1019,7 +1043,7 @@ class TestRoleExecution:
             )
             state_before = colors.read_text()
             old_units = [
-                install / "apps" / entry["installDir"] / "v0.1.0"
+                install / "apps" / entry["installDir"] / entry["tag"]
                 for entry in _app_list()
             ]
             before = {str(path): _sha256_tree(path) for path in old_units}

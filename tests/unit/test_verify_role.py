@@ -4785,8 +4785,8 @@ def _write_stub_binaries(home: Path) -> Path:
     # other four are the remaining keybind-invoked launchers (S4 / AD-10 layer 3:
     # clipboard history, wallpaper picker, icon-mapping editor, btop studio),
     # all rendered by the cli_tools role while legacy or by ags_apps_units after
-    # the clipboard flip. capture-tool itself is a SYMLINK into the ags-apps
-    # unit (v0.4.0) and is created below once the unit fixture exists.
+    # the clipboard flip. capture-tool itself is a SYMLINK into the capture
+    # unit at its fixture tag and is created below once the unit fixture exists.
     for name in (
         "capture-ui",
         "rofi-ui",
