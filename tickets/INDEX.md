@@ -24,7 +24,7 @@
 - [REQ-025-autostart-always-apps/ticket.md](./REQ-025-autostart-always-apps/ticket.md) — Verify always-on AGS apps by unit ownership, not autostart | `done` | tag: v0.1.39 | worktree: .worktrees/REQ-025/ | branch: ticket/REQ-025-autostart-always-apps
 - [REQ-026-assets-v013-terminal/ticket.md](./REQ-026-assets-v013-terminal/ticket.md) — Consume dotfiles-assets v0.13.0 (terminal skin, cleanup layout removal) | `done` | tag: v0.1.40 | worktree: .worktrees/REQ-026/ | branch: ticket/REQ-026-assets-v013-terminal
 - [REQ-027-final-app-tags/ticket.md](./REQ-027-final-app-tags/ticket.md) — Pin the final seven-app AGS release tags in the engine fixtures | `done` | tag: v0.1.41 | worktree: .worktrees/REQ-027/ | branch: ticket/REQ-027-final-app-tags
-- [REQ-028-platform-v091-mirror/ticket.md](./REQ-028-platform-v091-mirror/ticket.md) — Mirror ags-platform v0.9.1 in the engine pins | `in-progress` | worktree: .worktrees/REQ-028/ | branch: ticket/REQ-028-platform-v091-mirror
+- [REQ-028-platform-v091-mirror/ticket.md](./REQ-028-platform-v091-mirror/ticket.md) — Mirror ags-platform v0.9.1 in the engine pins | `done` | tag: v0.1.42 | worktree: .worktrees/REQ-028/ | branch: ticket/REQ-028-platform-v091-mirror
 
 ## Bugs
 
