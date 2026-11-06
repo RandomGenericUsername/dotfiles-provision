@@ -22,7 +22,7 @@
 - [REQ-023-appearance-supervision/ticket.md](./REQ-023-appearance-supervision/ticket.md) — Supervise the always-on AGS apps with systemd --user units | `done` | tag: v0.1.37 | worktree: .worktrees/REQ-023/ | branch: ticket/REQ-023-appearance-supervision
 - [REQ-024-appearance-v2-mirrors/ticket.md](./REQ-024-appearance-v2-mirrors/ticket.md) — Mirror the dotfiles-v3 appearance v2 tuple in the engine | `done` | tag: v0.1.38 | worktree: .worktrees/REQ-024/ | branch: ticket/REQ-024-appearance-v2-mirrors
 - [REQ-025-autostart-always-apps/ticket.md](./REQ-025-autostart-always-apps/ticket.md) — Verify always-on AGS apps by unit ownership, not autostart | `done` | tag: v0.1.39 | worktree: .worktrees/REQ-025/ | branch: ticket/REQ-025-autostart-always-apps
-- [REQ-026-assets-v013-terminal/ticket.md](./REQ-026-assets-v013-terminal/ticket.md) — Consume dotfiles-assets v0.13.0 (terminal skin, cleanup layout removal) | `in-progress` | worktree: .worktrees/REQ-026/ | branch: ticket/REQ-026-assets-v013-terminal
+- [REQ-026-assets-v013-terminal/ticket.md](./REQ-026-assets-v013-terminal/ticket.md) — Consume dotfiles-assets v0.13.0 (terminal skin, cleanup layout removal) | `done` | tag: v0.1.40 | worktree: .worktrees/REQ-026/ | branch: ticket/REQ-026-assets-v013-terminal
 
 ## Bugs
 
