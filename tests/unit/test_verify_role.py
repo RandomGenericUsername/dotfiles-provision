@@ -289,6 +289,10 @@ _SKIN_CONTRACT_BODIES = {
 
 def _skin_manifest_body(name: str) -> str:
     """A minimal v2-shape manifest: schemaVersion, name and the v2 token paths."""
+    panel_radius = 0 if name == "terminal" else 12
+    font_family = (
+        "JetBrainsMono Nerd Font, monospace" if name == "terminal" else "inherit"
+    )
     lines = [
         "schemaVersion = 2",
         f'name = "{name}"',
@@ -297,7 +301,7 @@ def _skin_manifest_body(name: str) -> str:
         'bg = "alpha(@surface, 0.94)"',
         'border = "@primary"',
         "border-width = 1.5",
-        "radius = 12",
+        f"radius = {panel_radius}",
         "padding = 11",
         'shadow = "none"',
         'blur = "none"',
@@ -356,7 +360,7 @@ def _skin_manifest_body(name: str) -> str:
         'ring = "transparent"',
         "",
         "[groups.type]",
-        'font-family = "inherit"',
+        f'font-family = "{font_family}"',
         "font-weight = 400",
         "letter-spacing = 0",
         "size-caption = 10.5",
@@ -378,11 +382,51 @@ def _skin_manifest_body(name: str) -> str:
         "",
     ]
     if name == "paper":
+        # The assets branch is authored as explicit SAME-SHAPE groups: a mode
+        # override replaces the whole group, not individual roles.
         lines.extend(
             [
                 "[mode.light.surface.panel]",
                 'bg = "@surface_container_lowest"',
                 'border = "alpha(@on_surface, 0.22)"',
+                "border-width = 1",
+                "radius = 6",
+                "padding = 11",
+                'shadow = "none"',
+                'blur = "none"',
+                "",
+                "[mode.light.surface.card]",
+                'bg = "@surface_container_low"',
+                'border = "alpha(@on_surface, 0.10)"',
+                "border-width = 1",
+                "radius = 4",
+                "padding = 10",
+                "",
+                "[mode.light.surface.cell]",
+                'bg = "transparent"',
+                'border = "transparent"',
+                "border-width = 0",
+                "radius = 3",
+                "padding = 8",
+                'hover-bg = "alpha(@on_surface, 0.06)"',
+                "",
+                "[mode.light.surface.control]",
+                'bg = "transparent"',
+                'border = "alpha(@on_surface, 0.22)"',
+                "border-width = 1",
+                "radius = 3",
+                "padding = 4",
+                "font-size = 11",
+                "font-weight = 600",
+                "",
+                "[mode.light.surface.pill]",
+                'bg = "alpha(@on_surface, 0.10)"',
+                'border = "alpha(@on_surface, 0.16)"',
+                "border-width = 1",
+                "radius = 20",
+                "padding = 2",
+                "font-size = 9.5",
+                "letter-spacing = 0.05",
             ]
         )
     return "\n".join(lines)
@@ -407,7 +451,7 @@ def _write_deployed_skins(spine: Path) -> None:
     contracts = skins / "contracts"
     for directory in (manifests, templates, contracts):
         directory.mkdir(parents=True, exist_ok=True)
-    for name in ("glass", "flat", "paper"):
+    for name in ("glass", "flat", "paper", "terminal"):
         (manifests / f"{name}.toml").write_text(_skin_manifest_body(name))
     for template in _SKIN_TEMPLATE_FILES:
         (templates / template).write_text(
@@ -1916,11 +1960,17 @@ class TestVerifyVars:
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
-    def test_skins_pin_is_v0122_with_the_v2_contract_and_templates(self) -> None:
-        """REQ-024: v0.12.2 ships seven templates and the contracts v0.7.0 plane."""
+    def test_skins_pin_is_v0130_with_the_v2_contract_and_templates(self) -> None:
+        """REQ-026: v0.13.0 ships four manifests and the contracts v0.7.0 plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.12.2"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.13.0"
         assert str(data["verify_skins_expected_contract_tag"]) == "v0.7.0"
+        assert [str(item) for item in data["verify_skins_manifest_names"]] == [
+            "glass",
+            "flat",
+            "paper",
+            "terminal",
+        ]
         assert [str(item) for item in data["verify_skins_template_files"]] == [
             "ags.gtk.css.j2",
             "ags-clipboard.gtk.css.j2",
@@ -3200,6 +3250,8 @@ _SKIN_VERIFY_TASK_NAMES = (
     "Assert the deployed skin manifests have the pinned v2 shape",
     "Read the deployed skin templates",
     "Assert every deployed skin template carries resolvable v2 token placeholders",
+    "Expand every deployed skin template for every manifest and mode",
+    "Assert every deployed skin template expands for every manifest and mode",
     "Read the deployed skins v2 schema envelope",
     "Read the vendored appearance-json contract",
     "Assert the deployed skins schema envelope is the v2 appearance envelope",
@@ -3266,6 +3318,61 @@ class TestVerifySkinPlane:
         assert result.returncode == 0, output
         assert "changed=0" in output
         assert "failed=0" in output
+
+    def test_deployed_skin_plane_accepts_the_fourth_terminal_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        """REQ-026: glass/flat/paper/terminal all expand through seven templates."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        manifests = sorted(
+            path.name for path in (install / "skins" / "manifests").iterdir()
+        )
+        assert manifests == ["flat.toml", "glass.toml", "paper.toml", "terminal.toml"]
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, output
+        assert "failed=0" in output, output
+
+    def test_skin_plane_rejects_a_tampered_terminal_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        """REQ-026: terminal must stay dense-monospace (radius 0 + monospace)."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        manifest = install / "skins" / "manifests" / "terminal.toml"
+        manifest.write_text(
+            _skin_manifest_body("terminal").replace(
+                'font-family = "JetBrainsMono Nerd Font, monospace"',
+                'font-family = "inherit"',
+            )
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a non-mono terminal manifest must fail verify"
+        assert "terminal type.font-family" in output, output
+
+    def test_skin_plane_rejects_a_retired_capture_layout_block(
+        self, tmp_path: Path
+    ) -> None:
+        """REQ-026: v0.13.0 removed the CSS-min ags-capture/btop layout blocks."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        manifest = install / "skins" / "manifests" / "glass.toml"
+        manifest.write_text(
+            _skin_manifest_body("glass")
+            + "\n[groups.layout.ags-capture]\npanel-width = 560\n"
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a retired capture layout block must fail verify"
+        assert "retired CSS-min layout block" in output, output
 
     def test_skin_plane_rejects_a_missing_per_app_template(
         self, tmp_path: Path

@@ -1708,12 +1708,38 @@
       {{ item.item }} is empty, has no {{ '{{SKIN_' }} placeholders, or names a
       placeholder outside the v2 CSS token paths. The seven
       <configDir>.gtk.css.j2 templates must all be real expander inputs whose
-      placeholders resolve against every v2 manifest (glass/flat/paper); layout
-      tokens are TSX-owned and must never be expanded into CSS. Re-run the
-      assets playbook against the pinned {{ verify_assets_pinned_tag }} corpus.
+      placeholders resolve against every v2 manifest
+      ({{ verify_skins_manifest_names | join('/') }}); layout tokens are
+      TSX-owned and must never be expanded into CSS. Re-run the assets playbook
+      against the pinned {{ verify_assets_pinned_tag }} corpus.
   loop: "{{ verify_skins_template_raw.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
+  when: not ansible_check_mode
+
+- name: Expand every deployed skin template for every manifest and mode
+  ansible.builtin.command:
+    argv: "{{ [ansible_python_interpreter | default('python3'), '-c',
+               verify_skins_expand_check_script,
+               verify_skins_manifests_dir, verify_skins_templates_dir,
+               verify_skins_manifest_names | to_json,
+               verify_skins_template_files | to_json] }}"
+  register: verify_skins_expansion
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert every deployed skin template expands for every manifest and mode
+  ansible.builtin.assert:
+    that:
+      - verify_skins_expansion.rc == 0
+    fail_msg: >-
+      the deployed skin templates under {{ verify_skins_templates_dir }} do not
+      expand cleanly through the deployed v2 manifests
+      ({{ verify_skins_manifest_names | join(', ') }}) for both modes:
+      {{ verify_skins_expansion.stderr | default('') }}
+      Re-run the assets playbook against the pinned {{ verify_assets_pinned_tag }}
+      corpus.
   when: not ansible_check_mode
 
 - name: Read the deployed skins v2 schema envelope

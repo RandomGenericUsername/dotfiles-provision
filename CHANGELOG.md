@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.40
+
+Consume dotfiles-assets v0.13.0: the fourth built-in skin and layout cleanup
+(REQ-026).
+
+- Every `*_assets_pinned_tag` mirror (all nine roles), the composition
+  fixture `assets.yaml` (tag + four checkout sources) and
+  `program-tuple.yaml` move to **dotfiles-assets v0.13.0**. The contracts PIN
+  stays **v0.7.0**.
+- The deployed skin-plane verify accepts the fourth Appearance v2 built-in
+  `terminal` (dense monospace, square/hairline) alongside `glass`, `flat` and
+  `paper`, and expands all seven `<configDir>.gtk.css.j2` templates through
+  every manifest × mode.
+- Terminal is checked structurally: `surface.panel.radius = 0` and a
+  `monospace` `type.font-family`. The retired CSS-min
+  `layout.ags-capture`/`layout.ags-btop-studio` blocks must be absent, while
+  other optional layout groups remain optional. The v2 nested-group,
+  appearance-json and contracts PIN sha256 checks are unchanged.
+- Runtime-owned `config/<configDir>/skin.css`/`skin.json` pointers remain
+  optional when absent and still must resolve into `current/` when present.
+
 ## 0.1.39
 
 Verify always-on AGS apps by unit ownership, not autostart (REQ-025).

@@ -167,7 +167,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.12.2
+verify_assets_pinned_tag: v0.13.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -207,10 +207,11 @@ verify_skins_manifest_names:
   - glass
   - flat
   - paper
+  - terminal
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
-#: v0.12.2 ships one `<configDir>.gtk.css.j2` per AGS app: the bar/settings
+#: v0.13.0 ships one `<configDir>.gtk.css.j2` per AGS app: the bar/settings
 #: template plus the six per-app targets. The expander renders `<configDir>.css`;
 #: a missing per-app template would leave that app's XDG skin pointer unbacked.
 verify_skins_template_files:
@@ -354,8 +355,29 @@ verify_skins_manifest_check_script: |
       for role in ("hover", "selected", "focus", "disabled"):
           if role not in (groups.get("state") or {}):
               failures.append(f"{path}: missing groups.state.{role}")
-      if not isinstance(groups.get("layout"), dict) or not groups["layout"]:
+      layout = groups.get("layout")
+      if not isinstance(layout, dict) or not layout:
           failures.append(f"{path}: groups.layout is empty")
+      if isinstance(layout, dict):
+          for retired in ("ags-capture", "ags-btop-studio"):
+              if retired in layout:
+                  failures.append(
+                      f"{path}: carries the retired CSS-min layout block "
+                      f"groups.layout.{retired}"
+                  )
+      if name == "terminal":
+          panel = (groups.get("surface") or {}).get("panel") or {}
+          type_group = groups.get("type") or {}
+          if panel.get("radius") != 0:
+              failures.append(
+                  f"{path}: terminal surface.panel.radius is "
+                  f"{panel.get('radius')!r}, expected 0"
+              )
+          if "monospace" not in str(type_group.get("font-family", "")):
+              failures.append(
+                  f"{path}: terminal type.font-family "
+                  f"{type_group.get('font-family')!r} is not monospace"
+              )
       mode = data.get("mode")
       if mode is not None and not isinstance(mode, dict):
           failures.append(f"{path}: mode is not a table")
@@ -367,6 +389,86 @@ verify_skins_manifest_check_script: |
       print("\n".join(failures), file=sys.stderr)
       raise SystemExit(1)
   print(f"v2 manifests ok: {len(sys.argv[2:])}")
+#: Every v2 manifest is expanded through every template for both modes. A
+#: template placeholder that no manifest can resolve, or one left unexpanded,
+#: would leave an app's XDG skin pointer unbacked at reconcile time. Mode
+#: overrides replace the whole group (matching the assets expander), so `paper`
+#: keeps its authored light surface/state/ink while `terminal` is mode-agnostic.
+verify_skins_expand_check_script: |
+  import copy
+  import json
+  import re
+  import sys
+  import tomllib
+  from pathlib import Path
+
+  manifests_dir = Path(sys.argv[1])
+  templates_dir = Path(sys.argv[2])
+  manifest_names = json.loads(sys.argv[3])
+  template_files = json.loads(sys.argv[4])
+  css_groups = ("surface", "state", "type", "ink")
+  placeholder_re = re.compile(r"\{\{(SKIN_[A-Z0-9_]+)\}\}")
+  failures = []
+  expansions = 0
+
+  def leaves(value, prefix=""):
+      if isinstance(value, dict):
+          for key, item in value.items():
+              yield from leaves(item, f"{prefix}.{key}" if prefix else key)
+      else:
+          yield prefix, value
+
+  for manifest_name in manifest_names:
+      path = manifests_dir / f"{manifest_name}.toml"
+      try:
+          with path.open("rb") as handle:
+              manifest = tomllib.load(handle)
+      except (OSError, tomllib.TOMLDecodeError) as exc:
+          failures.append(f"{path}: {exc}")
+          continue
+      base = manifest.get("groups") or {}
+      overrides = manifest.get("mode") or {}
+      for mode in ("dark", "light"):
+          resolved = {}
+          for group in css_groups:
+              source = (overrides.get(mode) or {}).get(group, base.get(group))
+              resolved[group] = copy.deepcopy(source) if isinstance(source, dict) else {}
+          by_placeholder = {
+              "SKIN_" + re.sub(r"[^A-Za-z0-9]+", "_", token_path).upper(): value
+              for group in css_groups
+              for token_path, value in leaves(resolved[group], group)
+          }
+          for template_file in template_files:
+              template_path = templates_dir / template_file
+              try:
+                  text = template_path.read_text()
+              except OSError as exc:
+                  failures.append(f"{template_path}: {exc}")
+                  continue
+              leftovers = sorted(set(placeholder_re.findall(text)) - set(by_placeholder))
+              if leftovers:
+                  failures.append(
+                      f"{template_path}: unresolved placeholder(s) {leftovers} "
+                      f"for {manifest_name!r} mode={mode}"
+                  )
+                  continue
+              expanded = placeholder_re.sub(
+                  lambda match: str(by_placeholder[match.group(1)]), text
+              )
+              remaining = sorted(set(placeholder_re.findall(expanded)))
+              if remaining:
+                  failures.append(
+                      f"{template_path}: unexpanded placeholder(s) {remaining} "
+                      f"for {manifest_name!r} mode={mode}"
+                  )
+              expansions += 1
+  if failures:
+      print("\n".join(failures), file=sys.stderr)
+      raise SystemExit(1)
+  print(
+      f"skin templates expanded: {len(template_files)} template(s) x "
+      f"{len(manifest_names)} manifest(s) x 2 mode(s) = {expansions}"
+  )
 verify_skins_contract_files:
   - PIN
   - appearance-manifest.schema.json
