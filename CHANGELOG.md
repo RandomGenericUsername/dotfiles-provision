@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.36
+
+Mirror `ags-platform` v0.8.0 in the engine pins (REQ-022).
+
+- The `ags_platform` role installs `v0.8.0`; the `verify` mirror follows. The
+  unit dir, pin file and the shared app-install shortcut still derive from the
+  one `ags_platform_version` var, so no path literal changes.
+- The composition fixture `program-tuple.yaml` moves to
+  `ags-platform: v0.8.0`, `contracts: v0.6.0` and keeps
+  `dotfiles-assets: v0.11.0`. Platform unit tests and host stand-ins follow.
+- v0.8.0 ships the app-scoped `createAppSkin` generation the final standalone
+  apps import. The assets pin and the skins verify plane are unchanged.
+- `dotfiles-v3` `make deploy-coverage` now resolves the tuple's platform tag
+  against this engine; a temporary copy with `installer.pin: v0.1.36` passes.
+
 ## 0.1.35
 
 Consume `dotfiles-assets` v0.11.0 (per-app skin templates).

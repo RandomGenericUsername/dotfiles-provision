@@ -218,8 +218,7 @@ class TestRoleStructure:
         vars_text = (_ROLE / "vars" / "main.yml").read_text()
         assert "program-tuple.yaml" in vars_text
         assert "ags_apps_units_tuple['ags-platform']" in vars_text
-        assert "v0.5.0" not in vars_text
-        assert "v0.5.0" not in vars_text
+        assert "v0.8.0" not in vars_text
         assert "ags_apps_version" not in vars_text
 
     def test_main_task_asserts_every_entry_is_standalone(self) -> None:
@@ -587,14 +586,14 @@ def _write_composition(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v0.5.0\ncontracts: v0.3.0\ndotfiles-assets: v0.11.0\n",
+        "schemaVersion: 1\nags-platform: v0.8.0\ncontracts: v0.6.0\ndotfiles-assets: v0.11.0\n",
         encoding="utf-8",
     )
     return provisioning
 
 
 def _stage_fake_platform(install: Path, icons_json: str = '{"schemaVersion": 1}\n') -> Path:
-    unit = install / "ags-platform" / "v0.5.0"
+    unit = install / "ags-platform" / "v0.8.0"
     unit.mkdir(parents=True)
     (unit / "index.ts").write_text("", encoding="utf-8")
     (unit / "icons.json").write_text(icons_json, encoding="utf-8")
@@ -754,7 +753,7 @@ class TestRoleExecution:
 
             shortcut = install / "apps" / "node_modules" / "ags-platform"
             assert shortcut.is_symlink()
-            assert os.readlink(shortcut) == str(install / "ags-platform" / "v0.5.0")
+            assert os.readlink(shortcut) == str(install / "ags-platform" / "v0.8.0")
 
             assert os.readlink(install / "config" / "ags") == str(
                 install / "apps" / "bar" / "v0.1.0"
