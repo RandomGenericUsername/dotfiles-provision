@@ -264,6 +264,22 @@ def _write_deployed_assets(spine: Path, pin: str, majors: dict[str, int]) -> Non
 
 
 _SKIN_CONTRACT_BODIES = {
+    "appearance-manifest.schema.json": '{"title": "appearance manifest"}\n',
+    "appearance-json.schema.json": json.dumps(
+        {
+            "properties": {
+                "version": {"const": 2},
+                "surface": {},
+                "state": {},
+                "type": {},
+                "ink": {},
+                "layout": {},
+            },
+            "required": ["version", "surface", "state", "type", "ink", "layout"],
+        }
+    )
+    + "\n",
+    "appearance-artifact.schema.json": '{"title": "appearance artifact"}\n',
     "skin-token.schema.json": '{"title": "skin token"}\n',
     "skin-manifest.schema.json": '{"title": "skin manifest"}\n',
     "skin-json.schema.json": '{"title": "resolved skin"}\n',
@@ -271,21 +287,104 @@ _SKIN_CONTRACT_BODIES = {
 
 
 def _skin_manifest_body(name: str) -> str:
-    """A minimal v1-shape manifest: schema_major, name and the 24 tokens."""
-    return (
-        "schema_major = 1\n"
-        f'name = "{name}"\n\n'
-        "[shape]\nradius-panel = 12\nradius-card = 9\nradius-cell = 7\n"
-        "radius-pill = 20\nborder-w = 1.5\nhairline-w = 1\n\n"
-        "[rhythm]\ngap = 8\ncell-pad = \"8px 9px\"\n\n"
-        "[surface]\nbg-panel = \"transparent\"\nbg-card = \"transparent\"\n"
-        "border = \"transparent\"\nshadow = \"none\"\nblur = \"none\"\n\n"
-        "[ink]\nink = \"@on_surface\"\nink-dim = \"alpha(@on_surface, 0.62)\"\n"
-        "accent = \"@primary\"\nink-over = \"auto\"\n\n"
-        "[type]\nfont-family = \"inherit\"\ntitle-size = 12.5\ntext-size = 13\n\n"
-        "[layout]\npanel-width = 312\nbt-list-spacing = 4\n"
-        "bar-row-height = 0\nchip-min = 0\n"
-    )
+    """A minimal v2-shape manifest: schemaVersion, name and the v2 token paths."""
+    lines = [
+        "schemaVersion = 2",
+        f'name = "{name}"',
+        "",
+        "[groups.surface.panel]",
+        'bg = "alpha(@surface, 0.94)"',
+        'border = "@primary"',
+        "border-width = 1.5",
+        "radius = 12",
+        "padding = 11",
+        'shadow = "none"',
+        'blur = "none"',
+        "",
+        "[groups.surface.card]",
+        'bg = "alpha(@surface_container_high, 0.18)"',
+        'border = "alpha(@on_surface, 0.10)"',
+        "border-width = 1",
+        "radius = 9",
+        "padding = 10",
+        "",
+        "[groups.surface.cell]",
+        'bg = "transparent"',
+        'border = "transparent"',
+        "border-width = 0",
+        "radius = 7",
+        "padding = 8",
+        'hover-bg = "alpha(@on_surface, 0.08)"',
+        "",
+        "[groups.surface.control]",
+        'bg = "transparent"',
+        'border = "alpha(@on_surface, 0.26)"',
+        "border-width = 1",
+        "radius = 7",
+        "padding = 4",
+        "font-size = 11",
+        "font-weight = 600",
+        "",
+        "[groups.surface.pill]",
+        'bg = "alpha(@on_surface, 0.12)"',
+        'border = "alpha(@on_surface, 0.14)"',
+        "border-width = 1",
+        "radius = 20",
+        "padding = 2",
+        "font-size = 9.5",
+        "letter-spacing = 0.05",
+        "",
+        "[groups.state.hover]",
+        'fill = "alpha(@on_surface, 0.08)"',
+        'ink = "@on_surface"',
+        'ring = "@primary"',
+        "",
+        "[groups.state.selected]",
+        'fill = "@primary_container"',
+        'ink = "@on_primary_container"',
+        'ring = "@primary"',
+        "",
+        "[groups.state.focus]",
+        'fill = "transparent"',
+        'ink = "@on_surface"',
+        'ring = "@primary"',
+        "",
+        "[groups.state.disabled]",
+        'fill = "transparent"',
+        'ink = "alpha(@on_surface, 0.38)"',
+        'ring = "transparent"',
+        "",
+        "[groups.type]",
+        'font-family = "inherit"',
+        "font-weight = 400",
+        "letter-spacing = 0",
+        "size-caption = 10.5",
+        "size-meta = 11",
+        "size-body = 13",
+        "size-title = 12.5",
+        "size-display = 16",
+        "",
+        "[groups.ink]",
+        'ink = "@on_surface"',
+        'ink-dim = "alpha(@on_surface, 0.62)"',
+        'accent = "@primary"',
+        'accent-muted = "alpha(@primary, 0.18)"',
+        'ink-over = "auto"',
+        "",
+        "[groups.layout.ags]",
+        "panel-width = 312",
+        "bt-list-spacing = 4",
+        "",
+    ]
+    if name == "paper":
+        lines.extend(
+            [
+                "[mode.light.surface.panel]",
+                'bg = "@surface_container_lowest"',
+                'border = "alpha(@on_surface, 0.22)"',
+            ]
+        )
+    return "\n".join(lines)
 
 
 _SKIN_TEMPLATE_FILES = (
@@ -300,7 +399,7 @@ _SKIN_TEMPLATE_FILES = (
 
 
 def _write_deployed_skins(spine: Path) -> None:
-    """Materialize the deployed <spine>/skins data verify reads (REQ-020/021)."""
+    """Materialize the deployed <spine>/skins v2 data verify reads."""
     skins = spine / "skins"
     manifests = skins / "manifests"
     templates = skins / "templates"
@@ -311,10 +410,39 @@ def _write_deployed_skins(spine: Path) -> None:
         (manifests / f"{name}.toml").write_text(_skin_manifest_body(name))
     for template in _SKIN_TEMPLATE_FILES:
         (templates / template).write_text(
-            ".skin { border-radius: {{SKIN_RADIUS_PANEL}}px; }\n"
+            ".skin { border-radius: {{SKIN_SURFACE_PANEL_RADIUS}}px; "
+            "color: {{SKIN_INK_INK}}; }\n"
         )
-    (skins / "schema.json").write_text('{"schema_major": 1}\n')
-    pin_lines = ["contracts=v0.6.0\n"]
+    (skins / "schema.json").write_text(
+        json.dumps(
+            {
+                "schema_major": 2,
+                "canonical": {
+                    "tag": "v0.7.0",
+                    "vendored": True,
+                    "delegates": {
+                        "manifest": "skins/contracts/appearance-manifest.schema.json",
+                        "json": "skins/contracts/appearance-json.schema.json",
+                        "artifact": "skins/contracts/appearance-artifact.schema.json",
+                    },
+                    "resolved_document": {
+                        "path": "skins/contracts/appearance-json.schema.json"
+                    },
+                },
+                "frozen": {
+                    "token_groups": {
+                        "surface": [],
+                        "state": [],
+                        "type": [],
+                        "ink": [],
+                        "layout": [],
+                    }
+                },
+            }
+        )
+        + "\n"
+    )
+    pin_lines = ["contracts=v0.7.0\n"]
     for name, body in _SKIN_CONTRACT_BODIES.items():
         (contracts / name).write_text(body)
         pin_lines.append(
@@ -1720,7 +1848,8 @@ class TestVerifyVars:
         "verify_skins_schema_file",
         "verify_skins_manifest_paths",
         "verify_skins_template_paths",
-        "verify_skins_token_names",
+        "verify_skins_token_paths",
+        "verify_skins_token_placeholders",
         "verify_skins_contract_paths",
         "verify_skins_consumer_pointer_names",
         "verify_assets_configs_dirs",
@@ -1786,11 +1915,11 @@ class TestVerifyVars:
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
-    def test_skins_pin_is_v011_with_seven_templates(self) -> None:
-        """REQ-021: v0.11.0 ships the bar template plus six per-app targets."""
+    def test_skins_pin_is_v0122_with_the_v2_contract_and_templates(self) -> None:
+        """REQ-024: v0.12.2 ships seven templates and the contracts v0.7.0 plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.11.0"
-        assert str(data["verify_skins_expected_contract_tag"]) == "v0.6.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.12.2"
+        assert str(data["verify_skins_expected_contract_tag"]) == "v0.7.0"
         assert [str(item) for item in data["verify_skins_template_files"]] == [
             "ags.gtk.css.j2",
             "ags-clipboard.gtk.css.j2",
@@ -1803,8 +1932,27 @@ class TestVerifyVars:
         assert "verify_skins_templates_dir" in str(
             data["verify_skins_template_paths"]
         )
-        assert len(data["verify_skins_token_names"]) == 24
-        assert "hairline-w" in data["verify_skins_token_names"]
+        assert len(data["verify_skins_token_paths"]) == 57
+        assert "surface.panel.border-width" in data["verify_skins_token_paths"]
+        assert "hairline-w" not in data["verify_skins_token_paths"]
+        placeholders = yaml.safe_load(
+            render_pin(
+                data["verify_skins_token_placeholders"],
+                verify_skins_token_paths=data["verify_skins_token_paths"],
+            )
+        )
+        assert "SKIN_SURFACE_PANEL_BG" in placeholders
+        assert "SKIN_SURFACE_PANEL_BORDER_WIDTH" in placeholders
+        assert "SKIN_HAIRLINE_W" not in placeholders
+        assert [str(item) for item in data["verify_skins_contract_files"]] == [
+            "PIN",
+            "appearance-manifest.schema.json",
+            "appearance-json.schema.json",
+            "appearance-artifact.schema.json",
+            "skin-token.schema.json",
+            "skin-manifest.schema.json",
+            "skin-json.schema.json",
+        ]
 
     def test_wlogout_legacy_template_path_is_the_spine_residue(self) -> None:
         """S3: the probe points at the SPINE copy a pre-S3 `config_copies` run left
@@ -2842,7 +2990,7 @@ class TestVerifyAgsPinMirror:
         verify_vars = _vars()
         platform_vars = _sibling_vars("ags_platform")
         assert verify_vars["verify_ags_platform_version"] == platform_vars["ags_platform_version"]
-        assert platform_vars["ags_platform_version"] == "v0.8.0"
+        assert platform_vars["ags_platform_version"] == "v0.9.0"
 
 
 class TestVerifyRuntimePinMirror:
@@ -2988,7 +3136,7 @@ class TestVerifyAssetsSchemaWindow:
         """Positive control: an in-window deployed corpus passes read-only."""
         spine = tmp_path / "spine"
         pin = str(_vars()["verify_assets_pinned_tag"])
-        _write_deployed_assets(spine, pin, {"icons": 1, "templates": 1, "desktop": 1, "skins": 1})
+        _write_deployed_assets(spine, pin, {"icons": 1, "templates": 1, "desktop": 1, "skins": 2})
         result = _run_verify_assets_tasks(
             tmp_path, _selected_verify_assets_tasks(), _verify_assets_extra_vars(spine)
         )
@@ -3001,7 +3149,7 @@ class TestVerifyAssetsSchemaWindow:
         """S5 negative: `pinned` recording another tag must fail verify."""
         spine = tmp_path / "spine"
         pin = str(_vars()["verify_assets_pinned_tag"])
-        _write_deployed_assets(spine, "v0.4.0", {"icons": 1, "templates": 1, "desktop": 1, "skins": 1})
+        _write_deployed_assets(spine, "v0.4.0", {"icons": 1, "templates": 1, "desktop": 1, "skins": 2})
         result = _run_verify_assets_tasks(
             tmp_path, _selected_verify_assets_tasks(), _verify_assets_extra_vars(spine)
         )
@@ -3015,7 +3163,7 @@ class TestVerifyAssetsSchemaWindow:
         """S5 negative: a deployed contract ahead of the window must fail."""
         spine = tmp_path / "spine"
         pin = str(_vars()["verify_assets_pinned_tag"])
-        _write_deployed_assets(spine, pin, {"icons": 2, "templates": 1, "desktop": 1, "skins": 1})
+        _write_deployed_assets(spine, pin, {"icons": 2, "templates": 1, "desktop": 1, "skins": 2})
         result = _run_verify_assets_tasks(
             tmp_path, _selected_verify_assets_tasks(), _verify_assets_extra_vars(spine)
         )
@@ -3041,13 +3189,18 @@ _SKIN_VERIFY_TASK_NAMES = (
     "Check the deployed skin plane data is present",
     "Assert the deployed skin plane data has the pinned types",
     "Read the deployed skin manifests",
-    "Assert the deployed skin manifests have the pinned v1 shape",
-    "Assert the deployed skin manifests carry every frozen token",
+    "Validate the deployed skin manifests against the v2 token paths",
+    "Assert the deployed skin manifests have the pinned v2 shape",
     "Read the deployed skin templates",
-    "Assert every deployed skin template carries resolvable token placeholders",
+    "Assert every deployed skin template carries resolvable v2 token placeholders",
+    "Read the deployed skins v2 schema envelope",
+    "Read the vendored appearance-json contract",
+    "Assert the deployed skins schema envelope is the v2 appearance envelope",
+    "Assert the vendored appearance-json contract requires the v2 resolved shape",
     "Stat the deployed vendored skin contracts with sha256 checksums",
     "Read the deployed skin contracts PIN",
-    "Assert the deployed skin contracts match the PIN tag and sha256 values",
+    "Assert the deployed skin contracts PIN names the expected tag",
+    "Assert every deployed vendored skin contract matches its PIN sha256",
 )
 
 
@@ -3122,8 +3275,26 @@ class TestVerifySkinPlane:
         assert "deployed skin plane" in output, output
         assert "incomplete" in output, output
 
+    def test_skin_plane_rejects_a_tampered_v2_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        """A v1/partial manifest must fail the v2 shape gate."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        manifest = install / "skins" / "manifests" / "glass.toml"
+        manifest.write_text(
+            'schemaVersion = 1\nname = "glass"\n[shape]\nradius-panel = 12\n'
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a v1 manifest must fail the v2 plane verify"
+        assert "schemaVersion is 1, expected 2" in output, output
+        assert "missing the nested groups table" in output, output
+
     def test_skin_plane_rejects_a_tampered_template(self, tmp_path: Path) -> None:
-        """A template placeholder that names no frozen token must fail verify."""
+        """A template placeholder outside the v2 paths must fail verify."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         template = install / "skins" / "templates" / "ags-capture.gtk.css.j2"
@@ -3146,7 +3317,7 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, "a tampered contract must fail verify"
-        assert "do not match their PIN" in output, output
+        assert "does not match its sha256 line" in output, output
 
 
 class TestVerifyDisplayManagerGreeter:
@@ -4517,7 +4688,7 @@ def _build_provisioned_layout(
         '{"schema_major": 1}\n'
     )
     (install / "assets" / assets_tag / "skins" / "schema.json").write_text(
-        '{"schema_major": 1}\n'
+        '{"schema_major": 2}\n'
     )
     # Pinned CLI checkouts (AD-10): the cli_tools role materializes one
     # tag-qualified checkout per pinned entry and records the pin beside it;
@@ -4681,7 +4852,7 @@ def _build_provisioned_layout(
     # installed by the ags_platform role as ONE versioned unit, NOT mirrored
     # per file under config/ags. The fixture mirrors verify_ags_platform_unit_dir
     # / _pin_file / _shortcut so the criterion asserts have something to pass on.
-    unit = install / "ags-platform" / "v0.8.0"
+    unit = install / "ags-platform" / "v0.9.0"
     (unit / "ports").mkdir(parents=True, exist_ok=True)
     (unit / "adapters").mkdir(parents=True, exist_ok=True)
     (unit / "package.json").write_text("{}")
@@ -4693,7 +4864,7 @@ def _build_provisioned_layout(
     (unit / "adapters" / "event-bus.ts").write_text("")
     (unit / "adapters" / "icon-registry.ts").write_text("")
     (unit / "adapters" / "astal.ts").write_text("")
-    (install / "ags-platform" / "pinned").write_text("v0.8.0\n")
+    (install / "ags-platform" / "pinned").write_text("v0.9.0\n")
     # The final all-standalone AGS topology (AD-31/AD-37): every app is its
     # own immutable tag under <install>/apps/<installDir>/<tag>, resolving the
     # ONE shared apps/node_modules/ags-platform shortcut. ags_apps_units owns

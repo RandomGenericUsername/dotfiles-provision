@@ -167,7 +167,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.11.0
+verify_assets_pinned_tag: v0.12.2
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -189,15 +189,15 @@ verify_assets_schema_support:
   icons: 1
   templates: 1
   desktop: 1
-  skins: 1
+  skins: 2
 
 # verify_skins_*: the DEPLOYED skin plane under <install>/skins (REQ-020). This
 #   is the runtime's FIRST skin root (dotfiles-runtime derive._skin_roots), so
 #   verify checks the data the runtime reads, not just the pinned checkout.
 #   Manifests + templates + vendored contracts/PIN + the local schema envelope
-#   are data; provisioning never renders or reconciles. The contract PIN fixes
-#   the canonical tag and the sha256 of the three vendored files, which verify
-#   re-hashes on the host.
+#   are data; provisioning never renders or reconciles. The v2 contract PIN
+#   fixes the canonical `contracts` tag and the sha256 of every vendored
+#   appearance/skin schema, which verify re-hashes on the host.
 verify_skins_dir: "{{ install_dir | trim }}/skins"
 verify_skins_manifests_dir: "{{ verify_skins_dir }}/manifests"
 verify_skins_templates_dir: "{{ verify_skins_dir }}/templates"
@@ -210,7 +210,7 @@ verify_skins_manifest_names:
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
-#: v0.11.0 ships one `<configDir>.gtk.css.j2` per AGS app: the bar/settings
+#: v0.12.2 ships one `<configDir>.gtk.css.j2` per AGS app: the bar/settings
 #: template plus the six per-app targets. The expander renders `<configDir>.css`;
 #: a missing per-app template would leave that app's XDG skin pointer unbacked.
 verify_skins_template_files:
@@ -224,52 +224,168 @@ verify_skins_template_files:
 verify_skins_template_paths: >-
   {{ verify_skins_template_files | map('regex_replace', '^',
      verify_skins_templates_dir ~ '/') | list }}
-#: The 24 frozen v1 token names. A template placeholder expands to one of these
-#: (`{{SKIN_RADIUS_PANEL}}` -> `radius-panel`); every manifest carries all 24,
-#: so a placeholder that maps outside this set is unresolvable on every skin.
-verify_skins_token_names:
-  - radius-panel
-  - radius-card
-  - radius-cell
-  - radius-pill
-  - border-w
-  - hairline-w
-  - gap
-  - cell-pad
-  - bg-panel
-  - bg-card
-  - border
-  - shadow
-  - blur
+#: Appearance token model v2 — the full nested CSS token paths from assets
+#: `skins/schema.json` `frozen.css_token_paths`. A v2 template placeholder is
+#: the path uppercased with every non-alphanumeric run replaced by `_`,
+#: prefixed `SKIN_` (`surface.panel.bg` -> `<SKIN_SURFACE_PANEL_BG>`). Layout
+#: tokens are TSX-owned and deliberately absent: a template expanding them
+#: would be a second owner and must fail verify.
+verify_skins_token_paths:
+  - surface.panel.bg
+  - surface.panel.border
+  - surface.panel.border-width
+  - surface.panel.radius
+  - surface.panel.padding
+  - surface.panel.shadow
+  - surface.panel.blur
+  - surface.card.bg
+  - surface.card.border
+  - surface.card.border-width
+  - surface.card.radius
+  - surface.card.padding
+  - surface.cell.bg
+  - surface.cell.border
+  - surface.cell.border-width
+  - surface.cell.radius
+  - surface.cell.padding
+  - surface.cell.hover-bg
+  - surface.control.bg
+  - surface.control.border
+  - surface.control.border-width
+  - surface.control.radius
+  - surface.control.padding
+  - surface.control.font-size
+  - surface.control.font-weight
+  - surface.pill.bg
+  - surface.pill.border
+  - surface.pill.border-width
+  - surface.pill.radius
+  - surface.pill.padding
+  - surface.pill.font-size
+  - surface.pill.letter-spacing
+  - state.hover.fill
+  - state.hover.ink
+  - state.hover.ring
+  - state.selected.fill
+  - state.selected.ink
+  - state.selected.ring
+  - state.focus.fill
+  - state.focus.ink
+  - state.focus.ring
+  - state.disabled.fill
+  - state.disabled.ink
+  - state.disabled.ring
+  - type.font-family
+  - type.font-weight
+  - type.letter-spacing
+  - type.size-caption
+  - type.size-meta
+  - type.size-body
+  - type.size-title
+  - type.size-display
+  - ink.ink
+  - ink.ink-dim
+  - ink.accent
+  - ink.accent-muted
+  - ink.ink-over
+verify_skins_token_placeholders: >-
+  {{ verify_skins_token_paths
+     | map('regex_replace', '[^A-Za-z0-9]', '_') | map('upper')
+     | map('regex_replace', '^', 'SKIN_') | list }}
+#: The v2 manifest envelope: five nested groups (`groups.surface`, `.state`,
+#: `.type`, `.ink`, `.layout`) plus optional `mode.dark`/`mode.light` overrides.
+verify_skins_manifest_groups:
+  - surface
+  - state
+  - type
   - ink
-  - ink-dim
-  - accent
-  - ink-over
-  - font-family
-  - title-size
-  - text-size
-  - panel-width
-  - bt-list-spacing
-  - bar-row-height
-  - chip-min
+  - layout
+verify_skins_manifest_surface_roles:
+  - panel
+  - card
+  - cell
+  - control
+  - pill
+verify_skins_manifest_state_roles:
+  - hover
+  - selected
+  - focus
+  - disabled
+verify_skins_manifest_check_script: |
+  import json
+  import sys
+  import tomllib
+
+  token_paths = json.loads(sys.argv[1])
+  failures = []
+  for path in sys.argv[2:]:
+      name = path.rsplit("/", 1)[-1].removesuffix(".toml")
+      try:
+          with open(path, "rb") as handle:
+              data = tomllib.load(handle)
+      except (OSError, tomllib.TOMLDecodeError) as exc:
+          failures.append(f"{path}: {exc}")
+          continue
+      if data.get("schemaVersion") != 2:
+          failures.append(f"{path}: schemaVersion is {data.get('schemaVersion')!r}, expected 2")
+      if data.get("name") != name:
+          failures.append(f"{path}: name is {data.get('name')!r}, expected {name!r}")
+      if "schema_major" in data:
+          failures.append(f"{path}: carries the v1 flat schema_major key")
+      groups = data.get("groups")
+      if not isinstance(groups, dict):
+          failures.append(f"{path}: missing the nested groups table")
+          continue
+      expected_groups = {"surface", "state", "type", "ink", "layout"}
+      if set(groups) != expected_groups:
+          failures.append(
+              f"{path}: groups are {sorted(groups)}, expected {sorted(expected_groups)}"
+          )
+      for token_path in token_paths:
+          node = groups
+          for part in token_path.split("."):
+              if not isinstance(node, dict) or part not in node:
+                  failures.append(f"{path}: missing token path {token_path}")
+                  break
+              node = node[part]
+      for role in ("panel", "card", "cell", "control", "pill"):
+          if role not in (groups.get("surface") or {}):
+              failures.append(f"{path}: missing groups.surface.{role}")
+      for role in ("hover", "selected", "focus", "disabled"):
+          if role not in (groups.get("state") or {}):
+              failures.append(f"{path}: missing groups.state.{role}")
+      if not isinstance(groups.get("layout"), dict) or not groups["layout"]:
+          failures.append(f"{path}: groups.layout is empty")
+      mode = data.get("mode")
+      if mode is not None and not isinstance(mode, dict):
+          failures.append(f"{path}: mode is not a table")
+      elif mode:
+          unknown = set(mode) - {"dark", "light"}
+          if unknown:
+              failures.append(f"{path}: unknown mode override(s) {sorted(unknown)}")
+  if failures:
+      print("\n".join(failures), file=sys.stderr)
+      raise SystemExit(1)
+  print(f"v2 manifests ok: {len(sys.argv[2:])}")
 verify_skins_contract_files:
   - PIN
+  - appearance-manifest.schema.json
+  - appearance-json.schema.json
+  - appearance-artifact.schema.json
   - skin-token.schema.json
   - skin-manifest.schema.json
   - skin-json.schema.json
 verify_skins_contract_paths: >-
   {{ verify_skins_contract_files | map('regex_replace', '^',
      verify_skins_contracts_dir ~ '/') | list }}
-verify_skins_expected_contract_tag: v0.6.0
-#: The manifest groups the frozen v1 envelope requires (assets skins/schema.json
-#: and the vendored canonical manifest schema). A missing group means the
-#: deployed copy is not the pinned shape even though the file exists.
-verify_skins_manifest_groups:
-  - shape
-  - rhythm
+verify_skins_expected_contract_tag: v0.7.0
+#: The resolved runtime document (`tokens.json`) is validated by the vendored
+#: `appearance-json` contract: version 2 plus the five fully resolved groups.
+verify_skins_resolved_token_groups:
   - surface
-  - ink
+  - state
   - type
+  - ink
   - layout
 
 # verify_skins_consumer_pointers: the runtime-owned per-configDir pointers.
@@ -776,7 +892,7 @@ verify_compositor_skeleton_files:
 #   shared app-install shortcut (<install>/apps/node_modules/ags-platform) is
 #   created by ags_apps_units. A rollback repoints that shortcut to a sibling
 #   version dir. The pin file records the installed version on the host.
-verify_ags_platform_version: v0.8.0
+verify_ags_platform_version: v0.9.0
 verify_ags_platform_unit_dir: "{{ install_dir | trim }}/ags-platform/{{ verify_ags_platform_version }}"
 verify_ags_platform_pin_file: "{{ install_dir | trim }}/ags-platform/pinned"
 

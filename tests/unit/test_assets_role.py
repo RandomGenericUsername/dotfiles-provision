@@ -800,7 +800,7 @@ class TestAssetsVars:
         assert "skins" in {str(item) for item in data["assets_deploy_dirs"]}
         assert "skins" in data["assets_classes"]
         assert data["assets_classes"]["skins"]["schema"] == "skins/schema.json"
-        assert data["assets_schema_support"]["skins"] == 1
+        assert data["assets_schema_support"]["skins"] == 2
 
         manifest = yaml.safe_load(_MANIFEST_PATH.read_text())
         assert "skins" in manifest["assets"]["classes"]
@@ -992,7 +992,7 @@ class TestAssetsSchemaContract:
         """
         data = _vars()
         support = data.get("assets_schema_support")
-        assert support == {"icons": 1, "templates": 1, "desktop": 1, "skins": 1}, support
+        assert support == {"icons": 1, "templates": 1, "desktop": 1, "skins": 2}, support
         schema_bearing = {
             name
             for name, entry in data["assets_classes"].items()
@@ -1097,7 +1097,7 @@ class TestAssetsSchemaContract:
         """
         checkout = tmp_path / "checkout"
         _write_schema_checkout(
-            checkout, {"icons": 1, "templates": 1, "desktop": 1, "skins": 1}
+            checkout, {"icons": 1, "templates": 1, "desktop": 1, "skins": 2}
         )
         result = _run_role_tasks(
             tmp_path,
@@ -1123,8 +1123,9 @@ class TestAssetsSchemaContract:
     ) -> None:
         """AD-12 negative: schema_major too high → the fetch assert fails,
         naming the file and the accepted window, before any copy."""
-        majors = {"icons": 1, "templates": 1, "desktop": 1, "skins": 1}
-        majors[schema_class] = 2
+        support = _vars()["assets_schema_support"]
+        majors = {"icons": 1, "templates": 1, "desktop": 1, "skins": 2}
+        majors[schema_class] = int(support[schema_class]) + 1
         checkout = tmp_path / "checkout"
         _write_schema_checkout(checkout, majors)
         result = _run_role_tasks(
@@ -1139,8 +1140,10 @@ class TestAssetsSchemaContract:
         assert file_fragment in output, (
             f"the failure must name the offending file ({file_fragment}); got:\n{output}"
         )
-        assert "declares schema_major 2" in output, output
-        assert f"supports {schema_class} schema_major 1" in output, output
+        assert f"declares schema_major {majors[schema_class]}" in output, output
+        assert (
+            f"supports {schema_class} schema_major {support[schema_class]}" in output
+        ), output
 
     def test_schema_check_is_skipped_under_check_mode(self, tmp_path: Path) -> None:
         """Check mode against an absent checkout stays dry and green."""

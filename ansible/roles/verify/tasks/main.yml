@@ -1664,51 +1664,28 @@
   register: verify_skins_manifest_raw
   when: not ansible_check_mode
 
-- name: Assert the deployed skin manifests have the pinned v1 shape
-  ansible.builtin.assert:
-    that:
-      - item.content | b64decode is search('(?m)^schema_major = 1$')
-      - >-
-        item.content | b64decode
-        is search('(?m)^name = "' ~ (item.item | basename
-        | regex_replace('\\.toml$', '')) ~ '"$')
-      - item.content | b64decode is search('(?m)^hairline-w = ')
-      - item.content | b64decode is search('(?m)^\[shape\]$')
-      - item.content | b64decode is search('(?m)^\[rhythm\]$')
-      - item.content | b64decode is search('(?m)^\[surface\]$')
-      - item.content | b64decode is search('(?m)^\[ink\]$')
-      - item.content | b64decode is search('(?m)^\[type\]$')
-      - item.content | b64decode is search('(?m)^\[layout\]$')
-    fail_msg: >-
-      {{ item.item | basename }} is not the pinned skin manifest shape:
-      expected schema_major = 1, name = "{{ item.item | basename
-      | regex_replace('\\.toml$', '') }}", the 24-token vocabulary with
-      `hairline-w`, and exactly the six groups
-      ({{ verify_skins_manifest_groups | join(', ') }}). Re-run the assets
-      playbook against the pinned v0.11.0 corpus.
-  loop: "{{ verify_skins_manifest_raw.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item | basename }}"
+- name: Validate the deployed skin manifests against the v2 token paths
+  ansible.builtin.command:
+    argv: "{{ [ansible_python_interpreter | default('python3'), '-c',
+               verify_skins_manifest_check_script,
+               verify_skins_token_paths | to_json] + verify_skins_manifest_paths }}"
+  register: verify_skins_manifest_validation
+  changed_when: false
+  failed_when: false
   when: not ansible_check_mode
 
-- name: Assert the deployed skin manifests carry every frozen token
+- name: Assert the deployed skin manifests have the pinned v2 shape
   ansible.builtin.assert:
     that:
-      - >-
-        (verify_skins_token_names
-         | difference(item.content | b64decode
-           | regex_findall('(?m)^([a-z0-9-]+) = ') | list)) | length == 0
+      - verify_skins_manifest_validation.rc == 0
     fail_msg: >-
-      {{ item.item | basename }} is missing frozen v1 token(s)
-      {{ verify_skins_token_names
-         | difference(item.content | b64decode
-           | regex_findall('(?m)^([a-z0-9-]+) = ') | list) | join(', ') }} —
-      every template placeholder must resolve against every manifest
-      (glass/flat/paper), so a partial token set is an unresolvable skin.
-      Re-run the assets playbook against the pinned v0.11.0 corpus.
-  loop: "{{ verify_skins_manifest_raw.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item | basename }}"
+      the deployed v2 skin manifests under {{ verify_skins_manifests_dir }} are
+      not the pinned Appearance v2 shape (schemaVersion = 2, name matching the
+      file, nested groups.surface/state/type/ink/layout, optional mode
+      overrides, and every CSS token path):
+      {{ verify_skins_manifest_validation.stderr | default('') }}
+      Re-run the assets playbook against the pinned {{ verify_assets_pinned_tag }}
+      corpus.
   when: not ansible_check_mode
 
 - name: Read the deployed skin templates
@@ -1718,26 +1695,93 @@
   register: verify_skins_template_raw
   when: not ansible_check_mode
 
-- name: Assert every deployed skin template carries resolvable token placeholders
+- name: Assert every deployed skin template carries resolvable v2 token placeholders
   ansible.builtin.assert:
     that:
       - (item.content | b64decode | length) > 0
       - item.content | b64decode is search('\{\{SKIN_')
       - >-
         ((item.content | b64decode
-          | regex_findall('\{\{(SKIN_[A-Z0-9_]+)\}\}') | unique
-          | map('lower') | map('regex_replace', '^skin_', '')
-          | map('regex_replace', '_', '-') | list)
-         | difference(verify_skins_token_names) | length) == 0
+          | regex_findall('\{\{(SKIN_[A-Z0-9_]+)\}\}') | unique | list)
+         | difference(verify_skins_token_placeholders) | length) == 0
     fail_msg: >-
       {{ item.item }} is empty, has no {{ '{{SKIN_' }} placeholders, or names a
-      placeholder that is not a frozen v1 token. The seven
+      placeholder outside the v2 CSS token paths. The seven
       <configDir>.gtk.css.j2 templates must all be real expander inputs whose
-      placeholders resolve against every manifest (glass/flat/paper). Re-run
-      the assets playbook against the pinned v0.11.0 corpus.
+      placeholders resolve against every v2 manifest (glass/flat/paper); layout
+      tokens are TSX-owned and must never be expanded into CSS. Re-run the
+      assets playbook against the pinned {{ verify_assets_pinned_tag }} corpus.
   loop: "{{ verify_skins_template_raw.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
+  when: not ansible_check_mode
+
+- name: Read the deployed skins v2 schema envelope
+  ansible.builtin.slurp:
+    src: "{{ verify_skins_schema_file }}"
+  register: verify_skins_schema_raw
+  when: not ansible_check_mode
+
+- name: Read the vendored appearance-json contract
+  ansible.builtin.slurp:
+    src: "{{ verify_skins_contracts_dir }}/appearance-json.schema.json"
+  register: verify_skins_resolved_contract_raw
+  when: not ansible_check_mode
+
+- name: Assert the deployed skins schema envelope is the v2 appearance envelope
+  ansible.builtin.assert:
+    that:
+      - >-
+        (verify_skins_schema_raw.content | b64decode | from_json).schema_major
+        == verify_assets_schema_support.skins
+      - >-
+        (verify_skins_schema_raw.content | b64decode | from_json).canonical.tag
+        == verify_skins_expected_contract_tag
+      - >-
+        (verify_skins_schema_raw.content | b64decode | from_json).canonical.vendored
+        is sameas true
+      - >-
+        ((verify_skins_schema_raw.content | b64decode | from_json).canonical.delegates
+         | dict2items | map(attribute='key') | sort | list)
+        == ['artifact', 'json', 'manifest']
+      - >-
+        ((verify_skins_schema_raw.content | b64decode | from_json).frozen.token_groups
+         | dict2items | map(attribute='key') | sort | list)
+        == ['ink', 'layout', 'state', 'surface', 'type']
+      - >-
+        (verify_skins_schema_raw.content | b64decode | from_json).canonical.resolved_document.path
+        is search('appearance-json\.schema\.json$')
+    fail_msg: >-
+      {{ verify_skins_schema_file }} is not the pinned Appearance v2 envelope:
+      expected schema_major {{ verify_assets_schema_support.skins }}, canonical
+      tag {{ verify_skins_expected_contract_tag }}, the three vendored delegates
+      (manifest/json/artifact), the five token groups
+      ({{ verify_skins_manifest_groups | join(', ') }}) and the resolved
+      tokens.json contract. Re-run the assets playbook against the pinned
+      {{ verify_assets_pinned_tag }} corpus.
+  when: not ansible_check_mode
+
+- name: Assert the vendored appearance-json contract requires the v2 resolved shape
+  ansible.builtin.assert:
+    that:
+      - >-
+        (verify_skins_resolved_contract_raw.content | b64decode | from_json).properties.version.const
+        == 2
+      - >-
+        ((verify_skins_resolved_contract_raw.content | b64decode | from_json).required
+         | sort | list)
+        == ['ink', 'layout', 'state', 'surface', 'type', 'version']
+      - >-
+        ((verify_skins_resolved_contract_raw.content | b64decode | from_json).properties
+         | dict2items | map(attribute='key') | sort | list)
+        == ['ink', 'layout', 'state', 'surface', 'type', 'version']
+    fail_msg: >-
+      {{ verify_skins_contracts_dir }}/appearance-json.schema.json is not the
+      pinned resolved-document contract: expected version 2 plus the five
+      resolved groups
+      ({{ verify_skins_resolved_token_groups | join(', ') }}), with no mode,
+      skin or palette wrapper. The runtime emits tokens.json against this
+      contract; re-run the assets playbook.
   when: not ansible_check_mode
 
 - name: Stat the deployed vendored skin contracts with sha256 checksums
@@ -1755,36 +1799,40 @@
   register: verify_skins_pin_raw
   when: not ansible_check_mode
 
-- name: Assert the deployed skin contracts match the PIN tag and sha256 values
+- name: Assert the deployed skin contracts PIN names the expected tag
   ansible.builtin.assert:
     that:
       - >-
         verify_skins_pin_raw.content | b64decode
         is search('(?m)^contracts=' ~ verify_skins_expected_contract_tag ~ '$')
       - >-
-        verify_skins_contract_checks.results | selectattr('stat.isreg') | list | length
+        verify_skins_contract_checks.results
+        | selectattr('stat.isreg') | list | length
         == verify_skins_contract_files | length
-      - >-
-        (verify_skins_pin_raw.content | b64decode
-         | regex_findall('(?m)^sha256\\s+([0-9a-f]{64})\\s+skin-token\\.schema\\.json$')
-         | first)
-        == verify_skins_contract_checks.results[1].stat.checksum
-      - >-
-        (verify_skins_pin_raw.content | b64decode
-         | regex_findall('(?m)^sha256\\s+([0-9a-f]{64})\\s+skin-manifest\\.schema\\.json$')
-         | first)
-        == verify_skins_contract_checks.results[2].stat.checksum
-      - >-
-        (verify_skins_pin_raw.content | b64decode
-         | regex_findall('(?m)^sha256\\s+([0-9a-f]{64})\\s+skin-json\\.schema\\.json$')
-         | first)
-        == verify_skins_contract_checks.results[3].stat.checksum
     fail_msg: >-
       the deployed vendored skin contracts under
-      {{ verify_skins_contracts_dir }} do not match their PIN
-      ({{ verify_skins_expected_contract_tag }}, three sha256 values). A
-      hand-edited or half-copied contract tree would let a consumer validate
-      against the wrong shape; re-run the assets playbook.
+      {{ verify_skins_contracts_dir }} do not match their PIN tag
+      {{ verify_skins_expected_contract_tag }} (expected
+      {{ verify_skins_contract_files | join(', ') }}). Re-run the assets
+      playbook against the pinned {{ verify_assets_pinned_tag }} corpus.
+  when: not ansible_check_mode
+
+- name: Assert every deployed vendored skin contract matches its PIN sha256
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg
+      - item.stat.path | basename == 'PIN' or
+        (verify_skins_pin_raw.content | b64decode
+         | regex_findall('(?m)^sha256\s+' ~ item.stat.checksum ~ '\s+'
+           ~ (item.stat.path | basename | regex_escape) ~ '$') | length) == 1
+    fail_msg: >-
+      {{ item.stat.path }} does not match its sha256 line in
+      {{ verify_skins_contracts_dir }}/PIN. A hand-edited or half-copied
+      appearance/skin contract tree would let a consumer validate against the
+      wrong shape; re-run the assets playbook.
+  loop: "{{ verify_skins_contract_checks.results | default([]) }}"
+  loop_control:
+    label: "{{ item.stat.path | basename }}"
   when: not ansible_check_mode
 
 - name: Check runtime palette files exist under the runtime current dir

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.38
+
+Mirror the `dotfiles-v3` Appearance v2 program tuple (REQ-024).
+
+- The `ags_platform` role and its `verify` mirror install/verify
+  **v0.9.0**; the unit dir, pin file and shared shortcut still derive from
+  the one `ags_platform_version` var.
+- Every `*_assets_pinned_tag` mirror (all nine roles), the composition
+  fixture `assets.yaml` (tag + checkout sources) and `program-tuple.yaml`
+  move to **dotfiles-assets v0.12.2**. The tuple's `contracts` pin is
+  **v0.7.0**. `dotfiles-v3` is not edited here.
+- The assets and verify `skins` schema support window is **2**, so the
+  v0.12.2 Appearance v2 `skins/schema.json` is accepted before the first
+  copy and re-checked in the deployed tree.
+- The deployed skin-plane verify now reads v2 data: `schemaVersion = 2`
+  manifests with nested
+  `groups.surface/state/type/ink/layout` (plus `mode.dark`/`mode.light`
+  overrides), all seven `<configDir>.gtk.css.j2` templates with v2
+  placeholder paths, the resolved `tokens.json` contract
+  (`{version: 2, surface, state, type, ink, layout}`), and the vendored
+  contracts PIN **v0.7.0** with a sha256 check for every appearance/skin
+  schema. The v1 `schema_major`/24-token/`hairline-w` checks are gone.
+- Runtime-owned `config/<configDir>/skin.css`/`skin.json` pointers remain
+  optional when absent and still must resolve into `current/` when present.
+
 ## 0.1.37
 
 Supervise the two always-on AGS apps with systemd `--user` units (REQ-023).
