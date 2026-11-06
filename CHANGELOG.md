@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.39
+
+Verify always-on AGS apps by unit ownership, not autostart (REQ-025).
+
+- `ags_apps_units` splits the assets-owned autostart assertion by launch
+  policy (AD-32, assets v0.12.1): `launch: always` apps (bar, notifications)
+  must have **zero** `--expect-instance` lines in
+  `configs/hypr/autostart.lua` and are verified through their installed,
+  enabled `dotfiles-ags-*.service` systemd `--user` unit; `launch: on-demand`
+  entries that declare an autostart identity (capture, clipboard) keep exactly
+  one `ags-run-locked` launch line.
+- The always-on unit surface (unit file plus its `default.target.wants` link)
+  is checked after render/enable by `_verify_always_on_unit.yml`. The `verify`
+  mirror applies the same launch-policy split.
+- Test fixtures use the actual assets v0.12.1 autostart shape (no `ags` /
+  `notifications` launches), with positive and negative execution tests for
+  both branches.
+
 ## 0.1.38
 
 Mirror the `dotfiles-v3` Appearance v2 program tuple (REQ-024).

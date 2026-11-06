@@ -66,7 +66,7 @@ _ROLE = _ROLES_DIR / "ags_apps_units"
 _FIXTURES = _ENGINE_ROOT / "tests" / "fixtures" / "ags-apps"
 _APP_LISTS = _FIXTURES / "app-list"
 _FAKE_APP = _FIXTURES / "fake-app"
-_ASSETS_AUTOSTART = _FIXTURES / "autostart" / "v0.6.2.lua"
+_ASSETS_AUTOSTART = _FIXTURES / "autostart" / "v0.12.1.lua"
 
 _SEVEN_APPS = [
     "bar",
@@ -157,9 +157,10 @@ class TestAllStandaloneFixture:
         assert "launcher" not in apps["bar"]
         assert "launcher" not in apps["notifications"]
 
-        # dotfiles-assets v0.6.4 owns the autostart content: the always-on bar
-        # and notifications overlay plus the boot-staggered capture and
-        # clipboard overlays. The on-demand selector/icme/studio do not appear.
+        # The app list still records the autostart identity for the always-on
+        # pair (the unit template/handoff uses it), but assets v0.12.1 removed
+        # those lines: only the boot-staggered on-demand capture and clipboard
+        # overlays launch at login. The selector/icme/studio have no identity.
         assert apps["bar"]["autostart"] == "ags"
         assert apps["notifications"]["autostart"] == "notifications"
         assert apps["capture"]["autostart"] == "capture"
@@ -167,17 +168,20 @@ class TestAllStandaloneFixture:
         for app in ("wallpaper-selector", "icme", "btop-theme-studio"):
             assert "autostart" not in apps[app]
 
-    def test_assets_v062_autostart_starts_each_declared_identity_once(self) -> None:
+    def test_assets_v0121_autostart_owns_only_on_demand_launches(self) -> None:
         content = _ASSETS_AUTOSTART.read_text()
         for entry in _app_list():
-            if "autostart" not in entry:
-                continue
-            identity = entry["autostart"]
-            assert content.count(f"--expect-instance {identity}") == 1, identity
-            assert "ags-run-locked" in content
-        # No on-demand app is started at login.
-        for app in ("wallpaper-selector", "icme", "btop-theme-studio"):
-            assert f"--expect-instance {app}" not in content
+            identity = entry["autostart"] if "autostart" in entry else entry["instance"]
+            occurrences = content.count(f"--expect-instance {identity}")
+            if entry["launch"] == "always":
+                assert occurrences == 0, (
+                    f"{entry['app']} is unit-owned and must not be autostarted"
+                )
+            elif "autostart" in entry:
+                assert occurrences == 1, identity
+                assert "ags-run-locked" in content
+            else:
+                assert occurrences == 0, identity
 
 
 class TestRoleStructure:
@@ -289,13 +293,26 @@ class TestRoleStructure:
         assert "ansible.builtin.copy" not in verify_unit
         assert "ansible.builtin.template" not in verify_unit
 
-    def test_installer_verifies_the_autostart_surface_under_the_shared_lock(self) -> None:
+    def test_installer_splits_the_autostart_surface_by_launch_policy(self) -> None:
         surfaces = (_ROLE / "tasks" / "_verify_surfaces.yml").read_text()
         assert "app.autostart" in surfaces
         assert "--expect-instance " in surfaces
         assert "ags-run-locked" in surfaces
+        # launch: always -> unit-owned, zero autostart lines, enabled unit.
+        assert "app.launch == 'always'" in surfaces
+        assert "| length - 1) == 0" in surfaces, (
+            "an always-on app must not be launched by autostart"
+        )
+        unit_check = (_ROLE / "tasks" / "_verify_always_on_unit.yml").read_text()
+        assert "ags_apps_units_unit_file" in unit_check
+        assert "ags_apps_units_unit_wants_link" in unit_check
+        assert "isreg" in unit_check and "islnk" in unit_check
+        assert "_verify_always_on_unit.yml" in (_ROLE / "tasks" / "_one.yml").read_text()
+        # launch: on-demand -> exactly one locked autostart line.
+        assert "app.launch == 'on-demand'" in surfaces
         assert "| length - 1) == 1" in surfaces, (
-            "the autostart identity must appear exactly once (no duplicate process)"
+            "an on-demand autostart identity must appear exactly once "
+            "(no duplicate process)"
         )
 
 
@@ -370,13 +387,16 @@ class TestLauncherTemplate:
         assert "ags-app-launcher.j2" in text
         assert "app.launcher" in text
 
-    def test_verify_mirror_requires_the_autostart_surface_under_the_shared_lock(
+    def test_verify_mirror_splits_the_autostart_surface_by_launch_policy(
         self,
     ) -> None:
         verify_one = (_ROLES_DIR / "verify" / "tasks" / "_verify_standalone.yml").read_text()
         assert "app.autostart" in verify_one
         assert "--expect-instance " in verify_one
         assert "ags-run-locked" in verify_one
+        assert "app.launch == 'always'" in verify_one
+        assert "| length - 1) == 0" in verify_one
+        assert "app.launch == 'on-demand'" in verify_one
         assert "| length - 1) == 1" in verify_one
 
     def test_verify_mirror_covers_all_standalone_surfaces(self) -> None:
@@ -667,11 +687,14 @@ def _write_composition(
     *,
     tags: dict[str, str] | None = None,
     fixture: str = "all-standalone.apps.yaml",
+    apps: tuple[str, ...] | None = None,
 ) -> Path:
     """Write the composition app list with per-test repo/tag overrides."""
     provisioning = root / "composition" / "dotfiles" / "provisioning"
     provisioning.mkdir(parents=True, exist_ok=True)
     document = yaml.safe_load((_APP_LISTS / fixture).read_text(encoding="utf-8"))
+    if apps is not None:
+        document["apps"] = [entry for entry in document["apps"] if entry["app"] in apps]
     tags = tags or {}
     for entry in document["apps"]:
         app_id = entry["app"]
@@ -697,12 +720,16 @@ def _stage_fake_platform(install: Path, icons_json: str = '{"schemaVersion": 1}\
     return unit
 
 
-def _stage_autostart(install: Path) -> Path:
-    """Install the verbatim assets v0.6.2 autostart fixture (never written by a role)."""
+def _stage_autostart_text(install: Path, text: str) -> Path:
     path = install / "config" / "hypr" / "autostart.lua"
-    path.parent.mkdir(parents=True)
-    path.write_text(_ASSETS_AUTOSTART.read_text(encoding="utf-8"), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
     return path
+
+
+def _stage_autostart(install: Path) -> Path:
+    """Install the verbatim assets v0.12.1 autostart fixture (never written by a role)."""
+    return _stage_autostart_text(install, _ASSETS_AUTOSTART.read_text(encoding="utf-8"))
 
 
 def _run_role(
@@ -1031,6 +1058,93 @@ class TestRoleExecution:
             assert colors.read_text() == state_before
         finally:
             _stop_fake_ags(paths)
+
+
+class TestAutostartLaunchPolicy:
+    """AD-32/assets v0.12.1: units own always-on apps; autostart owns overlays."""
+
+    def test_always_on_apps_are_unit_owned_and_absent_from_autostart(
+        self, tmp_path: Path
+    ) -> None:
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(
+            tmp_path, repos, apps=("bar", "notifications")
+        )
+        _stage_fake_platform(install, icons_json=bar_icons)
+        autostart = _stage_autostart(install)
+        result, paths = _run_role(tmp_path, provisioning)
+        _stop_fake_ags(paths)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+        content = autostart.read_text(encoding="utf-8")
+        for identity in ("ags", "notifications"):
+            assert content.count(f"--expect-instance {identity}") == 0, identity
+        user_units = Path(paths["home"]) / ".config" / "systemd" / "user"
+        for unit_name in (
+            "dotfiles-ags-bar.service",
+            "dotfiles-ags-notifications.service",
+        ):
+            unit_file = user_units / unit_name
+            wants = user_units / "default.target.wants" / unit_name
+            assert unit_file.is_file(), unit_name
+            assert wants.is_symlink(), unit_name
+            assert os.readlink(wants) == str(unit_file)
+
+    def test_always_on_app_with_an_autostart_line_fails(self, tmp_path: Path) -> None:
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos, apps=("bar",))
+        _stage_fake_platform(install, icons_json=bar_icons)
+        content = _ASSETS_AUTOSTART.read_text(encoding="utf-8")
+        _stage_autostart_text(
+            install,
+            content
+            + '    hl.exec_cmd("bash -lc \'$HOME/.local/bin/ags-run-locked '
+            "--expect-instance ags'\")\n",
+        )
+        result, paths = _run_role(tmp_path, provisioning)
+        _stop_fake_ags(paths)
+        assert result.returncode != 0
+        assert (
+            "assert autostart never launches an always-on identity"
+            in result.stdout
+        ), result.stdout + result.stderr
+        assert "bar" in result.stdout
+
+    def test_on_demand_locked_autostart_passes(self, tmp_path: Path) -> None:
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos, apps=("bar", "capture"))
+        _stage_fake_platform(install, icons_json=bar_icons)
+        autostart = _stage_autostart(install)
+        result, paths = _run_role(tmp_path, provisioning)
+        _stop_fake_ags(paths)
+        assert result.returncode == 0, result.stdout + result.stderr
+        content = autostart.read_text(encoding="utf-8")
+        assert content.count("--expect-instance capture") == 1
+        assert content.count("--expect-instance ags") == 0
+
+    def test_on_demand_missing_autostart_line_fails(self, tmp_path: Path) -> None:
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos, apps=("bar", "capture"))
+        _stage_fake_platform(install, icons_json=bar_icons)
+        content = _ASSETS_AUTOSTART.read_text(encoding="utf-8")
+        lines = [
+            line
+            for line in content.splitlines(keepends=True)
+            if "--expect-instance capture" not in line
+        ]
+        _stage_autostart_text(install, "".join(lines))
+        result, paths = _run_role(tmp_path, provisioning)
+        _stop_fake_ags(paths)
+        assert result.returncode != 0
+        assert (
+            "assert on-demand autostart launches the identity once under the "
+            "shared lock"
+        ) in result.stdout, result.stdout + result.stderr
+        assert "capture" in result.stdout
 
 
 class TestLauncherBehavior:

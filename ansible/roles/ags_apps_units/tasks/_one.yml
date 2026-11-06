@@ -279,6 +279,12 @@
         - app.launch == 'always'
         - ags_apps_units_manager_probe.rc | default(1) != 0
 
+    - name: "{{ app.app }} : verify the always-on unit is installed and enabled"
+      ansible.builtin.include_tasks: _verify_always_on_unit.yml
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+
     - name: "{{ app.app }} : start an on-demand cutover proof through the launch lock"
       ansible.builtin.command:
         argv:

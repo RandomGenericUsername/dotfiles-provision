@@ -3,6 +3,6 @@
 Renders structured output through the shared ``cli-output`` package.
 """
 
-__version__ = "0.1.38"
+__version__ = "0.1.39"
 
 __all__ = ["__version__"]

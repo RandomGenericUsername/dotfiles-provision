@@ -66,10 +66,14 @@
   when: app.launcher is defined
 
 # The autostart file is assets-corpus content (dotfiles-assets REQ-007 owns its
-# bytes); provisioning never writes it. It must nevertheless launch the app-list
-# identity exactly once, through the shared launch lock — a raw `ags run` line
-# would race the runtime restart lane and a duplicate line would create a
-# second process for the same instance (AD-28/AD-32).
+# bytes); provisioning never writes it. Its contract depends on launch policy
+# (AD-32, assets v0.12.1 epoch):
+#   launch: always   -> systemd --user owns the instance; autostart must NOT
+#                       launch it, and the installed unit must be enabled.
+#   launch: on-demand -> an entry that declares an autostart identity is
+#                       launched exactly once through the shared launch lock.
+# A raw `ags run` line would race the runtime restart lane and a duplicate
+# line would create a second process for the same instance (AD-28).
 - name: "{{ app.app }} : check the assets-owned autostart file"
   ansible.builtin.stat:
     path: "{{ ags_apps_units_autostart_file }}"
@@ -89,16 +93,38 @@
     ags_apps_units_autostart_content: "{{ ags_apps_units_autostart_raw.content | default('') | b64decode }}"
   when: app.autostart is defined
 
-- name: "{{ app.app }} : assert autostart launches the identity once under the shared lock"
+# Always-on apps are unit-owned (REQ-023); the unit and its enabled
+# default.target.wants link are verified by _verify_always_on_unit.yml after
+# the unit is rendered/enabled. Here the autostart file must not launch it.
+- name: "{{ app.app }} : assert autostart never launches an always-on identity"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_autostart_check.stat.exists | default(false)
+      - (ags_apps_units_autostart_content.split('--expect-instance ' ~ app.autostart) | length - 1) == 0
+    fail_msg: >-
+      {{ app.app }} is launch 'always', so {{ ags_apps_units_autostart_file }}
+      must NOT launch its '{{ app.autostart }}' identity. The assets corpus
+      owns that file (dotfiles-assets REQ-007); in the v0.12.1 cutover
+      always-on apps are systemd --user units, so autostart launches only the
+      on-demand overlays. Provisioning never writes assets-owned autostart
+      content.
+  when:
+    - app.autostart is defined
+    - app.launch == 'always'
+
+- name: "{{ app.app }} : assert on-demand autostart launches the identity once under the shared lock"
   ansible.builtin.assert:
     that:
       - ags_apps_units_autostart_check.stat.exists | default(false)
       - (ags_apps_units_autostart_content.split('--expect-instance ' ~ app.autostart) | length - 1) == 1
       - "'ags-run-locked' in ags_apps_units_autostart_content"
     fail_msg: >-
-      {{ app.app }} declares autostart '{{ app.autostart }}' but
-      {{ ags_apps_units_autostart_file }} does not launch it exactly once
-      through ags-run-locked. The assets corpus owns that file
-      (dotfiles-assets REQ-007); update the autostart line in the same cutover
-      epoch (AD-32). Provisioning never writes assets-owned autostart content.
-  when: app.autostart is defined
+      {{ app.app }} declares autostart '{{ app.autostart }}' for a
+      launch 'on-demand' entry, but {{ ags_apps_units_autostart_file }} does
+      not launch it exactly once through ags-run-locked. The assets corpus
+      owns that file (dotfiles-assets REQ-007); update the autostart line in
+      the same cutover epoch (AD-32). Provisioning never writes assets-owned
+      autostart content.
+  when:
+    - app.autostart is defined
+    - app.launch == 'on-demand'

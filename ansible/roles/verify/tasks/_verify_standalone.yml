@@ -224,19 +224,43 @@
     verify_ags_autostart_content: "{{ verify_ags_autostart_raw.content | default('') | b64decode }}"
   when: app.autostart is defined
 
-- name: "{{ app.app }} : assert autostart launches the identity once under the shared lock"
+# The autostart contract follows launch policy (AD-32, assets v0.12.1): a
+# launch 'always' app is owned by its systemd --user unit (checked by
+# _verify_units.yml) and must NOT be launched by autostart. A launch
+# 'on-demand' entry that declares an autostart identity launches exactly once
+# through the shared lock.
+- name: "{{ app.app }} : assert a launch 'always' app is never autostarted"
+  ansible.builtin.assert:
+    that:
+      - verify_ags_autostart_check.stat.exists | default(false)
+      - (verify_ags_autostart_content.split('--expect-instance ' ~ app.autostart) | length - 1) == 0
+    fail_msg: >-
+      {{ app.app }} is launch 'always', so
+      {{ verify_ags_apps_units_autostart_file }} must NOT launch its
+      '{{ app.autostart }}' identity. The systemd --user unit owns that app
+      (REQ-023); the assets corpus owns the autostart file (dotfiles-assets
+      REQ-007). Remove the line in the same cutover epoch (AD-32).
+      Provisioning never writes assets-owned autostart content.
+  when:
+    - app.autostart is defined
+    - app.launch == 'always'
+
+- name: "{{ app.app }} : assert on-demand autostart launches the identity once under the shared lock"
   ansible.builtin.assert:
     that:
       - verify_ags_autostart_check.stat.exists | default(false)
       - (verify_ags_autostart_content.split('--expect-instance ' ~ app.autostart) | length - 1) == 1
       - "'ags-run-locked' in verify_ags_autostart_content"
     fail_msg: >-
-      {{ app.app }} declares autostart '{{ app.autostart }}' but
+      {{ app.app }} declares autostart '{{ app.autostart }}' for a
+      launch 'on-demand' entry, but
       {{ verify_ags_apps_units_autostart_file }} does not launch it exactly once
       through ags-run-locked. The assets corpus owns that file
       (dotfiles-assets REQ-007); update the autostart line in the same cutover
       epoch (AD-32). Provisioning never writes assets-owned autostart content.
-  when: app.autostart is defined
+  when:
+    - app.autostart is defined
+    - app.launch == 'on-demand'
 
 # Shared launch-lock proof for the whole topology: the wrapper must exist and
 # every provisioned AGS launcher must route its cold start through it.

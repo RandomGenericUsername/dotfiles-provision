@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -2734,13 +2735,19 @@ class TestVerifyVars:
         skeletons = [str(f) for f in data["verify_compositor_skeleton_files"]]
         assert not any(entry.endswith("/icons.json") for entry in skeletons)
 
-    def test_verify_standalone_autostart_requires_one_locked_entry(self) -> None:
+    def test_verify_standalone_splits_autostart_by_launch_policy(self) -> None:
         text = (_ROLES_DIR / "tasks" / "_verify_standalone.yml").read_text()
         assert "app.autostart" in text
         assert "--expect-instance " in text
         assert "ags-run-locked" in text
+        assert "app.launch == 'always'" in text
+        assert "| length - 1) == 0" in text, (
+            "an always-on app must not be launched by autostart"
+        )
+        assert "app.launch == 'on-demand'" in text
         assert "| length - 1) == 1" in text, (
-            "the autostart identity must appear exactly once (no duplicate process)"
+            "the on-demand autostart identity must appear exactly once "
+            "(no duplicate process)"
         )
 
     def test_verify_derives_the_always_on_apps_from_the_same_list(self) -> None:
@@ -3530,6 +3537,119 @@ class TestEngineTagAssertion:
         when = " ".join(str(clause) for clause in assert_task.get("when", []))
         assert "not ansible_check_mode" in when
         assert "verify_expected_engine_tag" in when
+
+
+@pytest.mark.integration
+class TestVerifyAutostartLaunchPolicy:
+    """The verify mirror applies the same launch-policy split (AD-32)."""
+
+    _PATH = _ANSIBLE_DIR / "playbooks" / "verify.yaml"
+
+    @staticmethod
+    def _run(
+        tmp: Path, mutate: Callable[[Path], None] | None = None
+    ) -> tuple[subprocess.CompletedProcess[str], Path]:
+        home = tmp / "home"
+        xdg = tmp / "xdg"
+        install = tmp / "install"
+        state_home = tmp / "state-home"
+        cache_home = tmp / "cache-home"
+        home.mkdir()
+        xdg.mkdir()
+        install.mkdir()
+        bin_dir = _write_stub_binaries(home)
+        _build_provisioned_layout(home, xdg, install, state_home, cache_home)
+        autostart = install / "config" / "hypr" / "autostart.lua"
+        if mutate is not None:
+            mutate(autostart)
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        env = _test_env(
+            HOME=str(home),
+            XDG_CONFIG_HOME=str(xdg),
+            XDG_STATE_HOME=str(state_home),
+            XDG_CACHE_HOME=str(cache_home),
+            ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
+            PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
+        )
+        result = subprocess.run(
+            [
+                ansible_playbook,
+                str(TestVerifyAutostartLaunchPolicy._PATH),
+                "-e",
+                f"install_dir={install}",
+                "-e",
+                f"manifests_dir={manifests_dir()}",
+                *_cli_tags_extra_vars(),
+                *_display_manager_extra_vars(tmp),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=300,
+        )
+        return result, install
+
+    def test_always_zero_and_on_demand_one_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            result, install = self._run(Path(raw))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "failed=0" in result.stdout, result.stdout
+            content = (install / "config" / "hypr" / "autostart.lua").read_text(
+                encoding="utf-8"
+            )
+            for identity in ("ags", "notifications"):
+                assert content.count(f"--expect-instance {identity}") == 0
+            for identity in ("capture", "clipboard"):
+                assert content.count(f"--expect-instance {identity}") == 1
+            user_units = Path(raw) / "home" / ".config" / "systemd" / "user"
+            for unit_name in (
+                "dotfiles-ags-bar.service",
+                "dotfiles-ags-notifications.service",
+            ):
+                assert (user_units / unit_name).is_file()
+                assert (
+                    user_units / "default.target.wants" / unit_name
+                ).is_symlink()
+
+    def test_always_on_app_with_an_autostart_line_fails(self) -> None:
+        def mutate(path: Path) -> None:
+            path.write_text(
+                path.read_text(encoding="utf-8")
+                + '    hl.exec_cmd("bash -lc \'$HOME/.local/bin/ags-run-locked '
+                "--expect-instance ags'\")\n",
+                encoding="utf-8",
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            result, _ = self._run(Path(raw), mutate)
+            assert result.returncode != 0
+            assert (
+                "assert a launch 'always' app is never autostarted"
+                in result.stdout
+            ), result.stdout + result.stderr
+
+    def test_on_demand_missing_autostart_line_fails(self) -> None:
+        def mutate(path: Path) -> None:
+            path.write_text(
+                "".join(
+                    line
+                    for line in path.read_text(encoding="utf-8").splitlines(
+                        keepends=True
+                    )
+                    if "--expect-instance capture" not in line
+                ),
+                encoding="utf-8",
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            result, _ = self._run(Path(raw), mutate)
+            assert result.returncode != 0
+            assert (
+                "assert on-demand autostart launches the identity once under the "
+                "shared lock"
+            ) in result.stdout, result.stdout + result.stderr
 
 
 @pytest.mark.integration
@@ -4914,7 +5034,7 @@ def _build_provisioned_layout(
             launcher.write_text("#!/bin/sh\nexec ags-run-locked --expect-instance " + entry["instance"] + "\n")
             launcher.chmod(0o755)
     (install / "config" / "hypr" / "autostart.lua").write_text(
-        (Path(__file__).resolve().parents[1] / "fixtures" / "ags-apps" / "autostart" / "v0.6.2.lua").read_text()
+        (Path(__file__).resolve().parents[1] / "fixtures" / "ags-apps" / "autostart" / "v0.12.1.lua").read_text()
     )
     # REQ-023: the two always-on apps are systemd --user units. verify checks
     # the STATIC contract (file, enabled wants link, ExecStop, manifest

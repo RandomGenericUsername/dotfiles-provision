@@ -1,0 +1,35 @@
+# Verify the always-on systemd --user unit surface (REQ-023). READ-ONLY.
+#
+# The caller sets `app` from the composition app list and the per-app path
+# facts from tasks/_one.yml. This runs AFTER the unit is rendered and enabled
+# (live manager or the manager-less default.target.wants path), so it proves
+# the unit owns the instance instead of the assets-owned autostart file.
+
+- name: "{{ app.app }} : stat the always-on unit and its enabled wants link"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ ags_apps_units_unit_file }}"
+    - "{{ ags_apps_units_unit_wants_link }}"
+  register: ags_apps_units_always_on_unit_links
+
+- name: "{{ app.app }} : resolve the enabled always-on wants link"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_unit_wants_link }}"
+    follow: true
+  register: ags_apps_units_always_on_unit_wants_target
+
+- name: "{{ app.app }} : assert the always-on unit is installed and enabled"
+  ansible.builtin.assert:
+    that:
+      - ags_apps_units_always_on_unit_links.results[0].stat.isreg
+      - ags_apps_units_always_on_unit_links.results[1].stat.islnk
+      - ags_apps_units_always_on_unit_links.results[1].stat.lnk_target is search(ags_apps_units_unit_name ~ '$')
+      - ags_apps_units_always_on_unit_wants_target.stat.exists
+      - ags_apps_units_always_on_unit_wants_target.stat.isreg
+    fail_msg: >-
+      {{ app.app }} is launch 'always', so {{ ags_apps_units_unit_file }} must
+      be installed and enabled through {{ ags_apps_units_unit_wants_link }}.
+      In the v0.12.1 cutover always-on apps are systemd --user units (REQ-023);
+      the autostart file must not be their launch path.
