@@ -20,6 +20,7 @@
 - [REQ-021-skins-assets-v011/ticket.md](./REQ-021-skins-assets-v011/ticket.md) — Consume dotfiles-assets v0.11.0 (per-app skin templates) | `done` | tag: v0.1.35 | worktree: .worktrees/REQ-021/ | branch: ticket/REQ-021-skins-assets-v011
 - [REQ-022-ags-platform-v08-mirror/ticket.md](./REQ-022-ags-platform-v08-mirror/ticket.md) — Mirror ags-platform v0.8.0 in the engine pins | `done` | tag: v0.1.36 | worktree: .worktrees/REQ-022/ | branch: ticket/REQ-022-ags-platform-v08-mirror
 - [REQ-023-appearance-supervision/ticket.md](./REQ-023-appearance-supervision/ticket.md) — Supervise the always-on AGS apps with systemd --user units | `done` | tag: v0.1.37 | worktree: .worktrees/REQ-023/ | branch: ticket/REQ-023-appearance-supervision
+- [REQ-024-appearance-v2-mirrors/ticket.md](./REQ-024-appearance-v2-mirrors/ticket.md) — Mirror the dotfiles-v3 appearance v2 tuple in the engine | `in-progress` | worktree: .worktrees/REQ-024/ | branch: ticket/REQ-024-appearance-v2-mirrors
 
 ## Bugs
 
