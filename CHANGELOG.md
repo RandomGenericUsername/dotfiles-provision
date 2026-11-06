@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.42
+
+Mirror `ags-platform` v0.9.1 in the engine pins (REQ-028).
+
+- The `ags_platform` role installs **v0.9.1** (palette mode metadata, required
+  by theme-producer v0.6.0 output); the `verify` mirror follows. The unit dir,
+  pin file and shared app-install shortcut still derive from the one
+  `ags_platform_version` var, so no path literal changes.
+- The composition fixture `program-tuple.yaml` moves to
+  `ags-platform: v0.9.1` while `contracts: v0.7.0` and
+  `dotfiles-assets: v0.13.0` stay unchanged. Platform unit tests and host
+  stand-ins follow.
+- `dotfiles-v3` `make deploy-coverage` now resolves the tuple's platform tag
+  against this engine; a temporary copy with `installer.pin: v0.1.42` passes.
+
 ## 0.1.41
 
 Pin the final seven-app AGS release tags in the engine fixtures (REQ-027).
