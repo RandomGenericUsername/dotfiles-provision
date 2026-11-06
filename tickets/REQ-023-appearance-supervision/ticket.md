@@ -2,7 +2,7 @@
 id: REQ-023
 title: "Supervise the always-on AGS apps with systemd --user units"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -76,44 +76,89 @@ the instance come from the composition app list, never a second list.
 
 ## Acceptance
 
-- [ ] `ags_apps_units` renders `dotfiles-ags-bar.service` and
+- [x] `ags_apps_units` renders `dotfiles-ags-bar.service` and
       `dotfiles-ags-notifications.service` from the app list into
       `~/.config/systemd/user/`, with the unit content above.
-- [ ] The installer enables the units and starts them when a live
+- [x] The installer enables the units and starts them when a live
       `systemctl --user` manager exists; without one it creates the
       `default.target.wants/` symlink (R-6 discipline) and verify/doctor is the
       loud check.
-- [ ] Always-on apps are no longer started through a raw wrapper call in the
+- [x] Always-on apps are no longer started through a raw wrapper call in the
       role; only on-demand cutover proofs keep the wrapper start. Rollback
       restarts an always-on previous instance through its unit, not a raw
       process.
-- [ ] `ags-run-locked` gains `--exec`: acquire the shared lock, refuse an
+- [x] `ags-run-locked` gains `--exec`: acquire the shared lock, refuse an
       already-running expected instance (non-zero), close fd 9, then exec the
       supplied command. The existing background/register-and-exit mode is
       unchanged.
-- [ ] On-demand apps (`capture`, `clipboard`, `wallpaper-selector`, `icme`,
+- [x] On-demand apps (`capture`, `clipboard`, `wallpaper-selector`, `icme`,
       `btop-theme-studio`) keep their launchers and gain no unit.
-- [ ] `verify` asserts the two unit files exist, are enabled (wants symlink),
+- [x] `verify` asserts the two unit files exist, are enabled (wants symlink),
       use `ExecStop=... ags quit -i <instance>`, and name the manifest's
       `configDir`/`instance`. Live unit-active/PID/bus-owner/orphan checks are
       handed to the runtime doctor ticket (RFC §4.3), not duplicated here.
-- [ ] Unit-template rendering, enabled state, no-raw-duplicate-launch,
+- [x] Unit-template rendering, enabled state, no-raw-duplicate-launch,
       delegated-exit guard and lock-fd handling are covered by tests/
       fixtures; README and CHANGELOG are updated.
-- [ ] `make gates`, `make ci-gates-parity` and the targeted unit tests pass;
+- [x] `make gates`, `make ci-gates-parity` and the targeted unit tests pass;
       engine `0.1.37` and annotated tag `v0.1.37` land after a fast-forward
       merge; no push, no apply.
 
 ## Evidence / Verify
 
-Evidence is recorded on completion. `Verify:` commands:
+Branch `ticket/REQ-023-appearance-supervision`, worktree
+`.worktrees/REQ-023/`. Commits: `0757c55` (plan), `6d27b23`
+(implementation + release metadata).
 
-- `rg -n "dotfiles-ags-(bar|notifications)" ansible tests`
-- `uv run --frozen pytest -q tests/unit/test_ags_units_supervision.py
-  tests/unit/test_ags_apps_units_role.py tests/unit/test_verify_role.py
-  -m "not integration and not container_target"`
-- `make gates`
-- `make ci-gates-parity`
+- Unit names/template:
+  `rg -n "dotfiles-ags|dotfiles-ags-app.service" ansible/roles/ags_apps_units`
+  → the template renders `dotfiles-ags-{{ app.app }}.service` and the two
+  app-list names are `dotfiles-ags-bar.service` /
+  `dotfiles-ags-notifications.service`.
+- Unit contract:
+  `ansible/roles/ags_apps_units/templates/dotfiles-ags-app.service.j2:13-33`
+  — `ExecStart=<bin>/ags-run-locked --exec ... -- /usr/bin/ags run -d
+  {{ ags_apps_units_spine_link }}`, `ExecStop=/usr/bin/ags quit -i
+  {{ app.instance }}`, `Restart=on-failure`, `RestartSec=2`,
+  `TimeoutStopSec=10`, `KillMode=mixed`, `After=graphical-session.target`,
+  `WantedBy=default.target`.
+- Lock-fd + delegated guard:
+  `ansible/roles/cli_tools/files/ags-run-locked:85-110` — `--exec` exits 1
+  when `--expect-instance` is already on the bus, then `exec "$@" 9>&-`.
+  Background mode still exits 0 for the existing launcher/autostart no-op.
+  Timeout cleanup now quits by instance instead of killing the `ags run`
+  parent.
+- One owner:
+  `ansible/roles/ags_apps_units/tasks/_one.yml:231-302` — always-on renders
+  and enables/starts the unit; only `launch: on-demand` can take the raw
+  cutover start. `_rollback.yml:87-126` restarts an always-on previous
+  instance through its unit.
+- Static verify:
+  `ansible/roles/verify/tasks/_verify_units.yml` — asserts the unit file, the
+  `default.target.wants` link, `ExecStop=... quit -i`, and the unit's config
+  path/instance match the app list; no live PID/bus checks.
+- Targeted tests:
+  - `uv run --frozen pytest -q tests/unit/test_ags_units_supervision.py
+    -m "not integration and not container_target"` → **10 passed**.
+  - `uv run --frozen pytest -q tests/unit/test_ags_apps_units_role.py
+    -m "not integration and not container_target"` → **39 passed**.
+  - `uv run --frozen pytest -q tests/unit/test_verify_role.py
+    -m "not integration and not container_target"` → **115 passed,
+    12 deselected**.
+  - `uv run --frozen pytest -q
+    "tests/unit/test_verify_role.py::TestVerifyRuntime::test_verify_passes_on_a_provisioned_machine"
+    -m integration` → **1 passed**.
+- `make gates` → **rc=0**:
+  - `test`: `971 passed, 3 skipped, 52 deselected in 606.44s`
+  - `lint`: `All checks passed!`
+  - `hermetic`: `940 passed, 34 skipped, 52 deselected in 548.11s`
+  - `lock-check`: `Resolved 33 packages in 0.69ms`
+  - `docs-check`: rc=0
+- `make ci-gates-parity` → **PASS**
+  (`gates=['docs-check','hermetic','lint','lock-check','test']`,
+  exempt `assets-parity, ci-gates-parity, release`).
+- Engine `0.1.37` + CHANGELOG; annotated tag `v0.1.37` created after the
+  fast-forward merge. No `apply`, no push.
 
 ## Handoff
 
