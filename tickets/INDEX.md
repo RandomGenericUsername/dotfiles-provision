@@ -19,6 +19,7 @@
 - [REQ-020-skin-plane-deploy/ticket.md](./REQ-020-skin-plane-deploy/ticket.md) — Deploy the assets skin plane into the spine and expose the AGS skin pointers | `done` | tag: v0.1.34 | worktree: .worktrees/REQ-020/ | branch: ticket/REQ-020-skin-plane-deploy
 - [REQ-021-skins-assets-v011/ticket.md](./REQ-021-skins-assets-v011/ticket.md) — Consume dotfiles-assets v0.11.0 (per-app skin templates) | `done` | tag: v0.1.35 | worktree: .worktrees/REQ-021/ | branch: ticket/REQ-021-skins-assets-v011
 - [REQ-022-ags-platform-v08-mirror/ticket.md](./REQ-022-ags-platform-v08-mirror/ticket.md) — Mirror ags-platform v0.8.0 in the engine pins | `done` | tag: v0.1.36 | worktree: .worktrees/REQ-022/ | branch: ticket/REQ-022-ags-platform-v08-mirror
+- [REQ-023-appearance-supervision/ticket.md](./REQ-023-appearance-supervision/ticket.md) — Supervise the always-on AGS apps with systemd --user units | `in-progress` | worktree: .worktrees/REQ-023/ | branch: ticket/REQ-023-appearance-supervision
 
 ## Bugs
 
