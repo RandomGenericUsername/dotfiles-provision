@@ -1,0 +1,29 @@
+# state_links role vars — provisioning-owned stable links for the non-runtime
+# palette consumers (Generations v3, dotfiles-v3 docs/107 §2.7).
+
+# state_links_xdg_state_home: the runtime-owned state home. Honors
+#   $XDG_STATE_HOME with the spec default ~/.local/state, via
+#   ansible_facts.env (F4 lock). One XDG read for the whole role.
+state_links_xdg_state_home: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}"
+
+# state_links_state_current_dir / _palette_dir: the single committed `current`
+#   pointer and the generation-local palette directory the stable links name.
+#   Never a generation-specific path: `current` is the one atomic hop.
+state_links_state_current_dir: "{{ state_links_xdg_state_home | trim }}/dotfiles/current"
+state_links_state_current_palette_dir: "{{ state_links_state_current_dir }}/palette"
+
+# state_links_spine_config_dir: the config-in-spine root the config-links role
+#   exposes at ~/.config/<name>. The stable links are files INSIDE these
+#   provisioning-owned dirs; no AGS app spine link (config/<configDir> ->
+#   <install>/apps/<tag>) is ever a destination here.
+state_links_spine_config_dir: "{{ install_dir | trim }}/config"
+
+# state_links_consumers: one stable link per non-runtime palette consumer.
+#   `spine` is the destination relative to <install>/config; `target` is the
+#   palette artifact relative to state/current/palette. The runtime never
+#   repoints these links; a new generation is visible through `current`.
+state_links_consumers:
+  - { spine: gtk-3.0/colors.css, target: colors.gtk.css }
+  - { spine: gtk-4.0/colors.css, target: colors.adw.css }
+  - { spine: rofi/colors.rasi, target: colors.rasi }
+  - { spine: btop/themes/colors.btop.theme, target: colors.btop.theme }

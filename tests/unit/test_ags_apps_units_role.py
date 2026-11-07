@@ -300,14 +300,26 @@ class TestRoleStructure:
                 )
             if key == "ansible.builtin.file":
                 if "ags_apps_units_unit_dir" in dest:
-                    assert module.get("state") == "absent" and dest.endswith(".git"), (
+                    allowed_delete = dest.endswith(".git") or any(
+                        name in dest for name in (
+                            "appearance.css",
+                            "skin.css",
+                            "skin.json",
+                            "tokens.json",
+                            "colors.",
+                        )
+                    )
+                    assert module.get("state") == "absent" and allowed_delete, (
                         f"task {task.get('name')!r} mutates the immutable tag"
                     )
 
-    def test_colors_and_icons_are_verified_not_produced(self) -> None:
+    def test_runtime_artifacts_are_swept_and_icons_are_verified(self) -> None:
+        sweep = (_ROLE / "tasks" / "_one.yml").read_text()
+        assert "ags_apps_units_forbidden_runtime_artifacts" in sweep
+        assert "assert the tag carries no runtime artifact" in sweep
+        assert "find any remaining runtime artifact" in sweep
         verify_unit = (_ROLE / "tasks" / "_verify_unit.yml").read_text()
-        assert "colors.css" in verify_unit
-        assert "runtime_colors_pointer" in verify_unit
+        assert "colors.css" not in verify_unit
         assert "icons.json" in verify_unit
         assert "checksum" in verify_unit
         assert "ansible.builtin.copy" not in verify_unit
@@ -427,7 +439,7 @@ class TestLauncherTemplate:
             "app.installDir",
             "app.tag",
             "verify_ags_apps_units_platform_shortcut",
-            "colors.css",
+            "appearance-refresh",
             "icons.json",
             "autostart",
             "ags-run-locked",
@@ -586,8 +598,8 @@ case "$1" in
       case "$1" in -i) shift 2 ;; *) argv+=("$1"); shift ;; esac
     done
     log "request ${argv[*]}"
-    if [ "${argv[0]:-}" = "palette-refresh" ]; then
-      echo '{"ok":true}'
+    if [ "${argv[0]:-}" = "appearance-refresh" ]; then
+      python3 -c 'import json,sys; print(json.dumps({"deferred":"no generation yet","genHash":sys.argv[1]}))' "${argv[1]:-}"
       exit 0
     fi
     if [ "${argv[0]:-}" = "toggle" ] && grep -qx "${argv[0]}" "$TOGGLES" 2>/dev/null; then
@@ -727,7 +739,7 @@ def _write_composition(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v0.9.1\ncontracts: v0.7.0\ndotfiles-assets: v0.13.0\n",
+        "schemaVersion: 1\nags-platform: v0.9.1\ncontracts: v0.8.0\ndotfiles-assets: v0.13.0\n",
         encoding="utf-8",
     )
     return provisioning
@@ -816,10 +828,7 @@ def _run_role(
 
 
 def _stage_seven_app_repos(tmp_path: Path) -> tuple[dict[str, Path], Path]:
-    """Build the seven fake app repos and the runtime palette pointer."""
-    colors = tmp_path / "state" / "dotfiles" / "current" / "colors.gtk.css"
-    colors.parent.mkdir(parents=True)
-    colors.write_text("@define-color color_background #0b0b1a;\n", encoding="utf-8")
+    """Build the seven fake app repos (v3: no palette pointer inside a tag)."""
     repos: dict[str, Path] = {}
     icons = None
     for entry in _app_list():
@@ -834,7 +843,6 @@ def _stage_seven_app_repos(tmp_path: Path) -> tuple[dict[str, Path], Path]:
             instance=entry["instance"],
             config_dir=entry["configDir"],
             bin_link=entry.get("binLink"),
-            colors_pointer=colors if entry.get("barPalettePointer") else None,
             icons_json=icons_json if app_id == "bar" else None,
             tag=entry["tag"],
         )
@@ -907,10 +915,10 @@ class TestRoleExecution:
                 install / "apps" / "bar" / bar_tag
             )
             bar_unit = install / "apps" / "bar" / bar_tag
-            assert (bar_unit / "colors.css").is_symlink()
-            assert os.readlink(bar_unit / "colors.css") == str(
-                Path(paths["state"]) / "dotfiles" / "current" / "colors.gtk.css"
+            assert not (bar_unit / "colors.css").exists(), (
+                "v3: no runtime palette pointer may live inside an app tag"
             )
+            assert not (bar_unit / "appearance.css").exists()
             assert (bar_unit / "icons.json").read_bytes() == bar_icons.encode()
 
             # REQ-023: always-on apps are systemd --user units. This harness
@@ -961,6 +969,53 @@ class TestRoleExecution:
             assert second.returncode == 0, second.stdout + second.stderr
             after = {str(path): _sha256_tree(path) for path in units}
             assert before == after
+        finally:
+            _stop_fake_ags(paths)
+
+    def test_reinstall_sweeps_stale_runtime_artifacts_from_an_existing_tag(
+        self, tmp_path: Path
+    ) -> None:
+        """Generations v3 migration: a pre-v3 seeder wrote appearance.css (and
+        skin.css/skin.json/colors*) through config/<app> into the tag. The
+        reinstall must delete ONLY those runtime artifacts and leave app source
+        byte-identical."""
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
+        first, paths = _run_role(tmp_path, provisioning, cutover=True)
+        try:
+            assert first.returncode == 0, first.stdout + first.stderr
+            apps = {entry["app"]: entry for entry in _app_list()}
+            bar_unit = install / "apps" / apps["bar"]["installDir"] / apps["bar"]["tag"]
+            stale = {
+                "appearance.css": "/* v2 runtime */\n",
+                "skin.css": "/* v2 runtime */\n",
+                "skin.json": "{}\n",
+                "colors.css": "/* v2 palette pointer */\n",
+            }
+            for name, body in stale.items():
+                (bar_unit / name).write_text(body)
+            source_before = {
+                str(path.relative_to(bar_unit)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in bar_unit.rglob("*")
+                if path.is_file() and path.name not in stale
+            }
+
+            second, _ = _run_role(tmp_path, provisioning, cutover=True)
+            assert second.returncode == 0, second.stdout + second.stderr
+            for name in stale:
+                assert not (bar_unit / name).exists(), name
+            source_after = {
+                str(path.relative_to(bar_unit)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in bar_unit.rglob("*")
+                if path.is_file()
+            }
+            assert source_before == source_after, (
+                "the v3 sweep must remove only runtime artifacts; app source "
+                "inside the tag must stay byte-identical"
+            )
         finally:
             _stop_fake_ags(paths)
 
@@ -1038,10 +1093,10 @@ class TestRoleExecution:
         first, paths = _run_role(tmp_path, provisioning, cutover=True)
         try:
             assert first.returncode == 0, first.stdout + first.stderr
-            colors = (
-                Path(paths["state"]) / "dotfiles" / "current" / "colors.gtk.css"
-            )
-            state_before = colors.read_text()
+            sentinel = Path(paths["state"]) / "dotfiles" / "current" / "sentinel"
+            sentinel.parent.mkdir(parents=True, exist_ok=True)
+            sentinel.write_text("external state\n")
+            state_before = sentinel.read_text()
             old_units = [
                 install / "apps" / entry["installDir"] / entry["tag"]
                 for entry in _app_list()
@@ -1079,7 +1134,7 @@ class TestRoleExecution:
                 assert os.readlink(install / "config" / entry["spineLink"]) == str(new_unit)
             after = {str(path): _sha256_tree(path) for path in old_units}
             assert before == after, "a tag bump must not mutate an installed tag"
-            assert colors.read_text() == state_before
+            assert sentinel.read_text() == state_before
         finally:
             _stop_fake_ags(paths)
 

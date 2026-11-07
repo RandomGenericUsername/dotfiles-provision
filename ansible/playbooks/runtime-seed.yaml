@@ -1,18 +1,20 @@
-# Runtime seed playbook (Epic 4) — seeds the runtime's initial desktop state.
+# Runtime seed playbook (Epic 4 / Generations v3) — commits the runtime's
+# initial generation.
 #
 # Runs `dotfiles-runtime wallpaper set <install>/wallpapers/default.png`,
-# which derives palette/effects/icons into the content-addressed cache,
-# writes current.json, creates current/ symlinks (including the R2
-# consumer-path symlinks, rt-4-2), appends the seed history line, and
-# reloads desktop consumers. This is the ONLY producer of generated
-# artifacts — provisioning deploys inputs only (Epic 4: no
-# default_palette / icons roles; no generated/ tree).
+# which derives palette/effects/icons into the content-addressed cache, stages
+# a generation, writes `state/generations/<genHash>/manifest.json` last and
+# atomically commits `state/current -> generations/<genHash>` (contracts
+# generations.md v0.8.0 §3). It appends the seed history line and reloads
+# desktop consumers. This is the ONLY producer of generated artifacts —
+# provisioning deploys inputs only; runtime writes live under state/, never
+# under <install>/config or <install>/apps/<tag>.
 #
 # Placement in bootstrap.yaml: after config-links.yaml (the PRE-SEED settings
 # links the producer CLIs discover through ~/.config/<tool>) and before
 # config-links-post-seed.yaml/display-manager.yaml/verify.yaml. The post-seed
-# links expose rofi/gtk/btop only AFTER this step created their palette
-# pointers (BUG-006). Requires: assets (default.png), cli_tools (the installed
+# step exposes rofi/gtk/btop and creates their stable links only AFTER this
+# commit (BUG-006). Requires: assets (default.png), cli_tools (the installed
 # pinned dotfiles-runtime), runtime_daemon (the producer config), settings
 # (ITR/TPR/WEG settings.toml).
 #
@@ -27,8 +29,8 @@
 # fact-gathering setup module runs.
 #
 # Check-gating: the seed command is gated `when: not ansible_check_mode`
-# (dry-run must be dry — a seed writes cache entries, current.json,
-# history, and consumer symlinks).
+# (dry-run must be dry — a seed writes cache entries, a generation, the
+# current pointer and history).
 - name: Seed runtime desktop state from default wallpaper
   hosts: localhost
   gather_facts: true
@@ -42,17 +44,14 @@
     # renders it before this playbook; the seed reads it through the runtime.
     # NO producer env is passed here: ambient env is non-authoritative.
     runtime_seed_producer_config: "{{ install_dir | trim }}/config/dotfiles-runtime/producer.json"
-    # Runtime state the seed must advance + the consumer links it must create.
+    # The ONE committed generation pointer the seed must advance. Everything
+    # the runtime writes is under this state root; no install-spine consumer
+    # link is part of the seed (provisioning owns those in state_links).
     runtime_seed_state_home: >-
       {{ ansible_facts.env.XDG_STATE_HOME
          | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}
-    runtime_seed_current_state: "{{ runtime_seed_state_home | trim }}/dotfiles/current.json"
-    runtime_seed_consumer_links:
-      - "{{ install_dir | trim }}/config/ags/colors.css"
-      - "{{ install_dir | trim }}/config/gtk-3.0/colors.css"
-      - "{{ install_dir | trim }}/config/gtk-4.0/colors.css"
-      - "{{ install_dir | trim }}/config/rofi/colors.rasi"
-      - "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme"
+    runtime_seed_current_dir: "{{ runtime_seed_state_home | trim }}/dotfiles/current"
+    runtime_seed_generation_manifest: "{{ runtime_seed_current_dir }}/manifest.json"
   tasks:
     - name: Assert install_dir seam is provided
       ansible.builtin.assert:
@@ -80,12 +79,12 @@
           Re-run the runtime-daemon playbook (or bootstrap in order).
       when: not ansible_check_mode
 
-    # BUG-006: capture the pre-seed state so a tolerated rc=1 is only accepted
-    # when the seed actually produced FRESH state and the complete consumer
-    # link set. rc alone is not proof.
-    - name: Capture the runtime state before seeding
+    # BUG-006: capture the pre-seed generation so a tolerated rc=1 is only
+    # accepted when the seed actually committed FRESH state. rc alone is not
+    # proof.
+    - name: Capture the generation manifest before seeding
       ansible.builtin.stat:
-        path: "{{ runtime_seed_current_state }}"
+        path: "{{ runtime_seed_generation_manifest }}"
       register: runtime_seed_pre_state
       when: not ansible_check_mode
 
@@ -101,13 +100,13 @@
       failed_when: runtime_seed_result.rc not in [0, 1]
       when: not ansible_check_mode
 
-    - name: Capture the runtime state after seeding
+    - name: Capture the generation manifest after seeding
       ansible.builtin.stat:
-        path: "{{ runtime_seed_current_state }}"
+        path: "{{ runtime_seed_generation_manifest }}"
       register: runtime_seed_post_state
       when: not ansible_check_mode
 
-    - name: Determine whether the seed advanced current.json
+    - name: Determine whether the seed advanced the generation
       ansible.builtin.set_fact:
         runtime_seed_state_advanced: >-
           {{ (not (runtime_seed_pre_state.stat.exists | default(false)))
@@ -117,50 +116,67 @@
                  > (runtime_seed_pre_state.stat.mtime | default(0))) }}
       when: not ansible_check_mode
 
-    - name: Check the runtime consumer links after seeding
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop: "{{ runtime_seed_consumer_links }}"
-      register: runtime_seed_consumer_link_checks
-      when: not ansible_check_mode
+    - name: Read the committed generation manifest
+      ansible.builtin.slurp:
+        src: "{{ runtime_seed_generation_manifest }}"
+      register: runtime_seed_manifest_raw
+      when:
+        - not ansible_check_mode
+        - runtime_seed_post_state.stat.exists | default(false)
 
-    - name: Check the runtime consumer links resolve after seeding
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: true
-      loop: "{{ runtime_seed_consumer_links }}"
-      register: runtime_seed_consumer_resolve_checks
-      when: not ansible_check_mode
+    - name: Parse the committed generation identity
+      ansible.builtin.set_fact:
+        runtime_seed_generation: "{{ runtime_seed_manifest_raw.content | b64decode | from_json }}"
+      when:
+        - not ansible_check_mode
+        - runtime_seed_post_state.stat.exists | default(false)
 
-    # BUG-006: rc 1 is tolerated ONLY when the run still produced fresh state
-    # and every consumer link (rofi/gtk/btop/ags) is a symlink into current/
-    # that resolves. Otherwise fail loudly and name the missing path.
-    - name: Assert runtime seed produced fresh state and complete consumer links
+    - name: Read the current pointer target
+      ansible.builtin.command:
+        argv:
+          - readlink
+          - "{{ runtime_seed_current_dir }}"
+      register: runtime_seed_current_link
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - runtime_seed_post_state.stat.exists | default(false)
+
+    - name: Assert the seed produced fresh generation state
       ansible.builtin.assert:
         that:
           - runtime_seed_result.rc in [0, 1]
           - runtime_seed_post_state.stat.exists | default(false)
+          - runtime_seed_post_state.stat.isreg | default(false)
           - runtime_seed_state_advanced | bool
-          - runtime_seed_consumer_link_checks.results | selectattr('stat.islnk') | list | length == runtime_seed_consumer_links | length
-          - runtime_seed_consumer_link_checks.results | map(attribute='stat.lnk_target', default='') | select('search', 'dotfiles/current') | list | length == runtime_seed_consumer_links | length
-          - runtime_seed_consumer_resolve_checks.results | selectattr('stat.exists') | list | length == runtime_seed_consumer_links | length
         fail_msg: >-
-          runtime seed did not produce fresh state and the complete consumer
-          link set (BUG-006). rc={{ runtime_seed_result.rc }};
+          runtime seed did not produce a fresh generation manifest. rc={{
+          runtime_seed_result.rc }};
           state_advanced={{ runtime_seed_state_advanced | default(false) }};
-          missing_or_unresolved={{ (runtime_seed_consumer_link_checks.results | default([])
-            | rejectattr('stat.islnk') | map(attribute='item') | list)
-            + (runtime_seed_consumer_link_checks.results | default([])
-            | selectattr('stat.islnk')
-            | rejectattr('stat.lnk_target', 'search', 'dotfiles/current')
-            | map(attribute='item') | list)
-            + (runtime_seed_consumer_resolve_checks.results | default([])
-            | rejectattr('stat.exists') | map(attribute='item') | list) }};
+          manifest={{ runtime_seed_generation_manifest }}.
+          Accepting rc=1 requires a fresh current/manifest.json. Re-run the
+          runtime seed after fixing the reported path.
+      when: not ansible_check_mode
+
+    # v3 generation self-check: the manifest written last inside the generation
+    # names the SAME hash as the current target basename. A v2 current.json or a
+    # multi-pointer current/ directory fails this gate.
+    - name: Assert the seed committed one complete v3 generation
+      ansible.builtin.assert:
+        that:
+          - runtime_seed_generation.version == 3
+          - runtime_seed_generation.generationHash is match('^[0-9a-f]{64}$')
+          - runtime_seed_current_link.stdout | trim | basename == runtime_seed_generation.generationHash
+          - runtime_seed_generation.appearance.tokensPath == 'appearance/tokens.json'
+          - runtime_seed_generation.appearance.targets | length > 0
+        fail_msg: >-
+          runtime seed did not commit one complete v3 generation (contracts
+          generations.md v0.8.0). manifest={{ runtime_seed_generation_manifest }};
+          current_target={{ runtime_seed_current_link.stdout | default('') | trim }};
           stdout: {{ runtime_seed_result.stdout | default('') }};
           stderr: {{ runtime_seed_result.stderr | default('') }}.
-          Accepting rc=1 requires a fresh current.json AND every link
-          ({{ runtime_seed_consumer_links | join(', ') }}) resolving under
-          dotfiles/current. Re-run the runtime seed after fixing the reported
-          path.
-      when: not ansible_check_mode
+          The manifest written last must name the current target basename;
+          a v2 current.json / multi-pointer current is not a v3 generation.
+      when:
+        - not ansible_check_mode
+        - runtime_seed_post_state.stat.exists | default(false)

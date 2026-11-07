@@ -55,6 +55,20 @@ verify_xdg_state_home: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_fa
 #   introduced. Trim lock (stray-whitespace XDG values bit Story 1.11).
 verify_state_current_dir: "{{ verify_xdg_state_home | trim }}/dotfiles/current"
 
+# verify_state_generation_manifest / _palette_dir / _appearance_dir: the v3
+#   generation layout (contracts generations.md v0.8.0 §1). The manifest is
+#   written last inside generations/<genHash>/ and its generationHash must equal
+#   the `current` target basename. Palette consumers resolve through
+#   current/palette/... (provisioning-owned stable links), and app runtime
+#   sheets are read from current/appearance/<configDir>.css — never through an
+#   app tag or a config copy.
+verify_state_generation_manifest: "{{ verify_state_current_dir }}/manifest.json"
+verify_state_current_palette_dir: "{{ verify_state_current_dir }}/palette"
+verify_state_appearance_dir: "{{ verify_state_current_dir }}/appearance"
+verify_generation_manifest_version: 3
+verify_generation_contract_tag: v0.8.0
+verify_generation_tokens_path: appearance/tokens.json
+
 # verify_bin_scripts: every script or launcher a Hyprland keybind invokes. The
 #   Fn-key/SUPER binds in keybindings.lua shell out to these by NAME, so a
 #   missing or non-executable one is a key that silently does nothing (spine
@@ -1023,22 +1037,29 @@ verify_ags_platform_unit_files:
 
 verify_gui_tools_app_files: []
 
-# verify_consumer_symlinks: the R2 consumer-path symlinks the runtime
-#   seeder owns (criterion 7, Epic 4 current-only). The AGS fragment is
-#   colors.css → current/colors.gtk.css. BUG-006 adds the launcher/palette
-#   consumers that runtime-seed now exposes only after the seed: rofi
-#   (colors.rasi), gtk-3.0/gtk-4.0 (colors.css) and btop (colors.btop.theme).
-#   Checked WITHOUT following (islnk + raw target contains /current/) so a
-#   stale provisioning COPY fails the gate, then WITH follow to prove the
-#   target actually resolves. <install>/config/hypr/colors.conf is deliberately
-#   absent (nothing sources it — verified: no reference under the assets
-#   configs/hypr/*.lua).
+# verify_consumer_symlinks: the provisioning-owned stable links for the
+#   NON-runtime palette consumers (Generations v3, contracts generations.md
+#   §6). The state_links role owns them; the runtime never repoints them. Each
+#   link names state/current/palette/<target>, never a generation-specific
+#   path and never an AGS app tag. `config/ags/colors.css` is deliberately
+#   absent: AGS apps read state/current/appearance/<configDir>.css directly,
+#   and config/ags is a symlink into an immutable tag.
 verify_consumer_symlinks:
-  - "{{ install_dir | trim }}/config/ags/colors.css"
-  - "{{ install_dir | trim }}/config/gtk-3.0/colors.css"
-  - "{{ install_dir | trim }}/config/gtk-4.0/colors.css"
-  - "{{ install_dir | trim }}/config/rofi/colors.rasi"
-  - "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme"
+  - { path: "{{ install_dir | trim }}/config/gtk-3.0/colors.css", target: colors.gtk.css }
+  - { path: "{{ install_dir | trim }}/config/gtk-4.0/colors.css", target: colors.adw.css }
+  - { path: "{{ install_dir | trim }}/config/rofi/colors.rasi", target: colors.rasi }
+  - { path: "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme", target: colors.btop.theme }
+
+# verify_app_tag_forbidden_runtime_artifacts: runtime-owned names that must
+#   never exist inside an immutable app tag (contracts generations.md §6).
+#   `colors*` covers the retired palette-pointer family. The v2 runtime wrote
+#   appearance.css through config/<app> into the tag; v3 verify rejects it.
+verify_app_tag_forbidden_runtime_artifacts:
+  - appearance.css
+  - skin.css
+  - skin.json
+  - tokens.json
+  - colors*
 
 # verify_config_copies_targets: mirror of the config-copies.yaml entries EXACTLY
 #   (criterion 9). config-in-spine (2026-08-16): each is now a SYMLINK at

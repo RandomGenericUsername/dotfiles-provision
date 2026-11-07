@@ -69,47 +69,6 @@
       {{ verify_ags_xdg_link }} -> the spine link. Manifest identity must match
       the app list (app/instance/configDir/configLink).
 
-# REQ-020: the runtime owns config/<configDir>/skin.css + skin.json (the
-# app-scoped skin pointers). Provisioning NEVER creates them and a fresh
-# install has none before the first runtime reconcile/seed — so this pair
-# tolerates ABSENT pointers and checks only what is present: a present pointer
-# must be a symlink into the runtime's current/ dir (skins/<configDir>.css or
-# skin.json) and must resolve. That catches a stale provisioning copy or a
-# dangling pointer without making the first install depend on runtime state.
-- name: "{{ app.app }} : stat the runtime skin pointers (link metadata)"
-  ansible.builtin.stat:
-    path: "{{ verify_ags_skin_dir }}/{{ item }}"
-    follow: false
-  loop: "{{ verify_skins_consumer_pointer_names }}"
-  register: verify_ags_skin_pointer_links
-
-- name: "{{ app.app }} : stat the runtime skin pointer targets (followed)"
-  ansible.builtin.stat:
-    path: "{{ verify_ags_skin_dir }}/{{ item }}"
-    follow: true
-  loop: "{{ verify_skins_consumer_pointer_names }}"
-  register: verify_ags_skin_pointer_targets
-
-- name: "{{ app.app }} : assert present runtime skin pointers are current/ links"
-  ansible.builtin.assert:
-    that:
-      - >-
-        (item.0.stat.exists is false)
-        or (item.0.stat.islnk
-            and item.0.stat.lnk_target is search('/dotfiles/current/')
-            and item.0.stat.lnk_target is search('(skins/[^/]+\.css|skin\.json)$')
-            and item.1.stat.exists
-            and item.1.stat.isreg)
-    fail_msg: >-
-      {{ app.app }} has a runtime skin pointer under {{ verify_ags_skin_dir }}
-      that is not the expected `current/` symlink (or does not resolve). The
-      runtime seeder owns skin.css/skin.json; provisioning only guarantees the
-      config dir + XDG link. Reconcile the runtime (or remove a stale
-      provisioning copy) — do not hand-write these pointers.
-  loop: >-
-    {{ verify_ags_skin_pointer_links.results
-       | zip(verify_ags_skin_pointer_targets.results) | list }}
-
 - name: "{{ app.app }} : assert app.tsx declares the manifest instance"
   ansible.builtin.command:
     argv:
@@ -119,14 +78,14 @@
       - "{{ verify_ags_unit_dir }}/app.tsx"
   changed_when: false
 
-- name: "{{ app.app }} : assert a live app carries the palette-refresh handler"
+- name: "{{ app.app }} : assert a live app carries the appearance-refresh handler"
   ansible.builtin.command:
     argv:
       - grep
       - -R
       - -q
       - --exclude-dir=.git
-      - palette-refresh
+      - appearance-refresh
       - "{{ verify_ags_unit_dir }}"
   changed_when: false
   when:
@@ -161,26 +120,6 @@
     fail_msg: >-
       {{ app.app }} does not own its optional launcher declared in the app list.
   when: app.launcher is defined
-
-- name: "{{ app.app }} : stat the bar's colors.css stable pointer"
-  ansible.builtin.stat:
-    path: "{{ verify_ags_unit_dir }}/colors.css"
-    follow: false
-  register: verify_ags_colors_pointer
-  when: app.barPalettePointer | default(false) | bool
-
-- name: "{{ app.app }} : assert colors.css resolves to the runtime-owned pointer"
-  ansible.builtin.assert:
-    that:
-      - verify_ags_colors_pointer.stat.exists
-      - verify_ags_colors_pointer.stat.islnk
-      - verify_ags_colors_pointer.stat.lnk_target is search('dotfiles/current/colors\\.gtk\\.css$')
-      - verify_ags_colors_pointer.stat.lnk_target is not search(verify_ags_unit_dir)
-    fail_msg: >-
-      {{ app.app }}'s colors.css is not the stable runtime pointer
-      ({{ verify_ags_apps_units_colors_pointer }}) outside the immutable tag
-      (AD-37).
-  when: app.barPalettePointer | default(false) | bool
 
 - name: "{{ app.app }} : stat the platform and tag icons.json artifacts"
   ansible.builtin.stat:

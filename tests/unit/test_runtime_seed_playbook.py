@@ -96,35 +96,96 @@ def _task_names(play: dict) -> list[str]:
     return [str(task.get("name", "")) for task in play["tasks"]]
 
 
-def test_seed_captures_pre_state_and_asserts_postconditions() -> None:
-    """BUG-006: a tolerated rc=1 must still produce fresh current.json and
-    every consumer link, otherwise the bootstrap fails."""
+def test_seed_captures_the_generation_and_asserts_v3_postconditions() -> None:
+    """Generations v3: a tolerated rc=1 must still commit a fresh
+    current/manifest.json whose generationHash is the current target basename.
+    v2 consumer links under the install spine are not part of the seed."""
     play = _play()
     names = _task_names(play)
-    assert "Capture the runtime state before seeding" in names
-    assert "Capture the runtime state after seeding" in names
-    after = names.index("Capture the runtime state after seeding")
-    assert after < names.index("Assert runtime seed produced fresh state and complete consumer links")
-    assert str(play["vars"]["runtime_seed_current_state"]) == (
-        "{{ runtime_seed_state_home | trim }}/dotfiles/current.json"
+    assert "Capture the generation manifest before seeding" in names
+    assert "Capture the generation manifest after seeding" in names
+    after = names.index("Capture the generation manifest after seeding")
+    assert after < names.index("Assert the seed produced fresh generation state")
+    assert names.index("Assert the seed produced fresh generation state") < names.index(
+        "Assert the seed committed one complete v3 generation"
     )
-    links = [str(link) for link in play["vars"]["runtime_seed_consumer_links"]]
-    for name in ("ags/colors.css", "gtk-3.0/colors.css", "gtk-4.0/colors.css", "rofi/colors.rasi", "btop/themes/colors.btop.theme"):
-        assert any(name in link for link in links), f"missing consumer link {name}"
+    assert str(play["vars"]["runtime_seed_current_dir"]) == (
+        "{{ runtime_seed_state_home | trim }}/dotfiles/current"
+    )
+    assert str(play["vars"]["runtime_seed_generation_manifest"]) == (
+        "{{ runtime_seed_current_dir }}/manifest.json"
+    )
+    assert "runtime_seed_consumer_links" not in play["vars"]
 
-    assert_task = next(
+    fresh = next(
         task
         for task in play["tasks"]
-        if str(task.get("name")) == "Assert runtime seed produced fresh state and complete consumer links"
+        if str(task.get("name")) == "Assert the seed produced fresh generation state"
     )
-    that = " ".join(str(item) for item in assert_task["ansible.builtin.assert"]["that"])
+    that = " ".join(str(item) for item in fresh["ansible.builtin.assert"]["that"])
     assert "runtime_seed_result.rc in [0, 1]" in that
     assert "runtime_seed_state_advanced | bool" in that
-    assert "selectattr('stat.islnk')" in that
-    assert "dotfiles/current" in that
-    assert "selectattr('stat.exists')" in that
-    assert "missing_or_unresolved" in str(assert_task["ansible.builtin.assert"]["fail_msg"])
+    assert "runtime_seed_post_state.stat.exists" in that
 
+    generation = next(
+        task
+        for task in play["tasks"]
+        if str(task.get("name")) == "Assert the seed committed one complete v3 generation"
+    )
+    that = " ".join(str(item) for item in generation["ansible.builtin.assert"]["that"])
+    assert "runtime_seed_generation.version == 3" in that
+    assert "generationHash is match" in that
+    assert "runtime_seed_current_link.stdout | trim | basename" in that
+    assert "appearance.tokensPath == 'appearance/tokens.json'" in that
+    assert "appearance.targets | length > 0" in that
+    assert "generations.md v0.8.0" in str(
+        generation["ansible.builtin.assert"]["fail_msg"]
+    )
+
+
+
+_GENERATION_SCRIPT = """#!/usr/bin/env python3
+import json
+import pathlib
+import sys
+
+state = pathlib.Path(sys.argv[1])
+gen_hash = "a" * 64
+gen = state / "dotfiles" / "generations" / gen_hash
+(gen / "appearance").mkdir(parents=True, exist_ok=True)
+(gen / "appearance" / "tokens.json").write_text("{}\n", encoding="utf-8")
+(gen / "appearance" / "ags.css").write_text("/* seed */\n", encoding="utf-8")
+manifest = {
+    "version": 3,
+    "generationHash": gen_hash,
+    "created": {"at": "2026-11-06T00:00:00Z"},
+    "committed": {"at": "2026-11-06T00:00:01Z"},
+    "layers": {
+        "wallpaper": {"entryHash": "b" * 64, "path": "wallpaper"},
+        "palette": {"entryHash": "c" * 64, "path": "palette"},
+    },
+    "skin": {"name": "glass", "entryHash": "d" * 64, "mode": "dark"},
+    "appearance": {
+        "tokensPath": "appearance/tokens.json",
+        "targets": [{"configDir": "ags", "path": "appearance/ags.css"}],
+    },
+    "mode": "dark",
+    "intent": {
+        "wallpaper": "b" * 64,
+        "palette": "c" * 64,
+        "skin": "glass",
+        "mode": "dark",
+    },
+    "source": {"kind": "cli", "intentHash": "e" * 64},
+}
+(gen / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+current = state / "dotfiles" / "current"
+tmp = state / "dotfiles" / "current.tmp"
+if tmp.is_symlink() or tmp.exists():
+    tmp.unlink()
+tmp.symlink_to(pathlib.Path("generations") / gen_hash)
+tmp.replace(current)
+"""
 
 @pytest.mark.integration
 class TestSeedPostconditionsExecution:
@@ -144,6 +205,9 @@ class TestSeedPostconditionsExecution:
             '{"schema_version":1,"producer":"tpr","tpr_engine":"native","tpr_runtime":"container"}\n'
         )
         (install / "wallpapers" / "default.png").write_bytes(b"\x89PNG")
+        fake_generation = bin_dir / "fake-generation.py"
+        fake_generation.write_text(_GENERATION_SCRIPT, encoding="utf-8")
+        fake_generation.chmod(0o755)
         env = {
             key: value
             for key, value in os.environ.items()
@@ -188,22 +252,6 @@ class TestSeedPostconditionsExecution:
             env["RUNTIME_PALETTE_PRODUCER"] = "stale"
             env["RUNTIME__PALETTE__PRODUCER"] = "stale"
             env["RUNTIME__PALETTE__TPR_ENGINE"] = "matugen"
-            current = state / "dotfiles" / "current"
-            current.mkdir(parents=True)
-            artifacts = {
-                "config/ags/colors.css": "colors.gtk.css",
-                "config/gtk-3.0/colors.css": "colors.gtk.css",
-                "config/gtk-4.0/colors.css": "colors.adw.css",
-                "config/rofi/colors.rasi": "colors.rasi",
-                "config/btop/themes/colors.btop.theme": "colors.btop.theme",
-            }
-            for artifact in artifacts.values():
-                (current / artifact).write_text("x\n")
-            for link, artifact in artifacts.items():
-                target = install / link
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.symlink_to(current / artifact)
-
             marker = Path(raw) / "resolved-producer.txt"
             config = install / "config" / "dotfiles-runtime" / "producer.json"
             stub = bin_dir / "dotfiles-runtime"
@@ -213,7 +261,7 @@ class TestSeedPostconditionsExecution:
                 f"producer=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"producer\"])' {config})\n"
                 "printf '%s %s %s\\n' \"$producer\" \"${RUNTIME_PALETTE_PRODUCER:-}\" \"${RUNTIME__PALETTE__PRODUCER:-}\" > "  # noqa: E501
                 f"{marker}\n"
-                f"printf '{{\"schema_version\": 2, \"advanced\": true}}\\n' > {state}/dotfiles/current.json\n"
+                f"python3 {bin_dir}/fake-generation.py {state}\n"
                 "exit 0\n"
             )
             stub.chmod(0o755)
@@ -242,8 +290,8 @@ class TestSeedPostconditionsExecution:
 
             result = self._run(env, install)
             assert result.returncode != 0, result.stdout + result.stderr
-            assert "rofi/colors.rasi" in result.stdout + result.stderr, (
-                "the failure must name the missing consumer path; output:\n"
+            assert "current/manifest.json" in result.stdout + result.stderr, (
+                "the failure must name the missing generation manifest; output:\n"
                 + result.stdout
                 + result.stderr
             )
@@ -258,26 +306,10 @@ class TestSeedPostconditionsExecution:
             pytest.skip("ansible-playbook not installed")
         with tempfile.TemporaryDirectory() as raw:
             env, bin_dir, state, install = self._env(Path(raw))
-            current = state / "dotfiles" / "current"
-            current.mkdir(parents=True)
-            (state / "dotfiles" / "current.json").write_text('{"schema_version": 2}\n')
-            artifacts = {
-                "config/ags/colors.css": "colors.gtk.css",
-                "config/gtk-3.0/colors.css": "colors.gtk.css",
-                "config/gtk-4.0/colors.css": "colors.adw.css",
-                "config/rofi/colors.rasi": "colors.rasi",
-                "config/btop/themes/colors.btop.theme": "colors.btop.theme",
-            }
-            for artifact in artifacts.values():
-                (current / artifact).write_text("x\n")
-            for link, artifact in artifacts.items():
-                target = install / link
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.symlink_to(current / artifact)
             stub = bin_dir / "dotfiles-runtime"
             stub.write_text(
                 "#!/bin/sh\n"
-                f"printf '%s\\n' '{{\"schema_version\": 2, \"advanced\": true}}' > {state}/dotfiles/current.json\n"
+                f"python3 {bin_dir}/fake-generation.py {state}\n"
                 "echo 'transient reload failure' >&2\n"
                 "exit 1\n"
             )

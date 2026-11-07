@@ -25,3 +25,9 @@ wlogout_config_legacy_template_path: "{{ wlogout_config_spine_dir }}/style.css.t
 #   is the state dir; the runtime current/ pointers live one level below).
 #   Derivation mirrors verify_xdg_state_home exactly (single XDG resolution).
 wlogout_config_state_root: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}"
+
+# wlogout_config_state_palette_file: the v3 generation palette wlogout imports.
+#   It reads the runtime state directly (contracts generations.md §6): no
+#   <install>/config/ags/colors.css pointer, no app tag in the path. The
+#   `current` symlink makes this stable across generations.
+wlogout_config_state_palette_file: "{{ wlogout_config_state_root | trim }}/dotfiles/current/palette/colors.gtk.css"

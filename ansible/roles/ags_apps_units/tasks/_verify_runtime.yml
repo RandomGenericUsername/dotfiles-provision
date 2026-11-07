@@ -1,6 +1,6 @@
 # Runtime verification for one standalone app that this run STARTED (AD-28).
 # It proves the new instance is the one on the AGS bus and, for live apps, that
-# its palette-refresh handler answers through the contract. Read-only: no file
+# its appearance-refresh handler answers through the v3 contract. Read-only: no file
 # is written and no palette state is changed by the verification itself.
 #
 # The caller sets `app`, `ags_apps_units_started_this_run` and the path facts.
@@ -39,13 +39,13 @@
       '{{ app.instance }}' is not on the AGS bus. Identity is
       manifest.instance == app.tsx instanceName == `ags list` (AD-26).
 
-- name: "{{ app.app }} : invoke the palette-refresh handler"
+- name: "{{ app.app }} : invoke the appearance-refresh handler"
   ansible.builtin.command:
     argv:
       - ags
       - request
-      - palette-refresh
-      - 0000000000000000
+      - appearance-refresh
+      - "{{ ags_apps_units_verify_gen_hash }}"
       - -i
       - "{{ app.instance }}"
   register: ags_apps_units_handler
@@ -55,16 +55,21 @@
     - ags_apps_units_manifest.mode == 'live'
     - ags_apps_units_verify_handler | bool
 
-- name: "{{ app.app }} : assert the live palette-refresh handler answered"
+- name: "{{ app.app }} : assert the live appearance-refresh handler answered"
   ansible.builtin.assert:
     that:
       - ags_apps_units_handler.rc | default(1) == 0
       - >-
-        ags_apps_units_handler.stdout is search('"ok"[ ]*:[ ]*true')
-        or ags_apps_units_handler.stdout is search('"deferred"')
+        ags_apps_units_handler.stdout
+        is search('"applied"[ ]*:[ ]*"' ~ ags_apps_units_verify_gen_hash ~ '"')
+        or (ags_apps_units_handler.stdout is search('"deferred"')
+            and ags_apps_units_handler.stdout
+                is search('"' ~ ags_apps_units_verify_gen_hash ~ '"'))
     fail_msg: >-
-      {{ app.app }} is live but its palette-refresh handler did not return
-      {"ok":true} or {"ok":true,"deferred":"..."} (AD-27): rc={{
+      {{ app.app }} is live but its appearance-refresh handler did not return
+      {"applied":"<genHash>"} or a deferred response naming the requested
+      generation (contracts v0.8.0). A boolean {"ok":true} ack is not
+      generation-bound and is rejected. rc={{
       ags_apps_units_handler.rc | default('?') }}, stdout={{
       ags_apps_units_handler.stdout | default('') | trim }}, stderr={{
       ags_apps_units_handler.stderr | default('') | trim }}.

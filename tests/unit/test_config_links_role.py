@@ -493,7 +493,10 @@ class TestConfigLinksVars:
         )
         assert pre[0]["vars"]["config_links_phase"] == "pre_seed"
         assert post[0]["vars"]["config_links_phase"] == "post_seed"
-        assert pre[0]["roles"] == post[0]["roles"] == ["config_links"]
+        assert pre[0]["roles"] == ["config_links"]
+        # Generations v3: the post-seed play exposes the consumer dirs AND
+        # creates their provisioning-owned stable palette links.
+        assert post[0]["roles"] == ["config_links", "state_links"]
 
     def test_gtk_import_line_is_the_exact_palette_import(self) -> None:
         """The import line is pinned EXACTLY — verify's grep gate asserts the

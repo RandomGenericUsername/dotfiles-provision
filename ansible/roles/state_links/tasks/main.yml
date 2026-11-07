@@ -1,0 +1,90 @@
+# Stable consumer links for non-runtime palette readers (Generations v3).
+#
+# v3 artifact locality (dotfiles-v3 docs/107 §2.7, contracts generations.md
+# §6) makes the runtime write ONLY under $XDG_STATE_HOME/dotfiles/. The runtime
+# must never write `<install>/config/...` or `<install>/apps/<tag>/`.
+#
+# This role owns the provisioning side of that boundary: the stable links the
+# non-runtime consumers already read. They live in the install spine (which the
+# config-links role exposes at ~/.config/<name>) and point INTO the runtime
+# generation's palette directory:
+#
+#   <install>/config/gtk-3.0/colors.css      -> state/current/palette/colors.gtk.css
+#   <install>/config/gtk-4.0/colors.css      -> state/current/palette/colors.adw.css
+#   <install>/config/rofi/colors.rasi        -> state/current/palette/colors.rasi
+#   <install>/config/btop/themes/colors.btop.theme
+#                                             -> state/current/palette/colors.btop.theme
+#
+# The links are stable: they name the `current` pointer, never a
+# generation-specific path, so a new commit is visible without repointing them.
+# Provisioning never creates an app runtime sheet link; AGS apps read
+# `state/current/appearance/<configDir>.css` directly, and `config/<app>` is a
+# link to an immutable tag.
+#
+# Runs after runtime-seed (config-links-post-seed.yaml), so the palette target
+# normally exists. A fresh/incomplete state is tolerated: the links are still
+# created and the target assertion is skipped until `current/manifest.json`
+# exists. User-scoped: NO become.
+
+- name: Assert install_dir seam is provided
+  ansible.builtin.assert:
+    that:
+      - install_dir is defined
+      - install_dir is string
+      - install_dir | trim | length > 0
+    fail_msg: >-
+      install_dir is undefined or empty — the state_links role requires the
+      install_dir seam extra-var (the orchestrator resolves
+      $XDG_DATA_HOME/dotfiles/; direct runs pass -e install_dir=...)
+
+- name: Ensure the stable consumer link parents exist in the install spine
+  ansible.builtin.file:
+    path: "{{ state_links_spine_config_dir }}/{{ item.spine | dirname }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ state_links_consumers }}"
+  loop_control:
+    label: "{{ item.spine }}"
+
+- name: Create the provisioning-owned stable palette consumer links
+  ansible.builtin.file:
+    src: "{{ state_links_state_current_palette_dir }}/{{ item.target }}"
+    dest: "{{ state_links_spine_config_dir }}/{{ item.spine }}"
+    state: link
+    force: true
+  loop: "{{ state_links_consumers }}"
+  loop_control:
+    label: "{{ item.spine }}"
+
+# Absent-tolerant: a fresh state root has no generation yet. When the seed has
+# committed one, the links must resolve; verify re-asserts the same invariant
+# on the host.
+- name: Stat the committed generation manifest
+  ansible.builtin.stat:
+    path: "{{ state_links_state_current_dir }}/manifest.json"
+  register: state_links_generation_manifest
+
+- name: Resolve the stable consumer link targets
+  ansible.builtin.stat:
+    path: "{{ state_links_spine_config_dir }}/{{ item.spine }}"
+    follow: true
+  loop: "{{ state_links_consumers }}"
+  loop_control:
+    label: "{{ item.spine }}"
+  register: state_links_target_checks
+  when: state_links_generation_manifest.stat.exists | default(false)
+
+- name: Assert the stable consumer links resolve once a generation is committed
+  ansible.builtin.assert:
+    that:
+      - >-
+        state_links_target_checks.results
+        | selectattr('stat.exists') | list | length
+        == state_links_consumers | length
+    fail_msg: >-
+      a provisioning-owned stable consumer link does not resolve under
+      {{ state_links_state_current_palette_dir }}/. The runtime seed must
+      commit the v3 generation before the post-seed links are verified; a
+      dangling link would break the rofi/gtk/btop consumer at launch (v3
+      locality: provisioning owns the link, the runtime owns the palette).
+  when: state_links_generation_manifest.stat.exists | default(false)

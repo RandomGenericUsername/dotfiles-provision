@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.43
+
+Deploy Generations v3 artifact locality in the engine (REQ-029).
+
+- New `state_links` role (post-seed play) owns the stable links for the
+  non-runtime palette consumers: `config/gtk-3.0/colors.css`,
+  `config/gtk-4.0/colors.css`, `config/rofi/colors.rasi` and
+  `config/btop/themes/colors.btop.theme` point at
+  `$XDG_STATE_HOME/dotfiles/current/palette/...`. The runtime never repoints
+  them and no AGS app tag is in the read path.
+- `wlogout` imports the palette directly from
+  `current/palette/colors.gtk.css`; the old `config/ags/colors.css` runtime
+  pointer is gone.
+- `runtime-seed` asserts one committed v3 generation
+  (`current/manifest.json`, `version: 3`, `generationHash` == current target
+  basename) instead of v2 consumer links under the install spine.
+- `ags_apps_units` sweeps pre-v3 runtime artifacts (`appearance.css`,
+  `skin.css`, `skin.json`, `tokens.json`, `colors*`) from an existing tag on
+  reinstall/rollback and verifies the tag carries none; live apps are checked
+  against the generation-bound `appearance-refresh` protocol.
+- `verify` reads `current/manifest.json` and the manifest's
+  `current/appearance/<configDir>.css` targets when a generation exists
+  (absent-tolerant before the first seed), asserts the stable consumer links
+  resolve through `current/palette/`, and fails when a runtime artifact or a
+  state symlink targets an immutable app tag.
+- The composition fixture tuple moves to `contracts: v0.8.0`; the engine
+  vendors the frozen generation-manifest and appearance-refresh-result schemas
+  with a PIN and tests. `dotfiles-v3` and the assets/app/runtime pins are not
+  edited here.
+
 ## 0.1.42
 
 Mirror `ags-platform` v0.9.1 in the engine pins (REQ-028).

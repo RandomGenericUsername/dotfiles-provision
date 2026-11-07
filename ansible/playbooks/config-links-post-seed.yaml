@@ -1,8 +1,9 @@
-# Config-links post-seed playbook (BUG-006) — exposes the palette consumers.
+# Config-links post-seed playbook (BUG-006 / Generations v3) — exposes the
+# palette consumers and creates their provisioning-owned stable links.
 #
 # bootstrap order: config-links.yaml (pre-seed settings links) -> runtime-seed
-# (creates the runtime-owned colors.css/colors.rasi/btop theme pointers) ->
-# THIS playbook (gtk-3.0, gtk-4.0, rofi, btop) -> display-manager -> verify.
+# (commits the v3 generation under state/current) -> THIS playbook (gtk-3.0,
+# gtk-4.0, rofi, btop) -> display-manager -> verify.
 #
 # Why the split: the provisioned rofi config hard-imports colors.rasi; linking
 # ~/.config/rofi before runtime-seed exposes a launcher whose palette target
@@ -10,6 +11,11 @@
 # consumers only after the seed closes that exposure window. The settings links
 # must still run BEFORE the seed because the producer CLIs discover their
 # config through ~/.config/<tool>.
+#
+# v3 locality: config_links only exposes the directories. state_links owns the
+# stable palette links INSIDE those spine dirs, pointing at
+# state/current/palette/...; the runtime never writes them and no AGS app tag
+# is in the read path.
 #
 # User-scoped playbook: NO become (the links live under the user's config
 # home). gather_facts is REQUIRED for the role's ansible_facts.env derivations.
@@ -20,3 +26,4 @@
     config_links_phase: post_seed
   roles:
     - config_links
+    - state_links

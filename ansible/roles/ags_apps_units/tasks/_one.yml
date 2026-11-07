@@ -7,8 +7,9 @@
 #   <XDG_CONFIG_HOME>/<xdgLink>
 #   <bin>/<binLink>
 #   <bin>/<launcher>
-# The tag directory itself is only cloned (presence-guarded) and has its .git
-# removed once — never templated/copied into.
+# The tag directory itself is only cloned (presence-guarded), has its .git
+# removed once, and is swept of pre-v3 runtime artifacts (appearance.css /
+# skin.css / skin.json / colors*). It is never templated or copied into.
 
 - name: "{{ app.app }} : materialize the owner paths"
   ansible.builtin.set_fact:
@@ -134,6 +135,45 @@
       ansible.builtin.file:
         path: "{{ ags_apps_units_unit_dir }}/.git"
         state: absent
+      when: not ansible_check_mode
+
+    # Generations v3 migration: a pre-v3 runtime wrote appearance.css (and,
+    # earlier, skin.css/skin.json/colors*) through the config/<app> symlink
+    # into the released tag. Reinstall/rollback must make the tag immutable
+    # again: delete those known runtime artifacts only, never app source.
+    - name: "{{ app.app }} : remove stale runtime artifacts from the immutable tag"
+      ansible.builtin.file:
+        path: "{{ ags_apps_units_unit_dir }}/{{ item }}"
+        state: absent
+      loop: "{{ ags_apps_units_forbidden_runtime_artifacts }}"
+      when: not ansible_check_mode
+
+    - name: "{{ app.app }} : find any remaining runtime artifact in the tag"
+      ansible.builtin.find:
+        paths: "{{ ags_apps_units_unit_dir }}"
+        patterns:
+          - appearance.css
+          - skin.css
+          - skin.json
+          - tokens.json
+          - colors*
+        recurse: true
+        hidden: true
+        file_type: any
+      register: ags_apps_units_tag_runtime_artifacts
+      when: not ansible_check_mode
+
+    - name: "{{ app.app }} : assert the tag carries no runtime artifact"
+      ansible.builtin.assert:
+        that:
+          - ags_apps_units_tag_runtime_artifacts.matched | default(0) | int == 0
+        fail_msg: >-
+          {{ ags_apps_units_unit_dir }} still contains runtime-owned artifact(s)
+          {{ ags_apps_units_tag_runtime_artifacts.files | default([])
+             | map(attribute='path') | list }} (contracts generations.md §6,
+          AD-37). Runtime writes belong under
+          $XDG_STATE_HOME/dotfiles/current/; an app tag is immutable. Remove
+          the listed path(s) or install a tag that does not ship them.
       when: not ansible_check_mode
 
     - name: "{{ app.app }} : record the installed tag outside the immutable tree"

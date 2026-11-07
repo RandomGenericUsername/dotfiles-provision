@@ -12,13 +12,13 @@
 # (`@on_surface`, `@primary_container`) instead of the retired carrier tokens.
 #
 # Design:
-# - Runs AFTER assets (icons + wallpaper exist) + default_palette (colors.css
-#   fragment in config/ags) and BEFORE config_links.
-# - Vars resolve: COLORS_FILE_PATH → <install>/config/ags/colors.css (the
-#   rendered @define-color file wlogout imports); STATE_ROOT icons/wallpaper →
-#   $XDG_STATE_HOME/dotfiles/current/{icons/*,wallpaper.png} (the runtime's
-#   current pointers — gt-4-2 follow-up; the generated/ tree is deleted).
-#   font from the tunable shell vars (group_vars/all.yml).
+# - Runs AFTER assets (icons + wallpaper exist) and BEFORE config_links.
+# - Vars resolve: COLORS_FILE_PATH → the v3 generation palette
+#   `$XDG_STATE_HOME/dotfiles/current/palette/colors.gtk.css` (the rendered
+#   @define-color file wlogout imports). This is a DIRECT runtime-state read:
+#   provisioning never routes it through an AGS app tag or a config copy.
+#   STATE_ROOT icons/wallpaper → current/{icons,wallpaper} in the same state
+#   root. font from the tunable shell vars (group_vars/all.yml).
 # - The `template` module has full check-mode support — no --check gate.
 # - User-scoped: NO become.
 
@@ -51,7 +51,7 @@
     src: "{{ wlogout_config_assets_templates_dir }}/wlogout/style.css.tpl"
     dest: "{{ wlogout_config_spine_dir }}/style.css"
   vars:
-    COLORS_FILE_PATH: "{{ install_dir | trim }}/config/ags/colors.css"
+    COLORS_FILE_PATH: "{{ wlogout_config_state_palette_file }}"
     # gt-4-2 follow-up: icons + wallpaper read the RUNTIME state-root current/
     # pointers (single source, palette-fresh per wallpaper set) — the pre-Epic-4
     # <install>/generated/icons tree is deleted; the default.png hardcode never

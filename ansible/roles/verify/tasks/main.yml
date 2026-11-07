@@ -1861,9 +1861,9 @@
     label: "{{ item.stat.path | basename }}"
   when: not ansible_check_mode
 
-- name: Check runtime palette files exist under the runtime current dir
+- name: Check runtime palette files exist under the generation palette dir
   ansible.builtin.stat:
-    path: "{{ verify_state_current_dir }}/{{ item }}"
+    path: "{{ verify_state_current_palette_dir }}/{{ item }}"
     follow: true
   loop: "{{ verify_palette_files }}"
   register: verify_palette_current_checks
@@ -1875,8 +1875,10 @@
       - verify_palette_current_checks.results | map(attribute='stat.isreg', default=false) | list | select | list | length == verify_palette_files | length
     fail_msg: >-
       not every runtime palette file is present as a regular file under
-      {{ verify_state_current_dir }}/ (expected colors.conf, colors.yaml,
-      colors.gtk.css, colors.adw.css, colors.sequences — Epic 4 current-only
+      {{ verify_state_current_dir }} (expected
+      {{ verify_state_current_palette_dir }}/ with colors.conf, colors.yaml,
+      colors.gtk.css, colors.adw.css, colors.sequences — the v3 generation
+      palette, read through current/palette
       + gt-2-1 artifact growth; the default_palette role is
       deleted). A dangling runtime symlink (broken cache entry) also fails —
       the filesystem is authority. Run `dotfiles-runtime wallpaper set
@@ -2108,6 +2110,72 @@
     - not ansible_check_mode
     - verify_ags_standalone_apps | default([]) | length > 0
 
+# Generations v3: no runtime artifact may live inside an immutable app tag.
+# A pre-v3 seeder wrote appearance.css (and earlier skin.css/skin.json/colors*)
+# through the config/<app> symlink. The installer sweep removes leftovers on
+# reinstall; this read-only gate fails if any are planted again.
+- name: Find runtime artifacts inside immutable app tags
+  ansible.builtin.find:
+    paths: "{{ verify_ags_apps_units_install_root }}"
+    patterns: "{{ verify_app_tag_forbidden_runtime_artifacts }}"
+    recurse: true
+    hidden: true
+    file_type: any
+  register: verify_app_tag_runtime_artifacts
+  when: not ansible_check_mode
+
+- name: Find state-root symlinks that point into an app tag
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter | default('python3') }}"
+      - -c
+      - |
+        import os
+        import sys
+
+        root, apps = sys.argv[1], sys.argv[2]
+        bad = []
+        for base, dirs, files in os.walk(root, followlinks=False):
+            for name in dirs + files:
+                path = os.path.join(base, name)
+                if os.path.islink(path):
+                    target = os.path.realpath(path)
+                    if target == apps or target.startswith(apps + os.sep):
+                        bad.append(path)
+        print("\n".join(bad))
+      - "{{ verify_xdg_state_home | trim }}/dotfiles"
+      - "{{ verify_ags_apps_units_install_root }}"
+  register: verify_state_tag_links
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert the state root contains no symlink into an app tag
+  ansible.builtin.assert:
+    that:
+      - verify_state_tag_links.stdout | default('') | trim | length == 0
+    fail_msg: >-
+      the runtime state root contains symlink(s) into an immutable app tag:
+      {{ verify_state_tag_links.stdout | default('') }} (contracts
+      generations.md §6). Runtime state may reference only content-addressed
+      cache entries and generations; a state link into <install>/apps would
+      make the tag writable again.
+  when: not ansible_check_mode
+
+- name: Assert no runtime artifact exists inside an immutable app tag
+  ansible.builtin.assert:
+    that:
+      - verify_app_tag_runtime_artifacts.matched | default(0) | int == 0
+    fail_msg: >-
+      runtime-owned artifact(s) exist inside an immutable app tag:
+      {{ verify_app_tag_runtime_artifacts.files | default([])
+         | map(attribute='path') | list }} (contracts generations.md §6,
+      AD-37). Runtime writes belong under
+      $XDG_STATE_HOME/dotfiles/current/; app tags are immutable and app
+      runtime sheets are read directly from current/appearance/. Remove the
+      listed path(s) or install a tag that does not ship them.
+  when: not ansible_check_mode
+
 # REQ-023: the always-on apps are owned by systemd --user units. This is the
 # STATIC contract only; the runtime doctor owns live unit/PID/bus/orphan state
 # (RFC §4.3).
@@ -2141,50 +2209,139 @@
       The gui_tools role places them; run that playbook first
   when: not ansible_check_mode
 
-- name: Check R2 consumer symlinks resolve to current/
+# Generations v3: the consumer links are provisioning-owned and stable.
+# They name state/current/palette/<target> (one hop through the commit
+# pointer), never a generation-specific path and never an app tag. A stale
+# config copy or an AGS-tag-routed pointer fails the raw-target assertion;
+# following the link proves the palette entry actually resolves.
+- name: Check stable palette consumer links (link metadata)
   ansible.builtin.stat:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     follow: false
   loop: "{{ verify_consumer_symlinks }}"
+  loop_control:
+    label: "{{ item.path }}"
   register: verify_consumer_symlink_checks
-
-- name: Assert R2 consumer symlinks point at current/
-  ansible.builtin.assert:
-    that:
-      - verify_consumer_symlink_checks.results | selectattr('stat.islnk') | list | length == verify_consumer_symlinks | length
-      - verify_consumer_symlink_checks.results | map(attribute='stat.lnk_target', default='') | select('search', 'dotfiles/current') | list | length == verify_consumer_symlinks | length
-    fail_msg: >-
-      not every R2 consumer path is a symlink into the runtime current dir
-      (done-criterion 7, Epic 4 — the AGS colors.css must resolve to
-      {{ verify_state_current_dir }}/colors.gtk.css). A stale provisioning
-      COPY fails this gate by design. Run the runtime seed (the runtime
-      seeder owns these links, rt-4-2)
   when: not ansible_check_mode
 
-# BUG-006: a raw lnk_target containing /current/ is not proof the target
-# exists. Follow each consumer link and assert it resolves — the rofi launcher
-# hard-imports colors.rasi, so a dangling link is a broken launcher even though
-# the symlink itself is present.
-- name: Check R2 consumer symlinks resolve through current/
+- name: Check stable palette consumer links resolve through current/palette
   ansible.builtin.stat:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     follow: true
   loop: "{{ verify_consumer_symlinks }}"
+  loop_control:
+    label: "{{ item.path }}"
   register: verify_consumer_symlink_resolve_checks
   when: not ansible_check_mode
 
-- name: Assert R2 consumer symlinks resolve through current/
+- name: Assert each stable palette consumer link names current/palette and resolves
   ansible.builtin.assert:
     that:
-      - verify_consumer_symlink_resolve_checks.results | selectattr('stat.exists') | list | length == verify_consumer_symlinks | length
+      - pair.0.stat.exists
+      - pair.0.stat.islnk
+      - pair.0.stat.lnk_target == verify_state_current_palette_dir ~ '/' ~ pair.1.target
+      - pair.0.stat.lnk_target is not search('generations')
+      - pair.1.stat.exists
+      - pair.1.stat.isreg
     fail_msg: >-
-      a palette consumer link does not resolve under the runtime current dir
-      (BUG-006): {{ verify_consumer_symlink_resolve_checks.results
-         | rejectattr('stat.exists') | map(attribute='item') | list }}.
-      A launcher that hard-imports the palette (rofi colors.rasi, gtk
-      colors.css, btop theme) would fail at launch. Run the runtime seed and
-      re-run the post-seed config-links playbook.
+      {{ pair.1.path }} is not the provisioning-owned stable link
+      {{ verify_state_current_palette_dir }}/{{ pair.1.target }} (v3 locality,
+      contracts generations.md §6). The state_links role owns these links;
+      the runtime never repoints them, and no consumer reads through an app
+      tag or a generation-specific path.
+  loop: >-
+    {{ verify_consumer_symlink_checks.results
+       | zip(verify_consumer_symlink_resolve_checks.results) | list }}
+  loop_control:
+    loop_var: pair
+    label: "{{ pair.1.item.path }}"
   when: not ansible_check_mode
+
+# Generations v3 self-check. The manifest is written last and its
+# generationHash must equal the directory basename / current target basename.
+# A fresh install without a committed generation is tolerated: the whole block
+# is skipped until current/manifest.json exists (verify after seed is strict).
+- name: Stat the committed generation manifest and current pointer
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ verify_state_generation_manifest }}"
+    - "{{ verify_state_current_dir }}"
+  register: verify_generation_layout_checks
+
+- name: Read the committed generation manifest
+  ansible.builtin.slurp:
+    src: "{{ verify_state_generation_manifest }}"
+  register: verify_generation_manifest_raw
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
+
+- name: Parse the committed generation manifest
+  ansible.builtin.set_fact:
+    verify_generation_manifest: "{{ verify_generation_manifest_raw.content | b64decode | from_json }}"
+    verify_generation_targets: "{{ (verify_generation_manifest_raw.content | b64decode | from_json).appearance.targets | default([]) }}"
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
+
+- name: Check the generation appearance targets exist when a generation is present
+  ansible.builtin.stat:
+    path: "{{ verify_state_current_dir }}/{{ item.path }}"
+    follow: true
+  loop: "{{ verify_generation_targets | default([]) }}"
+  loop_control:
+    label: "{{ item.path | default('') }}"
+  register: verify_generation_target_checks
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
+
+- name: Check the generation token document exists when a generation is present
+  ansible.builtin.stat:
+    path: "{{ verify_state_current_dir }}/{{ verify_generation_manifest.appearance.tokensPath }}"
+    follow: true
+  register: verify_generation_tokens_check
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
+
+- name: Assert the generation manifest is one complete v3 generation
+  ansible.builtin.assert:
+    that:
+      - verify_generation_layout_checks.results[0].stat.isreg
+      - verify_generation_manifest.version == verify_generation_manifest_version
+      - verify_generation_manifest.generationHash is match('^[0-9a-f]{64}$')
+      - verify_generation_layout_checks.results[1].stat.islnk
+      - verify_generation_layout_checks.results[1].stat.lnk_target | basename
+        == verify_generation_manifest.generationHash
+      - verify_generation_manifest.appearance.tokensPath == verify_generation_tokens_path
+      - verify_generation_manifest.appearance.targets | length > 0
+      - verify_generation_manifest.mode == verify_generation_manifest.skin.mode
+      - verify_generation_manifest.intent.mode == verify_generation_manifest.mode
+      - verify_generation_manifest.intent.skin == verify_generation_manifest.skin.name
+      - >-
+        verify_generation_manifest.appearance.targets | map(attribute='path') | list
+        | difference(verify_generation_manifest.appearance.targets
+                     | map(attribute='configDir')
+                     | map('regex_replace', '^(.*)$', 'appearance/\1.css')
+                     | list) | length == 0
+      - >-
+        verify_generation_target_checks.results | selectattr('stat.isreg') | list
+        | length == verify_generation_targets | length
+      - verify_generation_tokens_check.stat.isreg | default(false)
+    fail_msg: >-
+      current/manifest.json is not the committed v3 generation required by
+      contracts {{ verify_generation_contract_tag }} (generations.md §2): the
+      manifest must be version {{ verify_generation_manifest_version }}, its
+      generationHash must equal the current target basename, appearance must
+      declare {{ verify_generation_tokens_path }} plus one
+      appearance/<configDir>.css target per app, and mode must agree across
+      mode/skin/intent. A v2 current directory or a torn manifest fails closed.
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
 
 - name: Check XDG base dirs exist
   ansible.builtin.stat:

@@ -12,10 +12,12 @@
 #
 # INSTALL SHAPE (AD-31): <install>/apps/<installDir>/<tag>/. Every app unit is
 # immutable after install (AD-37): this role clones the tag, removes the
-# clone's .git ONCE, and never writes another file inside the tag. Config,
-# spine, XDG, bin, launcher and autostart surfaces are links/files OUTSIDE the
-# tag. `colors.css` is verified as the stable runtime pointer; `icons.json` is
-# verified against the platform's single artifact — never generated here.
+# clone's .git ONCE, and never authors content inside the tag. Config, spine,
+# XDG, bin, launcher and autostart surfaces are links/files OUTSIDE the tag.
+# The ONE exception is the v3 migration sweep: runtime artifacts a pre-v3
+# seeder wrote into an existing tag (appearance.css/skin.css/skin.json/...)
+# are deleted so the tag becomes immutable again. `icons.json` is verified
+# against the platform's single artifact — never generated here.
 #
 # SHARED ANCESTOR (AD-31): exactly one
 # <install>/apps/node_modules/ags-platform shortcut points at the tuple's
@@ -71,12 +73,31 @@ ags_apps_units_bin_dir: >-
   {{ ansible_facts.env.UV_TOOL_BIN_DIR
      | default(ansible_facts.env.XDG_BIN_HOME | default(ansible_facts.env.HOME + '/.local/bin', true), true) }}
 
-# ags_apps_units_state_root / _runtime_colors_pointer: the runtime-owned stable
-#   palette pointer outside every tag (AD-37). A bar tag carries
-#   colors.css -> this pointer; provisioning only verifies that relationship,
-#   the runtime seeder updates the pointer.
+# ags_apps_units_state_root: the runtime-owned state root (logs live under
+#   <state>/ags/; runtime artifacts never live in an app tag since v3).
 ags_apps_units_state_root: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}"
-ags_apps_units_runtime_colors_pointer: "{{ ags_apps_units_state_root }}/dotfiles/current/colors.gtk.css"
+
+# ags_apps_units_forbidden_runtime_artifacts: runtime-owned names that must
+#   NEVER exist inside an immutable tag (contracts generations.md §6). The
+#   migration sweep removes leftovers a pre-v3 runtime wrote through the
+#   config/<app> symlink; `colors*` covers the old palette pointer family.
+#   AGS app runtime sheets are read directly from
+#   $XDG_STATE_HOME/dotfiles/current/appearance/<configDir>.css, never copied
+#   or linked through the tag.
+ags_apps_units_forbidden_runtime_artifacts:
+  - appearance.css
+  - skin.css
+  - skin.json
+  - tokens.json
+  - colors.css
+  - colors.conf
+  - colors.yaml
+  - colors.gtk.css
+  - colors.adw.css
+  - colors.sequences
+  - colors.rasi
+  - colors.kitty
+  - colors.btop.theme
 
 # ags_apps_units_autostart_file: the Hyprland autostart Lua file owned by the
 #   assets corpus (dotfiles-assets REQ-007 owns its contents). This role never
@@ -124,8 +145,12 @@ ags_apps_units_start_limit_burst: 3
 #   by this role's defaults.
 ags_apps_units_cutover: false
 
-# ags_apps_units_verify_handler: verify the palette-refresh handler for every
-#   live app that this run started (cutover or always-on). The runtime is the
-#   only palette-refresh trigger in normal operation; this is install-time
-#   proof, not a second refresh path.
+# ags_apps_units_verify_handler: verify the generation-bound appearance-refresh
+#   handler for every live app that this run started (cutover or always-on).
+#   The runtime is the only refresh trigger in normal operation; this is
+#   install-time proof, not a second refresh path.
 ags_apps_units_verify_handler: true
+# The requested generation for the install-time probe. It is deliberately not
+# the live generation: the installer runs before the seed, so a correct v3 app
+# may answer deferred (retryable). A boolean {"ok":true} is invalid either way.
+ags_apps_units_verify_gen_hash: "0000000000000000000000000000000000000000000000000000000000000000"

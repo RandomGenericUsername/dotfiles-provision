@@ -1,5 +1,6 @@
-# Static verification of one standalone tag (AD-26/AD-37). READ-ONLY: it never
-# writes colors.css or icons.json.
+# Static verification of one standalone tag (AD-26/AD-37). READ-ONLY: the
+# migration sweep in _one.yml owns runtime-artifact cleanup; this file verifies
+# manifest identity, the handler and the platform-owned icons.json.
 #
 # The caller sets `app` and the per-app path facts from tasks/_one.yml.
 
@@ -37,37 +38,17 @@
       - "{{ ags_apps_units_unit_dir }}/app.tsx"
   changed_when: false
 
-- name: "{{ app.app }} : assert the live palette-refresh handler exists"
+- name: "{{ app.app }} : assert the live appearance-refresh handler exists"
   ansible.builtin.command:
     argv:
       - grep
       - -R
       - -q
       - --exclude-dir=.git
-      - palette-refresh
+      - appearance-refresh
       - "{{ ags_apps_units_unit_dir }}"
   changed_when: false
   when: ags_apps_units_manifest.mode == 'live'
-
-- name: "{{ app.app }} : stat the bar's stable colors.css pointer"
-  ansible.builtin.stat:
-    path: "{{ ags_apps_units_unit_dir }}/colors.css"
-    follow: false
-  register: ags_apps_units_colors_pointer
-  when: app.barPalettePointer | default(false) | bool
-
-- name: "{{ app.app }} : assert colors.css is the stable runtime pointer, not tag state"
-  ansible.builtin.assert:
-    that:
-      - ags_apps_units_colors_pointer.stat.exists
-      - ags_apps_units_colors_pointer.stat.islnk
-      - ags_apps_units_colors_pointer.stat.lnk_target is search('dotfiles/current/colors\\.gtk\\.css$')
-      - ags_apps_units_colors_pointer.stat.lnk_target is not search(ags_apps_units_unit_dir)
-    fail_msg: >-
-      {{ app.app }}'s colors.css is not a symlink to the stable runtime pointer
-      {{ ags_apps_units_runtime_colors_pointer }} (AD-37). Writable palette
-      state must live outside the immutable tag; provisioning only verifies it.
-  when: app.barPalettePointer | default(false) | bool
 
 - name: "{{ app.app }} : stat the platform's single-produced icons.json"
   ansible.builtin.stat:

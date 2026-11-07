@@ -1006,10 +1006,11 @@ class TestVerifyTasks:
                     "conditions are allowed in a list, the gate clause is not"
                 )
 
-    def test_criterion_6_checks_current_only(self) -> None:
-        """Criterion 6 (Epic 4 current-only): the palette gate stats ONLY
-        {{ verify_state_current_dir }}/<file> (the runtime seed is the
-        single producer — no generated/ OR-leg). The current-dir stat sets
+    def test_criterion_6_checks_current_palette_only(self) -> None:
+        """Criterion 6 (Generations v3): the palette gate stats ONLY
+        {{ verify_state_current_palette_dir }}/<file> through the one
+        `current` pointer (the runtime seed is the single producer — no
+        generated/ OR-leg). The stat sets
         `follow: true` EXPLICITLY: the installed ansible-core's stat module
         defaults follow to FALSE (verified against the argument spec), so
         only an explicit follow resolves a healthy runtime symlink chain
@@ -1027,9 +1028,9 @@ class TestVerifyTasks:
             "criterion 6 must not reference generated/palettes (Epic 4 removed it)"
         )
         assert "{{ verify_palette_files }}" in str(cur.get("loop", ""))
-        assert "{{ verify_state_current_dir }}" in str(_module(cur).get("path", "")), (
-            "the gate must stat {{ verify_state_current_dir }}/<file>"
-        )
+        assert "{{ verify_state_current_palette_dir }}" in str(
+            _module(cur).get("path", "")
+        ), "the gate must stat {{ verify_state_current_palette_dir }}/<file>"
         assert _module(cur).get("follow") is True, (
             "the current-dir stat must pass follow: true EXPLICITLY (the stat "
             "module defaults follow to False in the installed ansible-core — a "
@@ -1848,24 +1849,36 @@ class TestVerifyTasks:
 
 
 class TestVerifyConsumerLinks:
-    """BUG-006: verify asserts the launcher palette consumers, not just AGS."""
+    """Generations v3: verify asserts the provisioning-owned stable links."""
 
-    def test_consumer_symlinks_include_rofi_gtk_and_btop(self) -> None:
-        links = [str(link) for link in _vars()["verify_consumer_symlinks"]]
-        for expected in (
-            "config/ags/colors.css",
-            "config/gtk-3.0/colors.css",
-            "config/gtk-4.0/colors.css",
-            "config/rofi/colors.rasi",
-            "config/btop/themes/colors.btop.theme",
+    def test_consumer_symlinks_include_rofi_gtk_and_btop_only(self) -> None:
+        links = _vars()["verify_consumer_symlinks"]
+        paths = [str(link["path"]) for link in links]
+        targets = {str(link["path"]): str(link["target"]) for link in links}
+        for expected, target in (
+            ("config/gtk-3.0/colors.css", "colors.gtk.css"),
+            ("config/gtk-4.0/colors.css", "colors.adw.css"),
+            ("config/rofi/colors.rasi", "colors.rasi"),
+            ("config/btop/themes/colors.btop.theme", "colors.btop.theme"),
         ):
-            assert any(expected in link for link in links), f"missing {expected}"
+            assert any(expected in path for path in paths), f"missing {expected}"
+            assert any(
+                expected in path and target == targets[path] for path in paths
+            ), f"wrong target for {expected}"
+        assert not any("config/ags/colors.css" in path for path in paths), (
+            "v3: the AGS app reads state/current/appearance directly; there is "
+            "no runtime pointer through the app tag"
+        )
 
     def test_consumer_symlinks_are_followed_and_must_resolve(self) -> None:
         tasks = _load_tasks()
         names = [str(task.get("name", "")) for task in tasks]
-        resolve_name = "Check R2 consumer symlinks resolve through current/"
-        assert_name = "Assert R2 consumer symlinks resolve through current/"
+        resolve_name = (
+            "Check stable palette consumer links resolve through current/palette"
+        )
+        assert_name = (
+            "Assert each stable palette consumer link names current/palette and resolves"
+        )
         assert resolve_name in names and assert_name in names
         assert names.index(resolve_name) < names.index(assert_name)
         stat = tasks[names.index(resolve_name)]
@@ -1874,8 +1887,10 @@ class TestVerifyConsumerLinks:
         assert str(stat.get("loop")) == "{{ verify_consumer_symlinks }}"
         check = tasks[names.index(assert_name)]
         that = " ".join(str(item) for item in _module(check).get("that", []))
-        assert "selectattr('stat.exists')" in that
-        assert "verify_consumer_symlinks | length" in that
+        assert "verify_state_current_palette_dir" in that
+        assert "pair.0.stat.islnk" in that
+        assert "pair.1.stat.isreg" in that
+        assert "generations" in that
 
 
 class TestVerifyVars:
@@ -4990,11 +5005,15 @@ def _build_provisioned_layout(
         f'[output]\ndirectory = "{cache_home}/dotfiles/tpr-output"\n'
     )
 
-    # Runtime-seeded palette + icons (what `wallpaper set` produces): the
-    # current/ symlinks resolve through a fake cache entry so follow: true
-    # resolves to isreg, and the R2 consumer symlink points at current/.
-    state_current = state_home / "dotfiles" / "current"
-    state_cache_palette = state_home / "dotfiles" / "cache" / "palettes" / "abc123"
+    # Runtime-seeded v3 generation (what `wallpaper set` commits): one
+    # generations/<genHash>/ directory with a manifest written last, one
+    # `current` symlink, and provisioning-owned stable consumer links that name
+    # current/palette/... (not a generation-specific path).
+    state_root = state_home / "dotfiles"
+    gen_hash = "a" * 64
+    state_generation = state_root / "generations" / gen_hash
+    state_current = state_root / "current"
+    state_cache_palette = state_root / "cache" / "palettes" / "abc123"
     state_cache_palette.mkdir(parents=True)
     palette_names = (
         "colors.conf",
@@ -5004,23 +5023,70 @@ def _build_provisioned_layout(
         "colors.sequences",
         "colors.kitty",
         "colors.rasi",
+        "colors.btop.theme",
     )
     for name in palette_names:
         (state_cache_palette / name).write_text("")
-    state_current.mkdir(parents=True)
+    state_generation.mkdir(parents=True)
+    (state_generation / "palette").symlink_to(state_cache_palette)
     for name in palette_names:
-        (state_current / name).symlink_to(state_cache_palette / name)
-    # BUG-006 consumer pointers (the runtime seeder owns these): the post-seed
-    # config-links role exposes rofi/gtk/btop through these links, and verify
-    # asserts both the symlink and that its target resolves.
+        (state_generation / name).symlink_to(Path("palette") / name)
+    config_dirs = (
+        "ags",
+        "ags-notifications",
+        "ags-capture",
+        "ags-clipboard",
+        "ags-wallpaper-selector",
+        "ags-icme",
+        "ags-btop-studio",
+    )
+    appearance = state_generation / "appearance"
+    appearance.mkdir()
+    (appearance / "tokens.json").write_text("{}\n")
+    targets = []
+    for config_dir in config_dirs:
+        target = appearance / f"{config_dir}.css"
+        target.write_text("/* appearance */\n")
+        targets.append(
+            {"configDir": config_dir, "path": f"appearance/{config_dir}.css"}
+        )
+    manifest = {
+        "version": 3,
+        "generationHash": gen_hash,
+        "created": {"at": "2026-11-06T00:00:00Z"},
+        "committed": {"at": "2026-11-06T00:00:01Z"},
+        "layers": {
+            "wallpaper": {"entryHash": "b" * 64, "path": "wallpaper"},
+            "palette": {"entryHash": "c" * 64, "path": "palette"},
+        },
+        "skin": {"name": "glass", "entryHash": "d" * 64, "mode": "dark"},
+        "appearance": {
+            "tokensPath": "appearance/tokens.json",
+            "targets": targets,
+        },
+        "mode": "dark",
+        "intent": {
+            "wallpaper": "b" * 64,
+            "palette": "c" * 64,
+            "skin": "glass",
+            "mode": "dark",
+        },
+        "source": {"kind": "cli", "intentHash": "e" * 64},
+    }
+    (state_generation / "manifest.json").write_text(json.dumps(manifest) + "\n")
+    state_current.symlink_to(Path("generations") / gen_hash)
+    # Generations v3 stable links (state_links owns these): gtk/rofi/btop name
+    # current/palette/<target>; there is no AGS config pointer and no path
+    # through an app tag.
     for rel, artifact in (
         ("config/gtk-3.0/colors.css", "colors.gtk.css"),
         ("config/gtk-4.0/colors.css", "colors.adw.css"),
         ("config/rofi/colors.rasi", "colors.rasi"),
+        ("config/btop/themes/colors.btop.theme", "colors.btop.theme"),
     ):
         pointer = install / rel
         pointer.parent.mkdir(parents=True, exist_ok=True)
-        pointer.symlink_to(state_current / artifact)
+        pointer.symlink_to(state_current / "palette" / artifact)
     state_cache_icons = state_home / "dotfiles" / "cache" / "icons" / "def456"
     state_cache_icons.mkdir(parents=True)
     # The samples verify asserts (verify_icons_samples): battery-0 predates the
@@ -5051,7 +5117,7 @@ def _build_provisioned_layout(
         (state_cache_icons / f"{sample}.svg").write_text(
             '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
         )
-    (state_current / "icons").symlink_to(state_cache_icons, target_is_directory=True)
+    (state_generation / "icons").symlink_to(state_cache_icons, target_is_directory=True)
 
     for lua in (
         "hyprland.lua",
@@ -5122,10 +5188,9 @@ def _build_provisioned_layout(
         (app_unit / "app.tsx").write_text(
             f'const appOptions = {{ instanceName: "{entry["instance"]}" }};\n'
         )
-        (app_unit / "handler.ts").write_text('export const command = "palette-refresh";\n')
+        (app_unit / "handler.ts").write_text('export const command = "appearance-refresh";\n')
         if entry["app"] == "bar":
             (app_unit / "icons.json").write_text("{}")
-            (app_unit / "colors.css").symlink_to(state_current / "colors.gtk.css")
         (apps_root / entry["installDir"] / "pinned").write_text(entry["tag"] + "\n")
         spine = install / "config" / entry["spineLink"]
         spine.symlink_to(app_unit, target_is_directory=True)
@@ -5196,7 +5261,7 @@ def _build_provisioned_layout(
     # the spine-rendered .zshrc through the symlink.
     (home / ".zshenv").write_text(f'export ZDOTDIR="{xdg}/zsh"\n')
     (install / "config" / "wlogout" / "style.css").write_text(
-        '@import url("<INSTALL>/config/ags/colors.css");\nbutton { color: @on_surface; }\n'
+        '@import url("<STATE>/dotfiles/current/palette/colors.gtk.css");\nbutton { color: @on_surface; }\n'
     )
     # Rendered kitty config (kitty_config role): verify checks the FINAL
     # kitty.conf (through the ~/.config/kitty link) and greps the runtime
@@ -5218,10 +5283,6 @@ def _build_provisioned_layout(
     )
     _btop_theme = "colors.btop.theme"
     (state_cache_palette / _btop_theme).write_text("")
-    (state_current / _btop_theme).symlink_to(state_cache_palette / _btop_theme)
-    (install / "config" / "btop" / "themes" / _btop_theme).symlink_to(
-        state_current / _btop_theme
-    )
 
     # Shell-tools clones (zsh_tools role — done-criterion 11): verify checks
     # ~/.oh-my-zsh, ~/.pyenv, ~/.nvm exist as dirs (in the HOME the playbook
