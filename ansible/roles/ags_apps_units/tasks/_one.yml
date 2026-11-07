@@ -258,9 +258,12 @@
         - not ansible_check_mode
         - (app.launch == 'always') or (ags_apps_units_cutover | bool)
 
-    # REQ-023: the two always-on apps are supervised by systemd --user. The
-    # installer renders/enables the unit and starts it; it never starts them
-    # through the raw wrapper path. On-demand cutover proofs keep the wrapper.
+    # REQ-023 / BUG-009: the two always-on apps are supervised by systemd
+    # --user. The pre-cutover _quiesce stopped the existing unit under the
+    # launch lock; after the link surfaces, the installer explicitly starts the
+    # unit and refuses to treat an already-active unit as success. It never
+    # starts them through the raw wrapper path. On-demand cutover proofs keep
+    # the wrapper.
     - name: "{{ app.app }} : ensure the user systemd unit directory exists"
       ansible.builtin.file:
         path: "{{ ags_apps_units_systemd_user_dir }}"
@@ -296,14 +299,113 @@
         - app.launch == 'always'
         - ags_apps_units_manager_probe.rc | default(1) == 0
 
-    - name: "{{ app.app }} : reload, enable and start the always-on unit"
-      ansible.builtin.systemd:
-        name: "{{ ags_apps_units_unit_name }}"
-        scope: user
-        daemon_reload: true
-        enabled: true
-        state: started
+    - name: "{{ app.app }} : reload the user manager after rendering the unit"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - daemon-reload
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : enable the always-on unit"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - enable
+          - "{{ ags_apps_units_unit_name }}"
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    # BUG-009: `state: started` against an already-active unit is a no-op, so
+    # an old process survives the link repoint. Require the pre-cutover stop to
+    # have left the unit inactive; only then does an explicit start prove the
+    # new link came up.
+    - name: "{{ app.app }} : read the unit state before the explicit start"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - is-active
+          - --quiet
+          - "{{ ags_apps_units_unit_name }}"
+      register: ags_apps_units_unit_prestart
+      changed_when: false
+      failed_when: false
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : refuse an already-active unit before the explicit start"
+      ansible.builtin.assert:
+        that:
+          - ags_apps_units_unit_prestart.rc | default(0) != 0
+        fail_msg: >-
+          {{ ags_apps_units_unit_name }} is still active before the explicit
+          start. The cutover stop did not release the old process, so
+          `systemctl --user start` would be a no-op and verify would reach the
+          previous generation. Stop the unit before the link repoint.
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : explicitly start the always-on unit on the new link"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - start
+          - "{{ ags_apps_units_unit_name }}"
       register: ags_apps_units_unit_start
+      failed_when: false
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : read the unit state after the explicit start"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - show
+          - --property=ActiveState
+          - --property=MainPID
+          - --value
+          - "{{ ags_apps_units_unit_name }}"
+      register: ags_apps_units_unit_state
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - app.launch == 'always'
+        - ags_apps_units_manager_probe.rc | default(1) == 0
+
+    - name: "{{ app.app }} : assert the explicit start brought the new unit up"
+      ansible.builtin.assert:
+        that:
+          - ags_apps_units_unit_start.rc | default(1) == 0
+          - >-
+            ags_apps_units_unit_state.stdout_lines | default([])
+            | map('trim') | select('equalto', 'active') | list | length == 1
+          - >-
+            ags_apps_units_unit_state.stdout_lines | default([])
+            | map('trim') | select('match', '^[1-9][0-9]*$') | list | length >= 1
+        fail_msg: >-
+          systemctl --user start {{ ags_apps_units_unit_name }} returned
+          rc={{ ags_apps_units_unit_start.rc | default('?') }} but the unit is
+          not active with a main PID (state={{
+          ags_apps_units_unit_state.stdout | default('') | trim }}). The old
+          process may still own the bus; the cutover must stop the unit before
+          relinking and start it after.
       when:
         - not ansible_check_mode
         - app.launch == 'always'

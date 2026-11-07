@@ -9,12 +9,13 @@
 # shipping an app with no owner.
 #
 # Order is the AD-32 epoch for each app:
-#   quiesce (confirmed quit, no bus name) -> install immutable tag ->
-#   repoint links -> render/enable/start the systemd --user unit (always-on)
-#   or start through the shared launch lock for an on-demand cutover proof ->
-#   verify identity, handler and every ownership surface. A failure runs the
-#   rollback block: quiesce the new instance, restore the previous links and
-#   restart the old instance through its unit/wrapper when it was running.
+#   quiesce (stop the owning always-on unit, confirmed quit, no bus name) ->
+#   install immutable tag -> repoint links -> explicitly start the systemd
+#   --user unit (always-on) or start through the shared launch lock for an
+#   on-demand cutover proof -> verify identity, handler and every ownership
+#   surface. A failure runs the rollback block: quiesce the new instance,
+#   restore the previous links and restart the old instance through its
+#   unit/wrapper when it was running.
 #
 # No task writes inside <install>/apps/<installDir>/<tag>/ after the clone:
 # only the presence-guarded git clone and the one-time .git removal touch it.

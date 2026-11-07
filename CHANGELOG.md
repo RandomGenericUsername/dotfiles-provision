@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.45
+
+Make the v3 cutover stop and explicitly start always-on AGS units (BUG-009).
+
+- `ags_apps_units` quiesce now stops an existing `launch: always` systemd
+  `--user` unit first (`systemctl --user stop`, which runs `ExecStop=ags quit`)
+  under the shared launch lock, then bounded-waits for the unit to leave
+  `active` and the D-Bus name to release before any link is repointed.
+- After the spine/XDG/bin/launcher surfaces point at the new tag, the role
+  reloads the user manager, enables the unit, refuses an already-active unit,
+  and runs an explicit `systemctl --user start`. It then asserts the unit is
+  `active` with a main PID, so an old always-on process can no longer survive
+  a tag bump. The bar (`dotfiles-ags-bar.service`) and notifications
+  (`dotfiles-ags-notifications.service`) follow the same path.
+- Manager-less hosts keep the `default.target.wants` enablement path; no
+  `systemctl` stop/start is attempted without a live user manager.
+- Regression tests cover the active-unit stop → relink → start order (old and
+  new link targets), the inactive/manager-less path, a failed start, the
+  bounded stop timeout, no raw always-on launch, and unchanged on-demand
+  behaviour.
+
 ## 0.1.44
 
 Mirror the final Generations v3 composition: `ags-platform` v1.0.0 and the v3

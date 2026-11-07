@@ -1,11 +1,33 @@
-# Quiesce one AGS instance: confirmed quit, bounded wait for the D-Bus name to
-# release. Holds the same shared launch lock every `ags run` path uses so a
-# concurrent launcher cannot start the instance under the link swap.
+# Quiesce one AGS instance: for an always-on app, stop its owning systemd
+# --user unit FIRST (ExecStop=ags quit) so the old process cannot be restarted
+# from the pre-cutover link; then confirm quit and bounded-wait for the unit to
+# leave active and the D-Bus name to release. Holds the same shared launch lock
+# every `ags run` path uses so a concurrent launcher cannot start the instance
+# under the link swap.
 #
 # The caller sets `app` (the app-list entry). `changed_when: false`: this is a
 # lifecycle step, not a machine configuration change.
 
-- name: "Quiesce {{ app.app }} (confirmed quit + bounded name release)"
+- name: "Quiesce {{ app.app }} : stat the owning always-on unit"
+  ansible.builtin.stat:
+    path: "{{ ags_apps_units_unit_file }}"
+  register: ags_apps_units_quiesce_unit_file
+  when:
+    - not ansible_check_mode
+    - app.launch == 'always'
+
+- name: "Quiesce {{ app.app }} : select the unit to stop"
+  ansible.builtin.set_fact:
+    ags_apps_units_quiesce_unit: >-
+      {{ ags_apps_units_unit_name
+         if (app.launch == 'always'
+             and ags_apps_units_manager_probe.rc | default(1) == 0
+             and ags_apps_units_quiesce_unit_file is defined
+             and ags_apps_units_quiesce_unit_file.stat.exists | default(false))
+         else '' }}
+  when: not ansible_check_mode
+
+- name: "Quiesce {{ app.app }} (stop unit, confirmed quit + bounded release)"
   ansible.builtin.shell:
     cmd: |
       set -u
@@ -16,6 +38,22 @@
       if ! flock -w {{ ags_apps_units_lock_timeout }} 9; then
           echo "timeout waiting for the shared AGS launch lock $lock" >&2
           exit 1
+      fi
+      if [ -n "${AGS_UNIT:-}" ]; then
+          if ! systemctl --user stop "$AGS_UNIT"; then
+              echo "systemctl --user stop '$AGS_UNIT' failed" >&2
+              exit 1
+          fi
+          for _ in $(seq 1 40); do
+              if ! systemctl --user is-active --quiet "$AGS_UNIT"; then
+                  break
+              fi
+              sleep 0.25
+          done
+          if systemctl --user is-active --quiet "$AGS_UNIT"; then
+              echo "AGS unit '$AGS_UNIT' stayed active after systemctl --user stop" >&2
+              exit 1
+          fi
       fi
       ags quit -i "$AGS_INSTANCE" >/dev/null 2>&1 || true
       for _ in $(seq 1 20); do
@@ -29,5 +67,6 @@
     executable: /bin/bash
   environment:
     AGS_INSTANCE: "{{ app.instance }}"
+    AGS_UNIT: "{{ ags_apps_units_quiesce_unit | default('') }}"
   changed_when: false
   when: not ansible_check_mode

@@ -467,18 +467,6 @@ class TestAlwaysOnUnits:
         assert "ags_apps_units_unit_file" in text
         assert "ags_apps_units_unit_wants_link" in text
         assert "default.target.wants" in (_ROLE / "vars" / "main.yml").read_text()
-        systemd_tasks = [
-            task
-            for task in one
-            if _module_key(task) == "ansible.builtin.systemd"
-        ]
-        assert len(systemd_tasks) == 1, "expected one enable/start unit task"
-        module = _module(systemd_tasks[0])
-        assert module.get("enabled") is True
-        assert module.get("state") == "started"
-        assert module.get("scope") == "user"
-        when = " ".join(str(clause) for clause in systemd_tasks[0].get("when", []))
-        assert "app.launch == 'always'" in when
 
         template_tasks = [
             task
@@ -488,6 +476,147 @@ class TestAlwaysOnUnits:
         ]
         assert len(template_tasks) == 1
         assert "app.launch == 'always'" in str(template_tasks[0].get("when"))
+
+        enable_tasks = [
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and "enable" in list(_module(task).get("argv", []))
+        ]
+        assert len(enable_tasks) == 1
+        assert _module(enable_tasks[0])["argv"][-1] == "{{ ags_apps_units_unit_name }}"
+        enable_when = " ".join(str(clause) for clause in enable_tasks[0].get("when", []))
+        assert "app.launch == 'always'" in enable_when
+        assert "ags_apps_units_manager_probe.rc" in enable_when
+
+        start_tasks = [
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and list(_module(task).get("argv", []))[:3]
+            == ["systemctl", "--user", "start"]
+        ]
+        assert len(start_tasks) == 1, "expected one explicit systemctl --user start"
+        assert _module(start_tasks[0])["argv"][-1] == "{{ ags_apps_units_unit_name }}"
+        start_when = " ".join(str(clause) for clause in start_tasks[0].get("when", []))
+        assert "app.launch == 'always'" in start_when
+        assert "ags_apps_units_manager_probe.rc" in start_when
+
+    def test_quiesce_stops_the_owning_unit_before_the_link_repoint(self) -> None:
+        quiesce = (_ROLE / "tasks" / "_quiesce.yml").read_text()
+        assert "systemctl --user stop" in quiesce
+        assert 'systemctl --user stop "$AGS_UNIT"' in quiesce
+        assert quiesce.index("systemctl --user stop") < quiesce.index("ags quit -i")
+        assert "systemctl --user is-active --quiet" in quiesce
+        assert "stayed active after systemctl --user stop" in quiesce
+        assert "systemctl --user stop '$AGS_UNIT' failed" in quiesce
+
+        one = self._all_nested_tasks(_tasks_file("_one.yml"))
+        quiesce_index = next(
+            i
+            for i, task in enumerate(one)
+            if _module_key(task) == "ansible.builtin.include_tasks"
+            and _module(task).get("_raw") == "_quiesce.yml"
+        )
+        spine_index = next(
+            i for i, task in enumerate(one) if "repoint the spine link" in str(task.get("name"))
+        )
+        start_index = next(
+            i
+            for i, task in enumerate(one)
+            if _module_key(task) == "ansible.builtin.command"
+            and list(_module(task).get("argv", []))[:3]
+            == ["systemctl", "--user", "start"]
+        )
+        assert quiesce_index < spine_index < start_index
+
+    def test_explicit_start_refuses_an_already_active_unit(self) -> None:
+        one = self._all_nested_tasks(_tasks_file("_one.yml"))
+        prestart = next(
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and list(_module(task).get("argv", []))[:4]
+            == ["systemctl", "--user", "is-active", "--quiet"]
+        )
+        assert prestart.get("register") == "ags_apps_units_unit_prestart"
+        assert prestart.get("failed_when") is False
+
+        guard = next(
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.assert"
+            and "refuse an already-active unit" in str(task.get("name"))
+        )
+        assert "ags_apps_units_unit_prestart.rc" in str(_module(guard)["that"])
+        assert "still active" in str(_module(guard).get("fail_msg"))
+
+    def test_failed_start_surfaces(self) -> None:
+        one = self._all_nested_tasks(_tasks_file("_one.yml"))
+        start = next(
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and list(_module(task).get("argv", []))[:3]
+            == ["systemctl", "--user", "start"]
+        )
+        assert start.get("failed_when") is False
+
+        poststart = next(
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and list(_module(task).get("argv", []))[:3]
+            == ["systemctl", "--user", "show"]
+        )
+        assert "ActiveState" in str(_module(poststart).get("argv"))
+        assert "MainPID" in str(_module(poststart).get("argv"))
+
+        assert_task = next(
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.assert"
+            and "explicit start brought the new unit up" in str(task.get("name"))
+        )
+        terms = str(_module(assert_task)["that"])
+        assert "ags_apps_units_unit_start.rc" in terms
+        assert "equalto', 'active'" in terms
+        assert "MainPID" not in terms  # the PID is the numeric stdout line
+        assert "not active with a main PID" in str(_module(assert_task).get("fail_msg"))
+
+    def test_stop_timeout_surfaces(self) -> None:
+        quiesce = (_ROLE / "tasks" / "_quiesce.yml").read_text()
+        assert "for _ in $(seq 1 40)" in quiesce
+        assert "stayed active after systemctl --user stop" in quiesce
+        assert "exit 1" in quiesce
+        template = (_ROLE / "templates" / "dotfiles-ags-app.service.j2").read_text()
+        assert "TimeoutStopSec={{ ags_apps_units_timeout_stop_sec }}" in template
+        variables = yaml.safe_load((_ROLE / "vars" / "main.yml").read_text())
+        assert variables["ags_apps_units_timeout_stop_sec"] == 10
+
+    def test_managerless_hosts_keep_the_wants_link_path(self) -> None:
+        one = self._all_nested_tasks(_tasks_file("_one.yml"))
+        wants = next(
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.file"
+            and _module(task).get("dest") == "{{ ags_apps_units_unit_wants_link }}"
+        )
+        wants_when = " ".join(str(clause) for clause in wants.get("when", []))
+        assert "ags_apps_units_manager_probe.rc" in wants_when
+        assert "!= 0" in wants_when
+
+        lifecycle = [
+            task
+            for task in one
+            if _module_key(task) == "ansible.builtin.command"
+            and list(_module(task).get("argv", []))[:2] == ["systemctl", "--user"]
+        ]
+        assert lifecycle
+        for task in lifecycle:
+            when_text = " ".join(str(clause) for clause in task.get("when", []))
+            assert "app.launch == 'always'" in when_text, task.get("name")
+            assert "ags_apps_units_manager_probe.rc" in when_text, task.get("name")
 
     def test_no_raw_always_on_start_remains(self) -> None:
         one = self._all_nested_tasks(_tasks_file("_one.yml"))
@@ -658,6 +787,135 @@ def _force_managerless(bin_dir: Path) -> None:
     path.chmod(0o755)
 
 
+def _fake_manager(bin_dir: Path) -> None:
+    """Install a fake `systemctl --user` that simulates a unit lifecycle.
+
+    It records every stop/start with the link target resolved at that moment,
+    so a test can prove the cutover stopped the OLD tag and started the NEW
+    link. `start` registers the instance on the fake AGS bus just like the real
+    unit would (via ExecStart); `stop` runs the unit's ExecStop equivalent
+    (`ags quit -i <instance>`).
+
+    Failure injection (environment):
+      FAKE_SYSTEMD_FAIL_START=1  -> `start` exits 1, leaves the unit inactive.
+      FAKE_SYSTEMD_STOP_NOOP=1   -> `stop` returns 0 but leaves the unit active
+                                    (the bounded-wait "stop timeout" path).
+    """
+    path = bin_dir / "systemctl"
+    path.write_text(
+        """#!/usr/bin/env bash
+set -u
+STATE="${FAKE_SYSTEMD_STATE:?}"
+LOG="${FAKE_SYSTEMD_CALLS:?}"
+UNIT_DIR="$HOME/.config/systemd/user"
+mkdir -p "$STATE" "$(dirname "$LOG")"
+touch "$LOG"
+log() { printf '%s\\n' "$*" >> "$LOG"; }
+
+if [ "${1:-}" = "--user" ]; then shift; fi
+cmd="${1:-}"
+[ "$#" -gt 0 ] && shift
+
+state_file() { printf '%s/%s.state' "$STATE" "$1"; }
+unit_instance() {
+    local unit_file="$UNIT_DIR/$1"
+    [ -f "$unit_file" ] || return 0
+    grep -o -- '--expect-instance [^ ]*' "$unit_file" | head -1 | awk '{print $2}'
+}
+unit_spine() {
+    local unit_file="$UNIT_DIR/$1"
+    [ -f "$unit_file" ] || return 0
+    sed -n 's|.*-- /usr/bin/ags run -d \\([^ ]*\\).*|\\1|p' "$unit_file" | head -1
+}
+current_link() {
+    local spine="$1"
+    if [ -n "$spine" ]; then
+        readlink -f "$spine" 2>/dev/null || true
+    fi
+}
+case "$cmd" in
+    show-environment) exit 0 ;;
+    daemon-reload) log "daemon-reload"; exit 0 ;;
+    reset-failed) log "reset-failed $*"; exit 0 ;;
+    enable)
+        unit="${1:-}"
+        [ -n "$unit" ] || exit 1
+        mkdir -p "$UNIT_DIR/default.target.wants"
+        ln -sfn "$UNIT_DIR/$unit" "$UNIT_DIR/default.target.wants/$unit"
+        log "enable $unit"
+        exit 0
+        ;;
+    stop)
+        unit="${1:-}"
+        [ -n "$unit" ] || exit 1
+        inst="$(unit_instance "$unit")"
+        spine="$(unit_spine "$unit")"
+        log "stop $unit link=$(current_link "$spine") instance=$inst"
+        if [ "${FAKE_SYSTEMD_STOP_NOOP:-0}" = "1" ]; then
+            printf 'active\\n' > "$(state_file "$unit")"
+            exit 0
+        fi
+        if [ "${FAKE_SYSTEMD_FAIL_STOP:-0}" = "1" ]; then
+            printf 'active\\n' > "$(state_file "$unit")"
+            exit 1
+        fi
+        if [ -n "$inst" ]; then
+            ags quit -i "$inst" >/dev/null 2>&1 || true
+        fi
+        printf 'inactive\\n' > "$(state_file "$unit")"
+        exit 0
+        ;;
+    start)
+        unit="${1:-}"
+        [ -n "$unit" ] || exit 1
+        state="$(cat "$(state_file "$unit")" 2>/dev/null || echo inactive)"
+        inst="$(unit_instance "$unit")"
+        spine="$(unit_spine "$unit")"
+        log "start $unit link=$(current_link "$spine") instance=$inst state=$state"
+        if [ "${FAKE_SYSTEMD_FAIL_START:-0}" = "1" ]; then
+            printf 'inactive\\n' > "$(state_file "$unit")"
+            exit 1
+        fi
+        if [ "$state" = "active" ]; then
+            exit 0
+        fi
+        if [ -n "$inst" ]; then
+            printf '%s\\n' "$inst" >> "${FAKE_AGS_REGISTRY:?}"
+        fi
+        printf 'active\\n' > "$(state_file "$unit")"
+        exit 0
+        ;;
+    is-active)
+        if [ "${1:-}" = "--quiet" ]; then shift; fi
+        unit="${1:-}"
+        if [ "$(cat "$(state_file "$unit")" 2>/dev/null || echo inactive)" = "active" ]; then
+            exit 0
+        fi
+        exit 3
+        ;;
+    show)
+        unit=""
+        for arg in "$@"; do unit="$arg"; done
+        state="$(cat "$(state_file "$unit")" 2>/dev/null || echo inactive)"
+        log "show $unit state=$state"
+        if [ "$state" = "active" ]; then
+            printf 'active\\n4242\\n'
+        else
+            printf 'inactive\\n0\\n'
+        fi
+        exit 0
+        ;;
+    *)
+        log "other $cmd $*"
+        exit 0
+        ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    path.chmod(0o755)
+
+
 def _make_app_repo(
     root: Path,
     name: str,
@@ -771,6 +1029,8 @@ def _run_role(
     *,
     cutover: bool = False,
     check: bool = False,
+    manager: bool = False,
+    extra_env: dict[str, str] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, str]]:
     ansible_playbook = shutil.which("ansible-playbook")
     if ansible_playbook is None:
@@ -785,7 +1045,12 @@ def _run_role(
         path.mkdir(exist_ok=True)
     _fake_ags(bin_dir)
     _write_wrapper(bin_dir)
-    _force_managerless(bin_dir)
+    if manager:
+        _fake_manager(bin_dir)
+    else:
+        _force_managerless(bin_dir)
+    systemd_state = tmp_path / "fake-systemd-state"
+    systemd_calls = tmp_path / "fake-systemd-calls"
     registry = tmp_path / "fake-ags-registry"
     env = dict(
         os.environ,
@@ -799,9 +1064,13 @@ def _run_role(
         FAKE_AGS_WINDOWS=str(tmp_path / "fake-ags-windows"),
         FAKE_AGS_REQUEST_TOGGLES=str(tmp_path / "fake-ags-request-toggles"),
         FAKE_AGS_RUN_SECONDS="30",
+        FAKE_SYSTEMD_STATE=str(systemd_state),
+        FAKE_SYSTEMD_CALLS=str(systemd_calls),
         ANSIBLE_CONFIG=str(_ANSIBLE_DIR / "ansible.cfg"),
         PATH=f"{bin_dir}:{os.environ.get('PATH', '')}",
     )
+    if extra_env:
+        env.update(extra_env)
     args = [
         ansible_playbook,
         str(_ANSIBLE_DIR / "playbooks" / "ags-apps-units.yaml"),
@@ -822,8 +1091,11 @@ def _run_role(
         "xdg": str(xdg),
         "bin": str(bin_dir),
         "state": str(state),
+        "runtime": str(runtime),
         "registry": str(registry),
         "home": str(home),
+        "systemd_state": str(systemd_state),
+        "systemd_calls": str(systemd_calls),
     }
 
 
@@ -847,6 +1119,46 @@ def _stage_seven_app_repos(tmp_path: Path) -> tuple[dict[str, Path], Path]:
             tag=entry["tag"],
         )
     return repos, icons or ""
+
+
+def _stage_bar_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Stage the bar-only composition used by the always-on cutover tests."""
+    entry = next(entry for entry in _app_list() if entry["app"] == "bar")
+    icons = (_FAKE_APP / "icons.json").read_text(encoding="utf-8")
+    repo = _make_app_repo(
+        tmp_path,
+        "bar",
+        app="bar",
+        instance=entry["instance"],
+        config_dir=entry["configDir"],
+        icons_json=icons,
+        tag=entry["tag"],
+    )
+    provisioning = _write_composition(tmp_path, {"bar": repo}, apps=("bar",))
+    install = tmp_path / "install"
+    _stage_fake_platform(install, icons_json=icons)
+    _stage_autostart(install)
+    return repo, provisioning, install
+
+
+def _bump_tag(tmp_path: Path, repo: Path, tag: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.email=t@example.invalid",
+            "-c",
+            "user.name=test",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            tag,
+        ],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "tag", tag], check=True)
 
 
 def _stop_fake_ags(paths: dict[str, str]) -> None:
@@ -950,6 +1262,110 @@ class TestRoleExecution:
             assert not (Path(paths["bin"]) / "hypr-pano-ui").exists()
         finally:
             _stop_fake_ags(paths)
+
+    def test_active_unit_cutover_stops_old_link_then_starts_new_link(
+        self, tmp_path: Path
+    ) -> None:
+        """BUG-009: an active always-on unit must not survive the relink.
+
+        First install leaves dotfiles-ags-bar.service active on v0.6.0. The tag
+        bump then has to stop that unit (logging the OLD link), repoint, and
+        explicitly start it (logging the NEW link). `state: started` would have
+        been a no-op here.
+        """
+        repo, provisioning, install = _stage_bar_repo(tmp_path)
+        first, paths = _run_role(tmp_path, provisioning, cutover=True, manager=True)
+        try:
+            assert first.returncode == 0, first.stdout + first.stderr
+            calls_first = Path(paths["systemd_calls"]).read_text().splitlines()
+            assert not any(
+                line.startswith("stop dotfiles-ags-bar.service") for line in calls_first
+            ), "an absent/inactive unit must not be stopped"
+            assert any(
+                line.startswith("start dotfiles-ags-bar.service")
+                and "state=inactive" in line
+                for line in calls_first
+            ), "the first install must explicitly start the inactive unit"
+            assert (
+                Path(paths["systemd_state"]) / "dotfiles-ags-bar.service.state"
+            ).read_text().strip() == "active"
+
+            _bump_tag(tmp_path, repo, "v0.2.0")
+            bumped = _write_composition(
+                tmp_path, {"bar": repo}, apps=("bar",), tags={"bar": "v0.2.0"}
+            )
+            second, _ = _run_role(tmp_path, bumped, cutover=True, manager=True)
+            assert second.returncode == 0, second.stdout + second.stderr
+
+            old_unit = install / "apps" / "bar" / "v0.6.0"
+            new_unit = install / "apps" / "bar" / "v0.2.0"
+            calls = Path(paths["systemd_calls"]).read_text().splitlines()
+            stop_index = next(
+                i
+                for i, line in enumerate(calls)
+                if line.startswith("stop dotfiles-ags-bar.service")
+            )
+            start_index = next(
+                i
+                for i, line in enumerate(calls)
+                if i > stop_index and line.startswith("start dotfiles-ags-bar.service")
+            )
+            assert f"link={old_unit}" in calls[stop_index], calls[stop_index]
+            assert f"link={new_unit}" in calls[start_index], calls[start_index]
+            assert "state=inactive" in calls[start_index], (
+                "the explicit start must not accept the old active unit"
+            )
+            assert os.readlink(install / "config" / "ags") == str(new_unit)
+            assert "ags" in Path(paths["registry"]).read_text().splitlines()
+        finally:
+            _stop_fake_ags(paths)
+
+    def test_failed_always_on_start_fails_the_cutover(self, tmp_path: Path) -> None:
+        _, provisioning, install = _stage_bar_repo(tmp_path)
+        result, paths = _run_role(
+            tmp_path,
+            provisioning,
+            cutover=True,
+            manager=True,
+            extra_env={"FAKE_SYSTEMD_FAIL_START": "1"},
+        )
+        _stop_fake_ags(paths)
+        assert result.returncode != 0
+        assert "assert the explicit start brought the new unit up" in result.stdout
+        assert "not active with a main PID" in result.stdout
+        spine = install / "config" / "ags"
+        assert not spine.is_symlink(), "a failed start must roll the links back"
+
+    def test_stop_timeout_fails_before_any_install(self, tmp_path: Path) -> None:
+        """A stop that returns 0 but leaves the unit active must fail the
+        bounded wait, not proceed to relink/start."""
+        _, provisioning, install = _stage_bar_repo(tmp_path)
+        home = tmp_path / "home"
+        unit_dir = home / ".config" / "systemd" / "user"
+        unit_dir.mkdir(parents=True)
+        unit_file = unit_dir / "dotfiles-ags-bar.service"
+        unit_file.write_text(
+            "[Service]\n"
+            "ExecStart=/bin/true --expect-instance ags "
+            f"-- /usr/bin/ags run -d {install}/config/ags\n"
+            "ExecStop=/usr/bin/ags quit -i ags\n",
+            encoding="utf-8",
+        )
+        state = tmp_path / "fake-systemd-state"
+        state.mkdir()
+        (state / "dotfiles-ags-bar.service.state").write_text("active\n", encoding="utf-8")
+
+        result, paths = _run_role(
+            tmp_path,
+            provisioning,
+            cutover=True,
+            manager=True,
+            extra_env={"FAKE_SYSTEMD_STOP_NOOP": "1"},
+        )
+        _stop_fake_ags(paths)
+        assert result.returncode != 0
+        assert "stayed active after systemctl --user stop" in result.stdout
+        assert not (install / "apps" / "bar" / "v0.6.0").exists()
 
     def test_second_run_does_not_write_inside_installed_tags(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
