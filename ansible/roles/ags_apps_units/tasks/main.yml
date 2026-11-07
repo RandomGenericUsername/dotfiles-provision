@@ -229,3 +229,13 @@
   loop_control:
     loop_var: app
     label: "{{ app.app }}"
+
+# Generations v3 migration: sweep EVERY installed tag under
+# <install>/apps/<installDir>/<tag>/, not just the tag this run pins. A host
+# upgraded from v1/v2 keeps runtime artifacts in historical immutable tags; the
+# read-only verify find scans the whole apps root and would reject them. This
+# runs after the per-app epoch (which sweeps + asserts the current tag) and
+# before verify in bootstrap order.
+- name: Sweep runtime artifacts from historical app tags
+  ansible.builtin.include_tasks: _sweep_tags.yml
+  when: not ansible_check_mode

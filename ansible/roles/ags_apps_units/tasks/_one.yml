@@ -141,22 +141,33 @@
     # earlier, skin.css/skin.json/colors*) through the config/<app> symlink
     # into the released tag. Reinstall/rollback must make the tag immutable
     # again: delete those known runtime artifacts only, never app source.
+    - name: "{{ app.app }} : find stale runtime artifacts in the immutable tag"
+      ansible.builtin.find:
+        paths: "{{ ags_apps_units_unit_dir }}"
+        patterns: "{{ ags_apps_units_forbidden_runtime_artifacts }}"
+        recurse: true
+        hidden: true
+        file_type: any
+      register: ags_apps_units_tag_stale_artifacts
+      when: not ansible_check_mode
+
     - name: "{{ app.app }} : remove stale runtime artifacts from the immutable tag"
       ansible.builtin.file:
-        path: "{{ ags_apps_units_unit_dir }}/{{ item }}"
+        path: "{{ item.path }}"
         state: absent
-      loop: "{{ ags_apps_units_forbidden_runtime_artifacts }}"
-      when: not ansible_check_mode
+      loop: "{{ ags_apps_units_tag_stale_artifacts.files | default([]) }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when:
+        - not ansible_check_mode
+        # Runtime-owned artifacts are files or symlinks. A real directory that
+        # happens to share an allowlisted basename is never removed.
+        - item.islnk | default(false) or not (item.isdir | default(false))
 
     - name: "{{ app.app }} : find any remaining runtime artifact in the tag"
       ansible.builtin.find:
         paths: "{{ ags_apps_units_unit_dir }}"
-        patterns:
-          - appearance.css
-          - skin.css
-          - skin.json
-          - tokens.json
-          - colors*
+        patterns: "{{ ags_apps_units_forbidden_runtime_artifacts }}"
         recurse: true
         hidden: true
         file_type: any

@@ -318,6 +318,14 @@ class TestRoleStructure:
         assert "ags_apps_units_forbidden_runtime_artifacts" in sweep
         assert "assert the tag carries no runtime artifact" in sweep
         assert "find any remaining runtime artifact" in sweep
+        # Historical tags are swept too, from the same documented allowlist.
+        historical = (_ROLE / "tasks" / "_sweep_tags.yml").read_text()
+        assert "ags_apps_units_installed_tag_dirs" in historical
+        assert "ags_apps_units_forbidden_runtime_artifacts" in historical
+        assert "depth: 2" in historical
+        assert "state: absent" in historical
+        main = (_ROLE / "tasks" / "main.yml").read_text()
+        assert "include_tasks: _sweep_tags.yml" in main
         verify_unit = (_ROLE / "tasks" / "_verify_unit.yml").read_text()
         assert "colors.css" not in verify_unit
         assert "icons.json" in verify_unit
@@ -1432,6 +1440,75 @@ class TestRoleExecution:
                 "the v3 sweep must remove only runtime artifacts; app source "
                 "inside the tag must stay byte-identical"
             )
+        finally:
+            _stop_fake_ags(paths)
+
+    def test_historical_tag_sweep_removes_artifacts_and_preserves_source(
+        self, tmp_path: Path
+    ) -> None:
+        """A v1/v2 runtime left artifacts in OLD tags, not just the pinned one.
+        The migration sweep must clean every installed tag directory while
+        leaving app source and .git intact; the verify-shaped recursive find
+        then matches nothing."""
+        install = tmp_path / "install"
+        repos, bar_icons = _stage_seven_app_repos(tmp_path)
+        provisioning = _write_composition(tmp_path, repos)
+        _stage_fake_platform(install, icons_json=bar_icons)
+        _stage_autostart(install)
+        first, paths = _run_role(tmp_path, provisioning, cutover=True)
+        try:
+            assert first.returncode == 0, first.stdout + first.stderr
+            apps = {entry["app"]: entry for entry in _app_list()}
+            bar = apps["bar"]
+            old_tag = install / "apps" / bar["installDir"] / "v0.0.1"
+            old_tag.mkdir(parents=True)
+            (old_tag / "app.tsx").write_text("// historical app source\n", encoding="utf-8")
+            (old_tag / "package.json").write_text("{}\n", encoding="utf-8")
+            (old_tag / ".git").mkdir()
+            (old_tag / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+            artifacts = {
+                "appearance.css": "/* v2 runtime */\n",
+                "skin.css": "/* v2 runtime */\n",
+                "skin.json": "{}\n",
+                "tokens.json": "{}\n",
+                "colors.css": "/* v2 palette pointer */\n",
+                "colors.yaml": "colors: {}\n",
+                "colors.btop.theme": "theme\n",
+            }
+            for name, body in artifacts.items():
+                (old_tag / name).write_text(body, encoding="utf-8")
+            (old_tag / "colors.rasi").symlink_to(tmp_path / "state" / "palette" / "colors.rasi")
+            source_before = {
+                str(path.relative_to(old_tag)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in old_tag.rglob("*")
+                if path.is_file() and path.name not in artifacts and ".git" not in path.parts
+            }
+
+            second, _ = _run_role(tmp_path, provisioning, cutover=True)
+            assert second.returncode == 0, second.stdout + second.stderr
+            for name in [*artifacts, "colors.rasi"]:
+                assert not (old_tag / name).exists(), name
+            source_after = {
+                str(path.relative_to(old_tag)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in old_tag.rglob("*")
+                if path.is_file() and ".git" not in path.parts
+            }
+            assert source_before == source_after, (
+                "the historical-tag sweep must remove only the runtime-artifact "
+                "allowlist; app source must stay byte-identical"
+            )
+            assert (old_tag / ".git" / "HEAD").read_text() == "ref: refs/heads/main\n"
+            current_tag = install / "apps" / bar["installDir"] / bar["tag"]
+            assert not any((current_tag / name).exists() for name in artifacts), (
+                "the current tag must stay clean"
+            )
+            # The verify gate repeats this recursive find over the apps root.
+            remaining = [
+                path
+                for path in (install / "apps").rglob("*")
+                if path.name in {*artifacts, "colors.rasi"}
+            ]
+            assert remaining == [], remaining
         finally:
             _stop_fake_ags(paths)
 

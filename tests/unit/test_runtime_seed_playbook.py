@@ -97,16 +97,17 @@ def _task_names(play: dict) -> list[str]:
 
 
 def test_seed_captures_the_generation_and_asserts_v3_postconditions() -> None:
-    """Generations v3: a tolerated rc=1 must still commit a fresh
-    current/manifest.json whose generationHash is the current target basename.
-    v2 consumer links under the install spine are not part of the seed."""
+    """Generations v3: rc=0 is success even on an idempotent no-op seed; a
+    tolerated rc=1 must still commit fresh state; the committed manifest's
+    generationHash must be the current target basename. v2 consumer links under
+    the install spine are not part of the seed."""
     play = _play()
     names = _task_names(play)
     assert "Capture the generation manifest before seeding" in names
     assert "Capture the generation manifest after seeding" in names
     after = names.index("Capture the generation manifest after seeding")
-    assert after < names.index("Assert the seed produced fresh generation state")
-    assert names.index("Assert the seed produced fresh generation state") < names.index(
+    assert after < names.index("Assert the seed produced acceptable generation state")
+    assert names.index("Assert the seed produced acceptable generation state") < names.index(
         "Assert the seed committed one complete v3 generation"
     )
     assert str(play["vars"]["runtime_seed_current_dir"]) == (
@@ -117,14 +118,16 @@ def test_seed_captures_the_generation_and_asserts_v3_postconditions() -> None:
     )
     assert "runtime_seed_consumer_links" not in play["vars"]
 
-    fresh = next(
+    accepted = next(
         task
         for task in play["tasks"]
-        if str(task.get("name")) == "Assert the seed produced fresh generation state"
+        if str(task.get("name")) == "Assert the seed produced acceptable generation state"
     )
-    that = " ".join(str(item) for item in fresh["ansible.builtin.assert"]["that"])
+    that = " ".join(str(item) for item in accepted["ansible.builtin.assert"]["that"])
     assert "runtime_seed_result.rc in [0, 1]" in that
-    assert "runtime_seed_state_advanced | bool" in that
+    # rc=0 accepts an unchanged (idempotent) committed manifest; only rc=1
+    # requires state advancement (BUG-006).
+    assert "runtime_seed_result.rc == 0 or runtime_seed_state_advanced | bool" in that
     assert "runtime_seed_post_state.stat.exists" in that
 
     generation = next(
@@ -144,7 +147,7 @@ def test_seed_captures_the_generation_and_asserts_v3_postconditions() -> None:
 
 
 
-_GENERATION_SCRIPT = """#!/usr/bin/env python3
+_GENERATION_SCRIPT = r"""#!/usr/bin/env python3
 import json
 import pathlib
 import sys
@@ -295,6 +298,48 @@ class TestSeedPostconditionsExecution:
                 + result.stdout
                 + result.stderr
             )
+
+    def test_rc0_with_an_unchanged_valid_manifest_is_accepted(self) -> None:
+        """An idempotent apply derives the same generation: rc=0 without any
+        manifest change is success, not a missing fresh generation."""
+        import shutil
+        import tempfile
+
+        if shutil.which("ansible-playbook") is None:
+            pytest.skip("ansible-playbook not installed")
+        with tempfile.TemporaryDirectory() as raw:
+            env, bin_dir, state, install = self._env(Path(raw))
+            subprocess.run(
+                ["python3", str(bin_dir / "fake-generation.py"), str(state)],
+                check=True,
+            )
+            stub = bin_dir / "dotfiles-runtime"
+            stub.write_text("#!/bin/sh\nexit 0\n")
+            stub.chmod(0o755)
+
+            result = self._run(env, install)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "Assert the seed produced acceptable generation state" in result.stdout
+
+    def test_rc_greater_than_one_fails(self) -> None:
+        import shutil
+        import tempfile
+
+        if shutil.which("ansible-playbook") is None:
+            pytest.skip("ansible-playbook not installed")
+        with tempfile.TemporaryDirectory() as raw:
+            env, bin_dir, state, install = self._env(Path(raw))
+            subprocess.run(
+                ["python3", str(bin_dir / "fake-generation.py"), str(state)],
+                check=True,
+            )
+            stub = bin_dir / "dotfiles-runtime"
+            stub.write_text("#!/bin/sh\necho 'hard seed failure' >&2\nexit 2\n")
+            stub.chmod(0o755)
+
+            result = self._run(env, install)
+            assert result.returncode != 0, result.stdout + result.stderr
+            assert "hard seed failure" in result.stdout + result.stderr
 
     def test_rc1_with_fresh_state_and_complete_links_is_accepted(self) -> None:
         import shutil

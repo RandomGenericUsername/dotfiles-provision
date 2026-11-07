@@ -77,27 +77,22 @@ ags_apps_units_bin_dir: >-
 #   <state>/ags/; runtime artifacts never live in an app tag since v3).
 ags_apps_units_state_root: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}"
 
-# ags_apps_units_forbidden_runtime_artifacts: runtime-owned names that must
-#   NEVER exist inside an immutable tag (contracts generations.md §6). The
-#   migration sweep removes leftovers a pre-v3 runtime wrote through the
-#   config/<app> symlink; `colors*` covers the old palette pointer family.
-#   AGS app runtime sheets are read directly from
+# ags_apps_units_forbidden_runtime_artifacts: the documented runtime-owned
+#   artifact ALLOWLIST that must NEVER exist inside an immutable tag
+#   (contracts generations.md §6). Both the per-app current-tag sweep and the
+#   historical-tag migration sweep use these glob patterns; `colors*` covers
+#   the retired palette-pointer family (colors.css/colors.yaml/colors.rasi/...).
+#   The sweeps delete ONLY files/symlinks whose basename matches one of these
+#   patterns. A real directory with a matching name, .git and every app source
+#   file are untouched. AGS app runtime sheets are read directly from
 #   $XDG_STATE_HOME/dotfiles/current/appearance/<configDir>.css, never copied
-#   or linked through the tag.
+#   or linked through a tag.
 ags_apps_units_forbidden_runtime_artifacts:
   - appearance.css
   - skin.css
   - skin.json
   - tokens.json
-  - colors.css
-  - colors.conf
-  - colors.yaml
-  - colors.gtk.css
-  - colors.adw.css
-  - colors.sequences
-  - colors.rasi
-  - colors.kitty
-  - colors.btop.theme
+  - colors*
 
 # ags_apps_units_autostart_file: the Hyprland autostart Lua file owned by the
 #   assets corpus (dotfiles-assets REQ-007 owns its contents). This role never

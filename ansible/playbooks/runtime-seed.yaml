@@ -142,20 +142,27 @@
         - not ansible_check_mode
         - runtime_seed_post_state.stat.exists | default(false)
 
-    - name: Assert the seed produced fresh generation state
+    # rc=0 is success even when the commit is a no-op: an idempotent apply
+    # derives the same generation and leaves current/manifest.json unchanged,
+    # so state_advanced is false and that is expected. Only a tolerated rc=1
+    # needs proof of fresh/changed state (BUG-006); a committed valid manifest
+    # with the current target matching its generationHash is asserted next.
+    - name: Assert the seed produced acceptable generation state
       ansible.builtin.assert:
         that:
           - runtime_seed_result.rc in [0, 1]
           - runtime_seed_post_state.stat.exists | default(false)
           - runtime_seed_post_state.stat.isreg | default(false)
-          - runtime_seed_state_advanced | bool
+          - runtime_seed_result.rc == 0 or runtime_seed_state_advanced | bool
         fail_msg: >-
-          runtime seed did not produce a fresh generation manifest. rc={{
+          runtime seed did not produce acceptable generation state. rc={{
           runtime_seed_result.rc }};
           state_advanced={{ runtime_seed_state_advanced | default(false) }};
           manifest={{ runtime_seed_generation_manifest }}.
-          Accepting rc=1 requires a fresh current/manifest.json. Re-run the
-          runtime seed after fixing the reported path.
+          rc=0 requires an existing current/manifest.json (an unchanged
+          generation is a successful idempotent apply); rc=1 additionally
+          requires fresh/changed state. Re-run the runtime seed after fixing the
+          reported path.
       when: not ansible_check_mode
 
     # v3 generation self-check: the manifest written last inside the generation

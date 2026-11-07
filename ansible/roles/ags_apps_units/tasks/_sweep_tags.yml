@@ -1,0 +1,96 @@
+# Generations v3 migration sweep for HISTORICAL app tags.
+#
+# The per-app epoch in _one.yml sweeps only the tag this run installs/repins.
+# A host upgraded from v1/v2 can still have runtime artifacts in older immutable
+# tags under <install>/apps/<installDir>/<tag>/ (the old runtime wrote through
+# config/<app> into whichever tag the link resolved at the time). verify scans
+# the whole apps root recursively, so those leftovers must be swept before it.
+#
+# SCOPE: every directory exactly two levels below <install>/apps whose basename
+# is an immutable vX.Y.Z tag (<install>/apps/<installDir>/<tag>/). The shared
+# apps/node_modules shortcut, .rollback backups and non-tag paths are excluded.
+#
+# ALLOWLIST: only files/symlinks whose basename matches
+# `ags_apps_units_forbidden_runtime_artifacts` (appearance.css, skin.css,
+# skin.json, tokens.json, colors*). App source, .git and real directories are
+# never touched. The current tag keeps its own sweep + immutability assert in
+# _one.yml.
+
+- name: Find the installed app directory/tag pairs under the apps root
+  ansible.builtin.find:
+    paths: "{{ ags_apps_units_install_root }}"
+    recurse: true
+    depth: 2
+    file_type: directory
+    hidden: true
+  register: ags_apps_units_installed_dirs
+  when: not ansible_check_mode
+
+- name: Select every installed app tag directory
+  ansible.builtin.set_fact:
+    ags_apps_units_installed_tag_dirs: >-
+      {{ ags_apps_units_installed_dirs.files | default([])
+         | map(attribute='path')
+         | select('match',
+                   '^' ~ (ags_apps_units_install_root | regex_escape)
+                   ~ '/[^/]+/v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+         | list }}
+  when: not ansible_check_mode
+
+- name: Find runtime artifacts in every installed app tag
+  ansible.builtin.find:
+    paths: "{{ item }}"
+    patterns: "{{ ags_apps_units_forbidden_runtime_artifacts }}"
+    recurse: true
+    hidden: true
+    file_type: any
+  loop: "{{ ags_apps_units_installed_tag_dirs }}"
+  loop_control:
+    label: "{{ item }}"
+  register: ags_apps_units_historical_tag_artifacts
+  when: not ansible_check_mode
+
+- name: Sweep runtime artifacts from every installed app tag
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: >-
+    {{ ags_apps_units_historical_tag_artifacts.results | default([])
+       | selectattr('files', 'defined') | map(attribute='files')
+       | flatten(levels=1) }}
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - not ansible_check_mode
+    # Runtime-owned artifacts are files or symlinks. A real directory that
+    # happens to share an allowlisted basename is never removed.
+    - item.islnk | default(false) or not (item.isdir | default(false))
+
+- name: Find any remaining runtime artifact in an installed app tag
+  ansible.builtin.find:
+    paths: "{{ item }}"
+    patterns: "{{ ags_apps_units_forbidden_runtime_artifacts }}"
+    recurse: true
+    hidden: true
+    file_type: any
+  loop: "{{ ags_apps_units_installed_tag_dirs }}"
+  loop_control:
+    label: "{{ item }}"
+  register: ags_apps_units_historical_remaining
+  when: not ansible_check_mode
+
+- name: Assert every installed app tag is free of runtime artifacts
+  ansible.builtin.assert:
+    that:
+      - >-
+        ags_apps_units_historical_remaining.results | default([])
+        | selectattr('files', 'defined') | map(attribute='files')
+        | flatten(levels=1) | length == 0
+    fail_msg: >-
+      an installed app tag still contains runtime-owned artifact(s): {{
+      ags_apps_units_historical_remaining.results | default([])
+      | selectattr('files', 'defined') | map(attribute='files')
+      | flatten(levels=1) | map(attribute='path') | list }} (contracts
+      generations.md §6, AD-37). Runtime writes belong under
+      $XDG_STATE_HOME/dotfiles/current/; app tags are immutable.
+  when: not ansible_check_mode

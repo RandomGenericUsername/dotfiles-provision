@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.46
+
+Finish the v3 cutover engine edges: accept an idempotent seed and sweep
+historical app tags (BUG-010).
+
+- `runtime-seed` accepts rc=0 with an existing `current/manifest.json` even
+  when the generation did not advance. A second apply that derives the same
+  generation is a successful idempotent commit; the existing v3 assertion still
+  proves the manifest parses and `generationHash` equals the current target
+  basename. A tolerated rc=1 still requires fresh/changed valid state, and
+  rc>1 fails.
+- `ags_apps_units` adds a migration sweep for every installed app tag under
+  `<install>/apps/<installDir>/<tag>/`, not just the tag the run pins. It
+  removes only the documented runtime-artifact allowlist (`appearance.css`,
+  `skin.css`, `skin.json`, `tokens.json`, `colors*`) as files/symlinks; app
+  source, `.git`, real directories and non-tag paths are untouched. The
+  per-app current-tag sweep and immutability assert remain.
+- Regression tests cover the idempotent seed, rc=1 fresh/no-manifest and rc>1,
+  historical-tag artifact removal with byte-identical source, and the
+  verify-shaped recursive find matching nothing after the sweep.
+
 ## 0.1.45
 
 Make the v3 cutover stop and explicitly start always-on AGS units (BUG-009).
