@@ -3062,7 +3062,7 @@ class TestVerifyAgsPinMirror:
         verify_vars = _vars()
         platform_vars = _sibling_vars("ags_platform")
         assert verify_vars["verify_ags_platform_version"] == platform_vars["ags_platform_version"]
-        assert platform_vars["ags_platform_version"] == "v0.9.1"
+        assert platform_vars["ags_platform_version"] == "v1.0.0"
 
 
 class TestVerifyRuntimePinMirror:
@@ -5145,7 +5145,7 @@ def _build_provisioned_layout(
     # installed by the ags_platform role as ONE versioned unit, NOT mirrored
     # per file under config/ags. The fixture mirrors verify_ags_platform_unit_dir
     # / _pin_file / _shortcut so the criterion asserts have something to pass on.
-    unit = install / "ags-platform" / "v0.9.1"
+    unit = install / "ags-platform" / "v1.0.0"
     (unit / "ports").mkdir(parents=True, exist_ok=True)
     (unit / "adapters").mkdir(parents=True, exist_ok=True)
     (unit / "package.json").write_text("{}")
@@ -5157,7 +5157,7 @@ def _build_provisioned_layout(
     (unit / "adapters" / "event-bus.ts").write_text("")
     (unit / "adapters" / "icon-registry.ts").write_text("")
     (unit / "adapters" / "astal.ts").write_text("")
-    (install / "ags-platform" / "pinned").write_text("v0.9.1\n")
+    (install / "ags-platform" / "pinned").write_text("v1.0.0\n")
     # The final all-standalone AGS topology (AD-31/AD-37): every app is its
     # own immutable tag under <install>/apps/<installDir>/<tag>, resolving the
     # ONE shared apps/node_modules/ags-platform shortcut. ags_apps_units owns

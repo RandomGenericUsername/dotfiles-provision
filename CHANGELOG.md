@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.44
+
+Mirror the final Generations v3 composition: `ags-platform` v1.0.0 and the v3
+app releases (REQ-030).
+
+- The `ags_platform` role installs **v1.0.0**; the `verify` mirror follows.
+  The unit dir, pin file and shared app-install shortcut still derive from the
+  one `ags_platform_version` var.
+- The final all-standalone app-list fixture and the composition fixture
+  `apps.yaml` pin the v3 released generation: bar **v0.6.0**, notifications
+  **v0.5.0**, capture **v0.7.0**, clipboard **v0.6.0**, and
+  wallpaper-selector/icme/btop-theme-studio **v0.5.0**. Fixture repos remain
+  placeholders and the inventory test names the same map.
+- The composition fixture `program-tuple.yaml` moves to
+  `ags-platform: v1.0.0`; `contracts: v0.8.0` and `dotfiles-assets: v0.13.0`
+  stay unchanged. The Generations v3 locality work from 0.1.43 (generation
+  manifest `version: 3`, stable consumer links, immutable app tags) is
+  untouched.
+- Host stand-ins in the platform, AGS-app and verify tests follow both pins.
+  `dotfiles-v3` is not edited here.
+
 ## 0.1.43
 
 Deploy Generations v3 artifact locality in the engine (REQ-029).
