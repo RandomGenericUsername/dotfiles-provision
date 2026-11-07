@@ -26,6 +26,7 @@
 - [REQ-027-final-app-tags/ticket.md](./REQ-027-final-app-tags/ticket.md) — Pin the final seven-app AGS release tags in the engine fixtures | `done` | tag: v0.1.41 | worktree: .worktrees/REQ-027/ | branch: ticket/REQ-027-final-app-tags
 - [REQ-028-platform-v091-mirror/ticket.md](./REQ-028-platform-v091-mirror/ticket.md) — Mirror ags-platform v0.9.1 in the engine pins | `done` | tag: v0.1.42 | worktree: .worktrees/REQ-028/ | branch: ticket/REQ-028-platform-v091-mirror
 - [REQ-029-generations-v3-locality/ticket.md](./REQ-029-generations-v3-locality/ticket.md) — Deploy v3 state locality: immutable app tags and stable consumer links | `done` | tag: v0.1.43 | worktree: .worktrees/REQ-029/ | branch: ticket/REQ-029-generations-v3-locality
+- [REQ-030-v3-final-mirrors/ticket.md](./REQ-030-v3-final-mirrors/ticket.md) — Mirror the final v3 composition: ags-platform v1.0.0 and v3 app tags | `in-progress` | worktree: .worktrees/REQ-030/ | branch: ticket/REQ-030-v3-final-mirrors
 
 ## Bugs
 
