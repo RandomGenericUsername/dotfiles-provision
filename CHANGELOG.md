@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.48
+
+Mirror the `ags-platform` v1.0.1 patch in the engine pins (REQ-031).
+
+- The `ags_platform` role installs **v1.0.1**; the `verify` mirror follows.
+  The unit dir, pin file and shared app-install shortcut still derive from the
+  one `ags_platform_version` var.
+- The composition fixture `program-tuple.yaml` moves to
+  `ags-platform: v1.0.1` while keeping `contracts: v0.8.0` and
+  `dotfiles-assets: v0.13.0`. The current v3 app tags are unchanged (bar
+  v0.6.0, notifications v0.5.0, capture v0.7.0, clipboard v0.6.0,
+  wallpaper-selector/icme/btop-theme-studio v0.5.0).
+- The host-stand-in fixtures and assertions in `test_ags_platform_role.py`,
+  `test_ags_apps_units_role.py` and `test_verify_role.py` move to v1.0.1.
+  v1.0.1 fixes the appearance CSS hex-literal validation so an ID selector is
+  no longer false-positived as a literal hex colour. Generations v3 locality
+  and the `version: 3` verify contract are unchanged.
+
 ## 0.1.47
 
 Fix verify's stable consumer-link assert so it renders and fails cleanly
