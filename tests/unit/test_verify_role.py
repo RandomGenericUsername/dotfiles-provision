@@ -1891,6 +1891,98 @@ class TestVerifyConsumerLinks:
         assert "pair.0.stat.islnk" in that
         assert "pair.1.stat.isreg" in that
         assert "generations" in that
+        # BUG-011: each pair entry is a registered task-result dict. The loop
+        # item (link path/target) lives under `.item`; reading it off the
+        # result dict fails argument finalization on every host.
+        fail_msg = str(_module(check).get("fail_msg", ""))
+        assert "pair.1.item.path" in fail_msg
+        assert "pair.1.item.target" in fail_msg
+        assert "pair.1.path" not in fail_msg
+        assert "pair.1.target" not in fail_msg
+        assert "pair.1.item.target" in that
+
+
+@pytest.mark.integration
+class TestVerifyConsumerLinkRender:
+    """BUG-011: run the stable consumer-link block for real.
+
+    Structural assertions cannot catch an Ansible argument-finalization
+    failure: the assert's ``fail_msg`` is rendered before the conditions run.
+    These cases start at the two ``stat`` tasks and prove the assert renders
+    cleanly on the passing topology and fails with the link path (never
+    ``object of type 'dict'``) when a link is wrong or missing.
+    """
+
+    _PATH = _ANSIBLE_DIR / "playbooks" / "verify.yaml"
+    _START = "Check stable palette consumer links (link metadata)"
+    _ASSERT = (
+        "Assert each stable palette consumer link names current/palette and resolves"
+    )
+
+    def _run(self, install: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        return subprocess.run(
+            [
+                ansible_playbook,
+                str(self._PATH),
+                "-e",
+                f"install_dir={install}",
+                "-e",
+                f"manifests_dir={manifests_dir()}",
+                *_cli_tags_extra_vars(),
+                "--start-at-task",
+                self._START,
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=300,
+        )
+
+    @staticmethod
+    def _assert_clean_render(combined: str) -> None:
+        assert "Finalization of task args" not in combined, combined[-5000:]
+        assert "object of type 'dict'" not in combined, combined[-5000:]
+        assert "has no attribute" not in combined, combined[-5000:]
+
+    def test_passing_topology_renders_the_consumer_assert(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            install, _home, _bin_dir, env = _synthetic_verify_machine(Path(tmp))
+            result = self._run(install, env)
+            combined = result.stdout + result.stderr
+            assert result.returncode == 0, combined[-5000:]
+            assert self._ASSERT in combined, combined[-5000:]
+            assert "All assertions passed" in combined, combined[-5000:]
+            self._assert_clean_render(combined)
+
+    @pytest.mark.parametrize("mutation", ["wrong-target", "missing"])
+    def test_bad_link_fails_cleanly_and_names_the_link(
+        self, mutation: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            install, _home, _bin_dir, env = _synthetic_verify_machine(Path(tmp))
+            link = install / "config" / "rofi" / "colors.rasi"
+            link.unlink()
+            if mutation == "wrong-target":
+                state_home = Path(env["XDG_STATE_HOME"])
+                link.symlink_to(
+                    state_home / "dotfiles" / "current" / "palette" / "colors.yaml"
+                )
+            result = self._run(install, env)
+            combined = result.stdout + result.stderr
+            assert result.returncode != 0, (
+                f"verify must FAIL for a {mutation} stable consumer link; "
+                "recap:\n" + combined[-5000:]
+            )
+            assert self._ASSERT in combined, combined[-5000:]
+            assert "config/rofi/colors.rasi" in combined, combined[-5000:]
+            assert "is not the provisioning-owned stable link" in combined, (
+                "the failure must be the clean assert message; recap:\n"
+                + combined[-5000:]
+            )
+            self._assert_clean_render(combined)
 
 
 class TestVerifyVars:
@@ -3845,7 +3937,10 @@ class TestVerifyRuntime:
                 "recap:\n" + first.stdout
             )
 
-            (state_home / "dotfiles" / "current" / "colors.conf").unlink()
+            # v3 verify reads the palette through current/palette/, so the
+            # negative lock must remove the file that path actually resolves
+            # to (the generation-root symlink is no longer asserted).
+            (state_home / "dotfiles" / "current" / "palette" / "colors.conf").unlink()
             second = run()
             assert second.returncode != 0, (
                 "verify must FAIL after a criterion element is removed "

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.47
+
+Fix verify's stable consumer-link assert so it renders and fails cleanly
+(BUG-011).
+
+- The assert loop zips two registered `stat` result lists, so each `pair.N`
+  is a task-result dict. `fail_msg` and the raw-target condition now read
+  `pair.1.item.path` / `pair.1.item.target` instead of the non-existent
+  `pair.N.path` / `pair.N.target`. Ansible finalizes `fail_msg` before the
+  conditions run, so the old form failed argument finalization on every host
+  reaching the task and broke verify/apply even when every link was correct.
+- Regression tests run the real `verify.yaml` from the consumer-link block:
+  the passing topology renders the assert cleanly, while a wrong or missing
+  link fails with the link path and the normal assertion message (never
+  `object of type 'dict'`).
+- Also corrected the v3 generation-target condition's over-escaped
+  backreference (`appearance/\1.css` in a conditional parsed as a control
+  character) to `appearance/\\1.css`, and updated the full-verify negative
+  lock to delete the palette file verify actually reads
+  (`current/palette/colors.conf`). Both were latent test/verify failures
+  masked by the consumer-link finalization error.
+
 ## 0.1.46
 
 Finish the v3 cutover engine edges: accept an idempotent seed and sweep

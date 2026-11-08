@@ -2239,13 +2239,13 @@
     that:
       - pair.0.stat.exists
       - pair.0.stat.islnk
-      - pair.0.stat.lnk_target == verify_state_current_palette_dir ~ '/' ~ pair.1.target
+      - pair.0.stat.lnk_target == verify_state_current_palette_dir ~ '/' ~ pair.1.item.target
       - pair.0.stat.lnk_target is not search('generations')
       - pair.1.stat.exists
       - pair.1.stat.isreg
     fail_msg: >-
-      {{ pair.1.path }} is not the provisioning-owned stable link
-      {{ verify_state_current_palette_dir }}/{{ pair.1.target }} (v3 locality,
+      {{ pair.1.item.path }} is not the provisioning-owned stable link
+      {{ verify_state_current_palette_dir }}/{{ pair.1.item.target }} (v3 locality,
       contracts generations.md §6). The state_links role owns these links;
       the runtime never repoints them, and no consumer reads through an app
       tag or a generation-specific path.
@@ -2325,7 +2325,7 @@
         verify_generation_manifest.appearance.targets | map(attribute='path') | list
         | difference(verify_generation_manifest.appearance.targets
                      | map(attribute='configDir')
-                     | map('regex_replace', '^(.*)$', 'appearance/\1.css')
+                     | map('regex_replace', '^(.*)$', 'appearance/\\1.css')
                      | list) | length == 0
       - >-
         verify_generation_target_checks.results | selectattr('stat.isreg') | list
