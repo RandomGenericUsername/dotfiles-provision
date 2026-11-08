@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.49
+
+Mirror the seven v3 AGS app patch releases in the engine fixtures (REQ-032).
+
+- The final all-standalone app-list fixture and the composition fixture
+  `apps.yaml` pin the patch releases built on `ags-platform` v1.0.1: bar
+  **v0.6.1**, notifications **v0.5.1**, capture **v0.7.1**, clipboard
+  **v0.6.1**, and wallpaper-selector/icme/btop-theme-studio **v0.5.1**. The
+  app releases carry no behaviour changes; fixture repos remain placeholders.
+- `test_ags_apps_units_role.py` follows the same inventory, including the
+  hardcoded bar cutover units, so the host simulation installs and bumps the
+  patch tags. Lane and supervision fields (`launch`, `autostart`, ownership,
+  links) are unchanged.
+- `ags-platform: v1.0.1`, `contracts: v0.8.0`, `dotfiles-assets: v0.13.0`,
+  the Generations v3 `version: 3` verify contract and the v3 locality
+  behaviour are untouched. `dotfiles-v3` is not edited here.
+
 ## 0.1.48
 
 Mirror the `ags-platform` v1.0.1 patch in the engine pins (REQ-031).

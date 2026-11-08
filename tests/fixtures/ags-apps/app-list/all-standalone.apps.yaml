@@ -9,8 +9,8 @@
 # exist.
 #
 # `repo` is a placeholder overridden by the execution harness; `tag` pins the
-# final v3 released generation (bar v0.6.0, notifications v0.5.0, capture v0.7.0,
-# clipboard v0.6.0, wallpaper-selector/icme/btop-theme-studio v0.5.0). The bar
+# final v3 released generation (bar v0.6.1, notifications v0.5.1, capture v0.7.1,
+# clipboard v0.6.1, wallpaper-selector/icme/btop-theme-studio v0.5.1). The bar
 # keeps the ONE stable palette pointer
 # (colors.css -> the runtime-owned XDG state pointer); the v0.1.1 state-migration
 # release introduced it. Autostart identities mirror dotfiles-assets v0.6.4:
@@ -22,7 +22,7 @@ apps:
     installDir: bar
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.6.0
+    tag: v0.6.1
     instance: ags
     configDir: ags
     configLink: ags
@@ -37,7 +37,7 @@ apps:
     installDir: notifications
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.5.0
+    tag: v0.5.1
     instance: notifications
     configDir: ags-notifications
     configLink: ags-notifications
@@ -51,7 +51,7 @@ apps:
     installDir: capture
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.7.0
+    tag: v0.7.1
     instance: capture
     configDir: ags-capture
     configLink: ags-capture
@@ -67,7 +67,7 @@ apps:
     installDir: clipboard
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.6.0
+    tag: v0.6.1
     instance: clipboard
     configDir: ags-clipboard
     configLink: ags-clipboard
@@ -82,7 +82,7 @@ apps:
     installDir: wallpaper-selector
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.5.0
+    tag: v0.5.1
     instance: wallpaper-selector
     configDir: ags-wallpaper-selector
     configLink: ags-wallpaper-selector
@@ -96,7 +96,7 @@ apps:
     installDir: icme
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.5.0
+    tag: v0.5.1
     instance: icon-color-mapping-editor
     configDir: ags-icme
     configLink: ags-icme
@@ -110,7 +110,7 @@ apps:
     installDir: btop-theme-studio
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.5.0
+    tag: v0.5.1
     instance: btop-theme-studio
     configDir: ags-btop-studio
     configLink: ags-btop-studio

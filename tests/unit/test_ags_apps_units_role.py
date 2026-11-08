@@ -78,15 +78,15 @@ _SEVEN_APPS = [
     "btop-theme-studio",
 ]
 
-#: The released tags of the final all-standalone epoch (REQ-030).
+#: The released tags of the final all-standalone epoch (REQ-032).
 _FINAL_APP_TAGS = {
-    "bar": "v0.6.0",
-    "notifications": "v0.5.0",
-    "capture": "v0.7.0",
-    "clipboard": "v0.6.0",
-    "wallpaper-selector": "v0.5.0",
-    "icme": "v0.5.0",
-    "btop-theme-studio": "v0.5.0",
+    "bar": "v0.6.1",
+    "notifications": "v0.5.1",
+    "capture": "v0.7.1",
+    "clipboard": "v0.6.1",
+    "wallpaper-selector": "v0.5.1",
+    "icme": "v0.5.1",
+    "btop-theme-studio": "v0.5.1",
 }
 
 
@@ -1276,7 +1276,7 @@ class TestRoleExecution:
     ) -> None:
         """BUG-009: an active always-on unit must not survive the relink.
 
-        First install leaves dotfiles-ags-bar.service active on v0.6.0. The tag
+        First install leaves dotfiles-ags-bar.service active on v0.6.1. The tag
         bump then has to stop that unit (logging the OLD link), repoint, and
         explicitly start it (logging the NEW link). `state: started` would have
         been a no-op here.
@@ -1305,7 +1305,7 @@ class TestRoleExecution:
             second, _ = _run_role(tmp_path, bumped, cutover=True, manager=True)
             assert second.returncode == 0, second.stdout + second.stderr
 
-            old_unit = install / "apps" / "bar" / "v0.6.0"
+            old_unit = install / "apps" / "bar" / "v0.6.1"
             new_unit = install / "apps" / "bar" / "v0.2.0"
             calls = Path(paths["systemd_calls"]).read_text().splitlines()
             stop_index = next(
@@ -1373,7 +1373,7 @@ class TestRoleExecution:
         _stop_fake_ags(paths)
         assert result.returncode != 0
         assert "stayed active after systemctl --user stop" in result.stdout
-        assert not (install / "apps" / "bar" / "v0.6.0").exists()
+        assert not (install / "apps" / "bar" / "v0.6.1").exists()
 
     def test_second_run_does_not_write_inside_installed_tags(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
