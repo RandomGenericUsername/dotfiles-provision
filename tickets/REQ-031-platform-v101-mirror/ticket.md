@@ -2,7 +2,7 @@
 id: REQ-031
 title: "Mirror ags-platform v1.0.1 in the engine pins"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
