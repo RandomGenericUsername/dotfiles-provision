@@ -2,7 +2,7 @@
 id: BUG-010
 title: "v3 cutover fails an idempotent seed and leaves runtime artifacts in historical app tags"
 kind: bug
-status: in-progress
+status: done
 lane: 2
 severity: high
 links:
@@ -49,17 +49,45 @@ Two final v3 cutover edges:
 
 ## Acceptance
 
-- [ ] Idempotent seed (rc=0, unchanged valid manifest) passes.
-- [ ] rc=1 with a fresh valid manifest passes; rc=1 without a manifest fails;
+- [x] Idempotent seed (rc=0, unchanged valid manifest) passes.
+- [x] rc=1 with a fresh valid manifest passes; rc=1 without a manifest fails;
       rc>1 fails.
-- [ ] The sweep removes runtime artifacts from historical tags and leaves app
+- [x] The sweep removes runtime artifacts from historical tags and leaves app
       source and `.git` unchanged.
-- [ ] Verify passes after the sweep (its recursive find matches zero); the
+- [x] Verify passes after the sweep (its recursive find matches zero); the
       current tag is clean and its immutability assert remains.
-- [ ] `make gates`, `make ci-gates-parity` and targeted runtime-seed/verify/
+- [x] `make gates`, `make ci-gates-parity` and targeted runtime-seed/verify/
       locality suites pass.
-- [ ] Engine `0.1.46` + CHANGELOG, annotated tag `v0.1.46` after the
+- [x] Engine `0.1.46` + CHANGELOG, annotated tag `v0.1.46` after the
       fast-forward merge; push `main` and the tag; no apply.
+
+## Evidence
+
+Implementation commit: `75f4dbf` (`fix(BUG-010): accept idempotent seeds and
+sweep historical app tags; release 0.1.46`).
+
+- `make gates` → exit 0 (`/tmp/opencode/bug010-gates.log`):
+  - `test`: **1005 passed, 3 skipped, 57 deselected** in 1149.56s
+  - `lint`: **All checks passed**
+  - `hermetic`: **974 passed, 34 skipped, 57 deselected** in 1087.04s
+  - `lock-check`: **Resolved 33 packages**
+  - `docs-check`: exit 0
+- `make ci-gates-parity` →
+  `PASS gates=['docs-check', 'hermetic', 'lint', 'lock-check', 'test']`.
+- Targeted coverage in the suite:
+  - `tests/unit/test_runtime_seed_playbook.py`: rc=0 idempotent acceptance,
+    rc=1 fresh-manifest acceptance, rc=1 missing-manifest rejection, rc>1
+    rejection.
+  - `tests/unit/test_ags_apps_units_role.py`: historical-tag sweep removes only
+    the documented allowlist, preserves app source and `.git`, and the
+    current-tag immutability assert remains.
+- Live failure being fixed (recorded from the v3 apply):
+  `rc=0; state_advanced=False; manifest=…/current/manifest.json` failed the
+  old fresh-generation assert; the retry's historical tags were flagged by
+  `verify` with `skin.css`, `appearance.css`, `colors.css`.
+- Release: engine `0.1.46`, annotated tag `v0.1.46` on the fast-forwarded
+  `main`; `main` and tag pushed; GitHub Release carries the sdist and wheel.
+  No `apply` was run in this ticket.
 
 ## Non-goals
 
