@@ -2,7 +2,7 @@
 id: BUG-011
 title: "Verify fails finalizing the stable consumer-link assert: registered result dict used as the link item"
 kind: bug
-status: in-progress
+status: done
 lane: 2
 severity: high
 links:
@@ -63,28 +63,82 @@ Origin: .../roles/verify/tasks/main.yml:2237
 
 ## Acceptance
 
-- [ ] `fail_msg` and `that` reference `pair.1.item.path` /
+- [x] `fail_msg` and `that` reference `pair.1.item.path` /
       `pair.1.item.target`; message content is unchanged.
-- [ ] Verify/state_links (and v3-adjacent roles) audited for the same
+- [x] Verify/state_links (and v3-adjacent roles) audited for the same
       result-dict attribute mistake; every finding fixed without changing
       semantics.
-- [ ] A real `ansible-playbook` regression test renders the assert on the
+- [x] A real `ansible-playbook` regression test renders the assert on the
       passing topology and forces the failure path for a wrong/missing link;
       the failure names the link path with no `object of type 'dict'` error.
-- [ ] `make gates`, `make ci-gates-parity` and the targeted verify/state-links
+- [x] `make gates`, `make ci-gates-parity` and the targeted verify/state-links
       tests pass (exact results recorded).
-- [ ] Engine `0.1.47` + CHANGELOG, annotated tag `v0.1.47` after the
+- [x] Engine `0.1.47` + CHANGELOG, annotated tag `v0.1.47` after the
       fast-forward merge; push `main` and the tag; GitHub Release carries only
       the 0.1.47 sdist and wheel.
 
+## Audit
+
+Every looped use of a registered `.results` list in `verify`, `state_links`,
+`config_links`, `config_copies`, `ags_apps_units`, `assets`, `cli_tools`,
+`compositor_configs` and `power_options` was checked for attributes read off
+the result dict instead of its `item` / `stat`. The consumer-link pair was the
+only instance of this class; `item.msg`, `item.content`, `item.source`,
+`item.item.*`, `item.stat.*` and the flattened `find` file dicts are correct.
+
+The same run surfaced two latent failures masked by the finalization error,
+fixed without changing intent:
+
+- The v3 generation-target condition used `appearance/\1.css` in a bare
+  conditional. Ansible's conditional parser treats `\1` as an escape, so the
+  expected list became literal control-character targets; the condition is now
+  `appearance/\\1.css` (one backreference at substitution time). Evidence:
+  a focused `assert` with the old form fails while the new form passes
+  (`/tmp/bug011fix/probe5.yml`, probe6).
+- `test_verify_passes_on_a_provisioned_machine`'s negative lock deleted
+  `current/colors.conf`, which v3 verify no longer reads; it now removes
+  `current/palette/colors.conf`, the file the palette gate actually asserts.
+
 ## Evidence
 
-Implementation commit: TBD.
+Implementation commit: `09ab230` (`fix(BUG-011): render the stable
+consumer-link assert; release 0.1.47`).
 
-- `make gates` → TBD.
-- `make ci-gates-parity` → TBD.
-- Targeted tests → TBD.
-- Release verification (`git ls-remote`, `gh release view`) → TBD.
+Pre-fix reproduction (`uv run pytest -q
+tests/unit/test_verify_role.py::TestVerifyRuntime::test_verify_passes_on_a_provisioned_machine`)
+→ exit 1 after 80.25s with:
+
+```
+TASK [verify : Assert each stable palette consumer link names current/palette and resolves]
+[ERROR]: Task failed: Finalization of task args for 'ansible.builtin.assert' failed:
+Error while resolving value for 'fail_msg': object of type 'dict' has no attribute 'path'
+failed=1
+```
+
+After the fix, the same full playbook run is green (`failed=0`, `ok=327`).
+
+- `make gates` → exit 0 (`/tmp/opencode/bug011-gates.log`):
+  - `test`: **1005 passed, 3 skipped, 60 deselected** in 1160.67s
+  - `lint`: **All checks passed**
+  - `hermetic`: **974 passed, 34 skipped, 60 deselected** in 1088.94s
+  - `lock-check`: **Resolved 33 packages**
+  - `docs-check`: exit 0 (silent; no missing docs/symlink)
+- `make ci-gates-parity` →
+  `PASS gates=['docs-check', 'hermetic', 'lint', 'lock-check', 'test'] jobs=['assets-parity', 'ci-gates-parity', 'docs-check', 'hermetic', 'lint', 'lock-check', 'release', 'test'] exempt=['assets-parity', 'ci-gates-parity', 'release']`.
+- Targeted verify/state-links tests
+  (`TestVerifyConsumerLinkRender`, `TestVerifyConsumerLinks`,
+  `TestVerifyRuntime::test_verify_passes_on_a_provisioned_machine`,
+  `TestVerifyRuntime::test_verify_fails_when_a_rofi_palette_link_is_missing`,
+  `test_v3_locality.py`) → **22 passed** in 291.20s
+  (`/tmp/opencode/bug011-targeted.log`). This includes:
+  - passing topology: the assert task renders `All assertions passed`, no
+    `Finalization of task args` / `object of type 'dict'`;
+  - wrong target and missing link: normal assertion failure naming
+    `config/rofi/colors.rasi` and `is not the provisioning-owned stable link`,
+    with no templating error.
+- Release: engine `0.1.47`, annotated tag `v0.1.47` on the fast-forwarded
+  `main`; `main` and tag pushed; GitHub Release carries only the 0.1.47 sdist
+  and wheel. No `apply` was run in this ticket.
 
 ## Non-goals
 

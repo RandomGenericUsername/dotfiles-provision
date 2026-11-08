@@ -30,7 +30,7 @@
 
 ## Bugs
 
-- [BUG-011-verify-consumer-link-assert-render/ticket.md](./BUG-011-verify-consumer-link-assert-render/ticket.md) — verify consumer-link assert reads `path`/`target` off a registered result dict and fails argument finalization | severity: high | `in-progress` | worktree .worktrees/BUG-011, branch ticket/BUG-011-verify-consumer-link-assert-render
+- [BUG-011-verify-consumer-link-assert-render/ticket.md](./BUG-011-verify-consumer-link-assert-render/ticket.md) — verify consumer-link assert reads `path`/`target` off a registered result dict and fails argument finalization | severity: high | `done` | worktree .worktrees/BUG-011, branch ticket/BUG-011-verify-consumer-link-assert-render | tag: v0.1.47
 - [BUG-010-v3-seed-idempotent-tag-sweep/ticket.md](./BUG-010-v3-seed-idempotent-tag-sweep/ticket.md) — v3 cutover fails an idempotent seed and leaves runtime artifacts in historical app tags | severity: high | `done` | worktree .worktrees/BUG-010, branch ticket/BUG-010-v3-seed-idempotent-tag-sweep | tag: v0.1.46
 - [BUG-009-unit-cutover-stop-start/ticket.md](./BUG-009-unit-cutover-stop-start/ticket.md) — v3 cutover leaves always-on AGS units on the previous tag (state: started is a no-op) | severity: high | `done` | worktree .worktrees/BUG-009, branch ticket/BUG-009-unit-cutover-stop-start | tag: v0.1.45
 - [BUG-003-consume-ags-apps-v042/ticket.md](./BUG-003-consume-ags-apps-v042/ticket.md) — consume ags-apps v0.4.2 (color thumbnails) + release v0.1.12 | severity: low | `done` | worktree .worktrees/BUG-003, branch ticket/BUG-003-consume-ags-apps-v042
