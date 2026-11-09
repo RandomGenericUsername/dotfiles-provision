@@ -2,7 +2,7 @@
 id: REQ-033
 title: "Provision the wlogout appearance consumer link (SKIN-WLOGOUT slice)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -43,27 +43,27 @@ Criteria: `W-2.5`–`W-2.8` in
 
 ## Acceptance
 
-- [ ] `state_links` owns a stable wlogout link
+- [x] `state_links` owns a stable wlogout link
       `config/wlogout/appearance.css -> state/current/appearance/wlogout.css`
       in the same consumer list as the palette links, using the existing
       create-then-assert-once-seeded flow. No generation path and no app tag.
-- [ ] `verify` asserts the raw `stat.lnk_target` is exactly
+- [x] `verify` asserts the raw `stat.lnk_target` is exactly
       `current/appearance/wlogout.css`, the followed link is a regular file,
       and the target contains neither `generations` nor an app-tag route.
-- [ ] `wlogout_config` still renders the assets v0.14.0 static style and the
+- [x] `wlogout_config` still renders the assets v0.14.0 static style and the
       rendered sheet imports `appearance.css` **last**; wallpaper, icons,
       layout IDs, transitions and the palette import remain app-owned. No new
       render variable is required by the released template.
-- [ ] Every engine `*_assets_pinned_tag` mirror, the composition fixture
+- [x] Every engine `*_assets_pinned_tag` mirror, the composition fixture
       `assets.yaml` (tag + four checkout sources), the fixture
       `program-tuple.yaml`, and hardcoded pin assertions move to
       **v0.14.0**; `contracts: v0.8.0` and `ags-platform: v1.0.1` do not move.
-- [ ] `test_v3_locality.py`, `test_verify_role.py` and
+- [x] `test_v3_locality.py`, `test_verify_role.py` and
       `test_wlogout_config_role.py` cover the positive link/order and the
       negative missing, dangling and wrong-target cases.
-- [ ] Targeted tests, `make gates` and `make ci-gates-parity` pass on the
+- [x] Targeted tests, `make gates` and `make ci-gates-parity` pass on the
       ticket branch.
-- [ ] Engine `0.1.50` + CHANGELOG, annotated tag `v0.1.50` after the
+- [x] Engine `0.1.50` + CHANGELOG, annotated tag `v0.1.50` after the
       fast-forward merge; push `main` and the tag; the GitHub Release carries
       only the 0.1.50 sdist and wheel; no apply.
 
@@ -82,3 +82,31 @@ Commits: plan (this file + INDEX), implementation/release metadata, then
 evidence. Annotated tag `v0.1.50` on the fast-forward merge commit; no apply.
 
 Evidence is recorded in this ticket after the gates complete.
+
+## Evidence
+
+Implementation: `ea436d2` (`feat(REQ-033): provision the wlogout appearance
+link; release 0.1.50`). `main` diff touches only state_links/verify/wlogout
+render/tests/fixtures/version metadata; no runtime, composition, app, contract
+or live state change.
+
+- `state_links_consumers` gains
+  `{ base: appearance, spine: wlogout/appearance.css, target: wlogout.css }`;
+  the link resolves through `state/current/appearance/wlogout.css`.
+- `verify_consumer_symlinks` gains the same link and explicitly rejects a
+  `generations` route or app-tag route; `verify_assets_pinned_tag` is
+  `v0.14.0`; `verify_skins_template_files` includes `wlogout.gtk.css.j2`.
+- `test_v3_locality.py`, `test_verify_role.py` and
+  `test_wlogout_config_role.py` cover positive creation/resolution/order and
+  missing, dangling, wrong-target and generation-path negatives.
+- `make gates` → **rc 0**
+  - `test`: **979 passed, 33 skipped, 64 deselected** in 2860.24s
+  - `lint`: **All checks passed**
+  - `hermetic`: **976 passed, 36 skipped, 64 deselected** in 2729.59s
+  - `lock-check`: **Resolved 33 packages**
+  - `docs-check`: rc 0
+- `make ci-gates-parity` →
+  `PASS gates=['docs-check','hermetic','lint','lock-check','test']`.
+- Release: engine `0.1.50`, annotated tag `v0.1.50`, GitHub Release with only
+  the 0.1.50 sdist/wheel; no apply. The earlier gate attempt was externally
+  terminated during `test` (`Error 143`) and was rerun from the same commit.
