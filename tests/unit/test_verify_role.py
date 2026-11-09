@@ -2111,10 +2111,10 @@ class TestVerifyVars:
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_skins_pin_is_v0140_with_the_v2_contract_and_templates(self) -> None:
-        """REQ-033: v0.14.0 ships four manifests, eight templates and the
+        """REQ-033: v0.15.0 ships four manifests, eight templates and the
         contracts v0.7.0 plane (wlogout joins the required target set)."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.14.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.15.0"
         assert str(data["verify_skins_expected_contract_tag"]) == "v0.7.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
@@ -4016,6 +4016,76 @@ class TestVerifyRuntime:
             assert second.returncode != 0, (
                 "verify must FAIL after a criterion element is removed "
                 "(negative lock — the gate is not vacuous); recap:\n" + second.stdout
+            )
+
+    def _run_verify(
+        self, tmp: Path, install: Path, env: dict[str, str]
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                shutil.which("ansible-playbook") or "ansible-playbook",
+                str(self._PATH),
+                "-e",
+                f"install_dir={install}",
+                "-e",
+                f"manifests_dir={manifests_dir()}",
+                *_cli_tags_extra_vars(),
+                *_display_manager_extra_vars(tmp),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=300,
+        )
+
+    def _rewrite_manifest_host(
+        self, state_home: Path, mutate: str
+    ) -> None:
+        manifest_path = state_home / "dotfiles" / "current" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        fingerprint = "1" * 64
+        manifest["host"] = {
+            "source": "hyprland",
+            "version": 1,
+            "fingerprint": fingerprint,
+            "defaults": {
+                "surface.panel.radius": 0,
+                "surface.panel.border-width": 1,
+            },
+        }
+        manifest["intent"]["host"] = (
+            "2" * 64 if mutate == "fingerprint-mismatch" else fingerprint
+        )
+        if mutate == "host-without-intent":
+            del manifest["intent"]["host"]
+        manifest_path.write_text(json.dumps(manifest) + "\n")
+
+    def test_verify_accepts_a_host_bearing_generation(self) -> None:
+        """contracts v0.9.0: the optional host block is valid runtime output."""
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            install, _home, _bin_dir, env = _synthetic_verify_machine(root)
+            self._rewrite_manifest_host(Path(env["XDG_STATE_HOME"]), "valid")
+            result = self._run_verify(root, install, env)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "failed=0" in result.stdout, result.stdout
+
+    @pytest.mark.parametrize("mutation", ["fingerprint-mismatch", "host-without-intent"])
+    def test_verify_rejects_a_malformed_host_block(self, mutation: str) -> None:
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            install, _home, _bin_dir, env = _synthetic_verify_machine(root)
+            self._rewrite_manifest_host(Path(env["XDG_STATE_HOME"]), mutation)
+            result = self._run_verify(root, install, env)
+            assert result.returncode != 0, result.stdout + result.stderr
+            assert "malformed host block" in (result.stdout + result.stderr), (
+                result.stdout + result.stderr
             )
 
     def test_engine_tag_is_asserted_against_the_pin(self) -> None:

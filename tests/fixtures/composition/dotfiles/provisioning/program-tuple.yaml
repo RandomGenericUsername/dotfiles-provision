@@ -3,10 +3,10 @@
 # The composition owns this record; every standalone app repo and the remaining
 # legacy unit build/test against these exact tags for the adoption generation.
 # A tuple bump is a program-wide revalidation event, never part of a single-app
-# cutover. The contracts repo owns the schema (v0.8.0,
+# cutover. The contracts repo owns the schema (v0.9.0,
 # schemas/program-tuple.schema.json) and `make deploy-coverage` validates the
 # shape plus the assets-pin agreement.
 schemaVersion: 1
 ags-platform: v1.0.1
-contracts: v0.8.0
-dotfiles-assets: v0.14.0
+contracts: v0.9.0
+dotfiles-assets: v0.15.0

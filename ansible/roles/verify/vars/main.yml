@@ -56,7 +56,7 @@ verify_xdg_state_home: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_fa
 verify_state_current_dir: "{{ verify_xdg_state_home | trim }}/dotfiles/current"
 
 # verify_state_generation_manifest / _palette_dir / _appearance_dir: the v3
-#   generation layout (contracts generations.md v0.8.0 §1). The manifest is
+#   generation layout (contracts generations.md v0.9.0 §1). The manifest is
 #   written last inside generations/<genHash>/ and its generationHash must equal
 #   the `current` target basename. Palette consumers resolve through
 #   current/palette/... (provisioning-owned stable links), and app runtime
@@ -66,7 +66,7 @@ verify_state_generation_manifest: "{{ verify_state_current_dir }}/manifest.json"
 verify_state_current_palette_dir: "{{ verify_state_current_dir }}/palette"
 verify_state_appearance_dir: "{{ verify_state_current_dir }}/appearance"
 verify_generation_manifest_version: 3
-verify_generation_contract_tag: v0.8.0
+verify_generation_contract_tag: v0.9.0
 verify_generation_tokens_path: appearance/tokens.json
 
 # verify_bin_scripts: every script or launcher a Hyprland keybind invokes. The
@@ -181,7 +181,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.14.0
+verify_assets_pinned_tag: v0.15.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -225,7 +225,7 @@ verify_skins_manifest_names:
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
-#: v0.14.0 ships one `<configDir>.gtk.css.j2` per target: the seven AGS app
+#: v0.15.0 ships one `<configDir>.gtk.css.j2` per target: the seven AGS app
 #: templates plus the non-AGS wlogout consumer. The expander renders
 #: `<configDir>.css`; a missing template would leave that consumer's generated
 #: sheet unbacked (W-2.1/W-2.9).

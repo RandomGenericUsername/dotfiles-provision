@@ -1,7 +1,7 @@
 """Generations v3 deployment/locality contracts for the provisioning engine.
 
 These tests pin the wave-4 boundary from `dotfiles-v3/docs/107-generations-v3.md`
-§2.7 and contracts `generations.md` v0.8.0 §6:
+§2.7 and contracts `generations.md` v0.9.0 §6:
 
 - provisioning owns stable links for non-runtime palette consumers and points
   them at `state/current/palette/...`;
@@ -167,9 +167,9 @@ class TestStableConsumerLinks:
 
 
 class TestVerifyGenerationLayout:
-    def test_verify_expects_contracts_v080_generation(self) -> None:
+    def test_verify_expects_contracts_v090_generation(self) -> None:
         data = _vars("verify")
-        assert data["verify_generation_contract_tag"] == "v0.8.0"
+        assert data["verify_generation_contract_tag"] == "v0.9.0"
         assert data["verify_generation_manifest_version"] == 3
         assert data["verify_state_generation_manifest"] == (
             "{{ verify_state_current_dir }}/manifest.json"
@@ -190,8 +190,16 @@ class TestVerifyGenerationLayout:
             "appearance.targets | length > 0",
             "intent.mode == verify_generation_manifest.mode",
             "intent.skin == verify_generation_manifest.skin.name",
+            "verify_generation_manifest.host is not defined",
+            "verify_generation_manifest.host.source == 'hyprland'",
+            "verify_generation_manifest.host.version == 1",
+            "verify_generation_manifest.host.defaults | length > 0",
+            "intent.host is defined",
         ):
             assert expected in that, expected
+        assert (
+            "intent.host == verify_generation_manifest.host.fingerprint" in that
+        )
 
     def test_verify_is_absent_tolerant_until_a_generation_is_committed(self) -> None:
         for name in (
@@ -358,16 +366,16 @@ class TestStableLinksExecution:
 
 
 _CONTRACTS_FIXTURE = (
-    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.8.0"
+    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.9.0"
 )
 
 
-class TestVendoredContractsV080:
-    """The engine vendors the v0.8.0 generation/refresh schemas it validates."""
+class TestVendoredContractsV090:
+    """The engine vendors the v0.9.0 generation/refresh schemas it validates."""
 
-    def test_pin_names_contracts_v080_and_matches_every_schema_digest(self) -> None:
+    def test_pin_names_contracts_v090_and_matches_every_schema_digest(self) -> None:
         pin = (_CONTRACTS_FIXTURE / "PIN").read_text()
-        assert "contracts=v0.8.0" in pin
+        assert "contracts=v0.9.0" in pin
         import hashlib
 
         for schema in _CONTRACTS_FIXTURE.glob("*.schema.json"):
@@ -399,6 +407,40 @@ class TestVendoredContractsV080:
         appearance = schema["definitions"]["appearance"]
         assert "appearance/tokens.json" in str(appearance)
         assert "appearance/[a-z0-9]" in str(schema["definitions"]["target"])
+
+    def test_generation_manifest_schema_accepts_an_optional_host_block(self) -> None:
+        import json
+
+        schema = json.loads(
+            (_CONTRACTS_FIXTURE / "generation-manifest.schema.json").read_text()
+        )
+        host = schema["definitions"]["host"]
+        assert set(host["required"]) == {
+            "source",
+            "version",
+            "fingerprint",
+            "defaults",
+        }
+        assert host["properties"]["source"]["enum"] == ["hyprland"]
+        assert host["properties"]["version"]["const"] == 1
+        assert host["properties"]["fingerprint"]["$ref"].endswith("/hash")
+        assert host["properties"]["defaults"]["minProperties"] == 1
+        assert "host" not in schema["required"]
+        assert schema["allOf"], "host/intent.host coupling must stay explicit"
+
+    def test_host_bearing_manifest_fixture_carries_a_matching_intent_host(self) -> None:
+        import json
+
+        manifest = json.loads(
+            (
+                _CONTRACTS_FIXTURE / "generation-manifest-host.valid.json"
+            ).read_text()
+        )
+        assert manifest["version"] == 3
+        assert manifest["host"]["source"] == "hyprland"
+        assert manifest["host"]["version"] == 1
+        assert manifest["host"]["defaults"]
+        assert manifest["intent"]["host"] == manifest["host"]["fingerprint"]
 
     def test_v2_boolean_ack_is_not_a_contract_shape(self) -> None:
         import json

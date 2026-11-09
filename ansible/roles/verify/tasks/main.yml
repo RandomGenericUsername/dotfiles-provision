@@ -2324,6 +2324,18 @@
       - verify_generation_manifest.intent.mode == verify_generation_manifest.mode
       - verify_generation_manifest.intent.skin == verify_generation_manifest.skin.name
       - >-
+        (verify_generation_manifest.host is not defined and
+        verify_generation_manifest.intent.host is not defined)
+        or
+        (verify_generation_manifest.host is defined and
+        verify_generation_manifest.host.source == 'hyprland' and
+        verify_generation_manifest.host.version == 1 and
+        verify_generation_manifest.host.fingerprint is match('^[0-9a-f]{64}$') and
+        verify_generation_manifest.host.defaults | length > 0 and
+        verify_generation_manifest.intent.host is defined and
+        verify_generation_manifest.intent.host ==
+        verify_generation_manifest.host.fingerprint)
+      - >-
         verify_generation_manifest.appearance.targets | map(attribute='path') | list
         | difference(verify_generation_manifest.appearance.targets
                      | map(attribute='configDir')
@@ -2339,8 +2351,11 @@
       manifest must be version {{ verify_generation_manifest_version }}, its
       generationHash must equal the current target basename, appearance must
       declare {{ verify_generation_tokens_path }} plus one
-      appearance/<configDir>.css target per app, and mode must agree across
-      mode/skin/intent. A v2 current directory or a torn manifest fails closed.
+      appearance/<configDir>.css target per app, mode must agree across
+      mode/skin/intent, and an optional host block must carry a hyprland v1
+      fingerprint with non-empty defaults plus a matching intent.host. A v2
+      current directory, a torn manifest or a malformed host block fails
+      closed.
   when:
     - not ansible_check_mode
     - verify_generation_layout_checks.results[0].stat.exists | default(false)
@@ -2677,7 +2692,7 @@
       sheet last (W-2.6): {{ verify_wlogout_appearance_import.stderr | default('') }}.
       Expected the palette import first and `@import url("appearance.css");`
       last, with wallpaper/icons/layout/transitions kept app-owned. The
-      wlogout_config role renders the pinned assets v0.14.0 style.css.tpl; run
+      wlogout_config role renders the pinned assets v0.15.0 style.css.tpl; run
       the wlogout-config playbook (needs assets + runtime-seed first).
   when: not ansible_check_mode
 

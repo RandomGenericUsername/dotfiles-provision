@@ -5,7 +5,7 @@
 # which derives palette/effects/icons into the content-addressed cache, stages
 # a generation, writes `state/generations/<genHash>/manifest.json` last and
 # atomically commits `state/current -> generations/<genHash>` (contracts
-# generations.md v0.8.0 §3). It appends the seed history line and reloads
+# generations.md v0.9.0 §3). It appends the seed history line and reloads
 # desktop consumers. This is the ONLY producer of generated artifacts —
 # provisioning deploys inputs only; runtime writes live under state/, never
 # under <install>/config or <install>/apps/<tag>.
@@ -178,7 +178,7 @@
           - runtime_seed_generation.appearance.targets | length > 0
         fail_msg: >-
           runtime seed did not commit one complete v3 generation (contracts
-          generations.md v0.8.0). manifest={{ runtime_seed_generation_manifest }};
+          generations.md v0.9.0). manifest={{ runtime_seed_generation_manifest }};
           current_target={{ runtime_seed_current_link.stdout | default('') | trim }};
           stdout: {{ runtime_seed_result.stdout | default('') }};
           stderr: {{ runtime_seed_result.stderr | default('') }}.

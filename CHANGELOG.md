@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.51
+
+Mirror contracts v0.9.0 and assets v0.15.0 for the host-defaults cutover
+(REQ-034, SKIN-HOST-DEFAULTS).
+
+- Every engine `*_assets_pinned_tag` mirror, the composition fixture
+  `assets.yaml` (tag + four checkout sources) and `program-tuple.yaml` move to
+  **dotfiles-assets v0.15.0**. The v3 app tags, runtime-independent behavior,
+  `state_links` and the wlogout appearance link are unchanged.
+- `verify_generation_contract_tag` and the vendored contract fixtures move to
+  **contracts v0.9.0**. `tests/fixtures/contracts/v0.9.0/` carries the frozen
+  generation-manifest and appearance-refresh-result schemas plus the PIN/hashes.
+- Verify keeps `generation_manifest_version: 3`. It now accepts the optional
+  contracts v0.9.0 `host` block (`source: hyprland`, mapping `version: 1`,
+  `fingerprint`, non-empty `defaults`) with a matching `intent.host`; a host
+  block without `intent.host` or with a mismatched fingerprint fails closed.
+  All hash, generationHash/current and locality checks are unchanged.
+- The composition fixture tuple pins `contracts: v0.9.0`,
+  `dotfiles-assets: v0.15.0`, `ags-platform: v1.0.1`; a `SKIN-HOST-DEFAULTS`
+  cutover that pins `dotfiles-runtime: v1.1.0` can consume installer v0.1.51.
+
 ## 0.1.50
 
 Provision the wlogout appearance consumer link (REQ-033, SKIN-WLOGOUT slice).
