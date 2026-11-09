@@ -29,6 +29,7 @@
 - [REQ-030-v3-final-mirrors/ticket.md](./REQ-030-v3-final-mirrors/ticket.md) — Mirror the final v3 composition: ags-platform v1.0.0 and v3 app tags | `done` | tag: v0.1.44 | worktree: .worktrees/REQ-030/ | branch: ticket/REQ-030-v3-final-mirrors
 - [REQ-031-platform-v101-mirror/ticket.md](./REQ-031-platform-v101-mirror/ticket.md) — Mirror ags-platform v1.0.1 in the engine pins | `done` | tag: v0.1.48 | worktree: .worktrees/REQ-031/ | branch: ticket/REQ-031-platform-v101-mirror
 - [REQ-032-app-patch-tags/ticket.md](./REQ-032-app-patch-tags/ticket.md) — Mirror the seven v3 app patch releases in the engine fixtures | `done` | worktree: .worktrees/REQ-032/ | branch: ticket/REQ-032-app-patch-tags | tag: v0.1.49
+- [REQ-033-skin-wlogout/ticket.md](./REQ-033-skin-wlogout/ticket.md) — Provision the wlogout appearance consumer link (SKIN-WLOGOUT slice) | `in-progress` | worktree: .worktrees/REQ-033/ | branch: ticket/REQ-033-skin-wlogout
 
 ## Bugs
 
