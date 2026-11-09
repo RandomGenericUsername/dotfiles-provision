@@ -1,9 +1,10 @@
 # Config-links post-seed playbook (BUG-006 / Generations v3) — exposes the
-# palette consumers and creates their provisioning-owned stable links.
+# palette and generated-appearance consumers and creates their
+# provisioning-owned stable links.
 #
 # bootstrap order: config-links.yaml (pre-seed settings links) -> runtime-seed
 # (commits the v3 generation under state/current) -> THIS playbook (gtk-3.0,
-# gtk-4.0, rofi, btop) -> display-manager -> verify.
+# gtk-4.0, rofi, btop, wlogout) -> display-manager -> verify.
 #
 # Why the split: the provisioned rofi config hard-imports colors.rasi; linking
 # ~/.config/rofi before runtime-seed exposes a launcher whose palette target
@@ -13,13 +14,13 @@
 # config through ~/.config/<tool>.
 #
 # v3 locality: config_links only exposes the directories. state_links owns the
-# stable palette links INSIDE those spine dirs, pointing at
-# state/current/palette/...; the runtime never writes them and no AGS app tag
-# is in the read path.
+# stable consumer links INSIDE those spine dirs, pointing at
+# state/current/{palette,appearance}/...; the runtime never writes them and no
+# AGS app tag is in the read path.
 #
 # User-scoped playbook: NO become (the links live under the user's config
 # home). gather_facts is REQUIRED for the role's ansible_facts.env derivations.
-- name: Link palette-consumer configs into the XDG config home (post-seed)
+- name: Link palette and appearance-consumer configs into the XDG config home (post-seed)
   hosts: localhost
   gather_facts: true
   vars:

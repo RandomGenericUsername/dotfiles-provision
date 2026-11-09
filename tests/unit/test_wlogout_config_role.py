@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -151,7 +152,47 @@ class TestWlogoutConfigTasks:
             assert not task.get("become", False)
 
 
+def _imports(text: str) -> list[str]:
+    return re.findall(r'@import\s+(?:url\(\s*)?["\']([^"\']+)["\']', text)
+
+
 class TestWlogoutConfigTemplate:
+    def test_template_imports_generated_appearance_last(self) -> None:
+        """W-2.6: the palette import stays first (palette-only fallback) and
+        the generated sibling sheet is imported LAST so its same-specificity
+        paint rules win the GTK3 cascade."""
+        text = _template().read_text()
+        imports = _imports(text)
+        assert imports[0] == "{{COLORS_FILE_PATH}}", (
+            "the palette import must stay first so a missing generated target "
+            "still leaves a palette-only stylesheet"
+        )
+        assert imports[-1] == "appearance.css", (
+            "the generated appearance sheet must be imported last"
+        )
+
+    def test_template_keeps_app_owned_structure(self) -> None:
+        """W-2.6: wallpaper, icon URLs, layout IDs and transitions remain
+        app-owned in the static template (never in the generated sheet)."""
+        text = _template().read_text()
+        for layout_id in (
+            "#lock",
+            "#logout",
+            "#suspend",
+            "#hibernate",
+            "#shutdown",
+            "#reboot",
+        ):
+            assert layout_id in text, f"static template lost layout ID {layout_id}"
+        assert "{{CURRENT_WALLPAPER_SYMLINK}}" in text, "wallpaper stays app-owned"
+        assert "{{STATE_ROOT}}/dotfiles/current/icons/" in text, (
+            "icon URLs stay app-owned"
+        )
+        assert re.search(r"\btransition\s*:", text), "transitions stay app-owned"
+        assert "{{SKIN_" not in text, (
+            "the static template must not expand generated skin tokens"
+        )
+
     def test_template_uses_palette_semantic_roles(self) -> None:
         """v0.6.4: the template consumes palette.v1 semantic roles, not the
         retired CSG carrier tokens (`@color_00..@color_15`)."""
@@ -294,6 +335,17 @@ class TestWlogoutConfigPlaybook:
             assert "@import" in text, "rendered style.css must import colors.css"
             assert "@on_surface" in text, (
                 "rendered style.css must use palette.v1 semantic roles"
+            )
+            imports = _imports(text)
+            assert imports[0].endswith("colors.gtk.css"), (
+                "the rendered palette import must stay first"
+            )
+            assert imports[-1] == "appearance.css", (
+                "the rendered static sheet must import the generated appearance "
+                "sheet last (W-2.6)"
+            )
+            assert "#lock" in text and "transition:" in text, (
+                "wallpaper/icon/layout/transition rules stay app-owned"
             )
             assert not (wlogout_dir / "style.css.tpl").exists(), (
                 "the pre-S3 style.css.tpl residue must be pruned on the same pass — a "

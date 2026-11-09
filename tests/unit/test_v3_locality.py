@@ -91,20 +91,25 @@ class TestStableConsumerLinks:
         data = _vars("state_links")
         consumers = data["state_links_consumers"]
         assert isinstance(consumers, list)
-        assert [(item["spine"], item["target"]) for item in consumers] == [
-            ("gtk-3.0/colors.css", "colors.gtk.css"),
-            ("gtk-4.0/colors.css", "colors.adw.css"),
-            ("rofi/colors.rasi", "colors.rasi"),
-            ("btop/themes/colors.btop.theme", "colors.btop.theme"),
+        assert [
+            (item["base"], item["spine"], item["target"]) for item in consumers
+        ] == [
+            ("palette", "gtk-3.0/colors.css", "colors.gtk.css"),
+            ("palette", "gtk-4.0/colors.css", "colors.adw.css"),
+            ("palette", "rofi/colors.rasi", "colors.rasi"),
+            ("palette", "btop/themes/colors.btop.theme", "colors.btop.theme"),
+            ("appearance", "wlogout/appearance.css", "wlogout.css"),
         ]
         joined = str(data)
         assert "config/ags" not in joined
-        assert "appearance" not in joined
         assert data["state_links_state_current_palette_dir"] == (
             "{{ state_links_state_current_dir }}/palette"
         )
+        assert data["state_links_state_current_appearance_dir"] == (
+            "{{ state_links_state_current_dir }}/appearance"
+        )
 
-    def test_state_links_target_the_current_palette_never_a_generation(self) -> None:
+    def test_state_links_target_the_current_pointer_never_a_generation(self) -> None:
         link_tasks = [
             task
             for task in _tasks("state_links")
@@ -114,10 +119,25 @@ class TestStableConsumerLinks:
         assert len(link_tasks) == 1
         module = _module(link_tasks[0])
         assert module["src"] == (
-            "{{ state_links_state_current_palette_dir }}/{{ item.target }}"
+            "{{ state_links_state_current_dir }}/{{ item.base }}/{{ item.target }}"
         )
         assert module["dest"] == "{{ state_links_spine_config_dir }}/{{ item.spine }}"
         assert "install_dir | trim }}/config/{{ item.spine }}" not in str(module["dest"])
+        assert "generations" not in str(module["src"])
+        assert "/apps/" not in str(module["src"])
+
+    def test_wlogout_appearance_link_names_the_current_appearance_sheet(self) -> None:
+        data = _vars("state_links")
+        consumer = next(
+            item
+            for item in data["state_links_consumers"]
+            if item["spine"] == "wlogout/appearance.css"
+        )
+        assert consumer == {
+            "base": "appearance",
+            "spine": "wlogout/appearance.css",
+            "target": "wlogout.css",
+        }
 
     def test_post_seed_playbook_runs_config_links_then_state_links(self) -> None:
         playbook = yaml.safe_load(
@@ -273,6 +293,9 @@ def _stage_palette(state: Path, *, manifest: bool) -> None:
         "colors.btop.theme",
     ):
         (palette / name).write_text("/* palette */\n", encoding="utf-8")
+    appearance = state / "dotfiles" / "current" / "appearance"
+    appearance.mkdir(parents=True, exist_ok=True)
+    (appearance / "wlogout.css").write_text("/* appearance */\n", encoding="utf-8")
     if manifest:
         (state / "dotfiles" / "current" / "manifest.json").write_text(
             '{"version": 3}\n', encoding="utf-8"
@@ -287,26 +310,28 @@ class TestStableLinksExecution:
         state = tmp_path / "state"
         for path in (home, config, state):
             path.mkdir()
-        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes"):
+        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes", "wlogout"):
             (install / "config" / spine).mkdir(parents=True)
         _stage_palette(state, manifest=True)
 
         result = _run_post_seed(install, home, config, state)
         assert result.returncode == 0, result.stdout + result.stderr
         expected = {
-            "gtk-3.0/colors.css": "colors.gtk.css",
-            "gtk-4.0/colors.css": "colors.adw.css",
-            "rofi/colors.rasi": "colors.rasi",
-            "btop/themes/colors.btop.theme": "colors.btop.theme",
+            "gtk-3.0/colors.css": ("palette", "colors.gtk.css"),
+            "gtk-4.0/colors.css": ("palette", "colors.adw.css"),
+            "rofi/colors.rasi": ("palette", "colors.rasi"),
+            "btop/themes/colors.btop.theme": ("palette", "colors.btop.theme"),
+            "wlogout/appearance.css": ("appearance", "wlogout.css"),
         }
-        for spine, target in expected.items():
+        for spine, (base, target) in expected.items():
             link = install / "config" / spine
             assert link.is_symlink(), spine
             assert os.readlink(link) == str(
-                state / "dotfiles" / "current" / "palette" / target
+                state / "dotfiles" / "current" / base / target
             )
             assert link.resolve().is_file(), spine
             assert not str(link.resolve()).startswith(str(install / "apps")), spine
+            assert "generations" not in os.readlink(link), spine
 
     def test_post_seed_tolerates_a_fresh_state_root(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
@@ -315,7 +340,7 @@ class TestStableLinksExecution:
         state = tmp_path / "state"
         for path in (home, config, state):
             path.mkdir()
-        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes"):
+        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes", "wlogout"):
             (install / "config" / spine).mkdir(parents=True)
 
         result = _run_post_seed(install, home, config, state)
@@ -327,6 +352,7 @@ class TestStableLinksExecution:
             "gtk-4.0/colors.css",
             "rofi/colors.rasi",
             "btop/themes/colors.btop.theme",
+            "wlogout/appearance.css",
         ):
             assert (install / "config" / spine).is_symlink(), spine
 

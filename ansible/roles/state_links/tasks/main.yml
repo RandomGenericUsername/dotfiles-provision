@@ -14,12 +14,14 @@
 #   <install>/config/rofi/colors.rasi        -> state/current/palette/colors.rasi
 #   <install>/config/btop/themes/colors.btop.theme
 #                                             -> state/current/palette/colors.btop.theme
+#   <install>/config/wlogout/appearance.css   -> state/current/appearance/wlogout.css
 #
 # The links are stable: they name the `current` pointer, never a
 # generation-specific path, so a new commit is visible without repointing them.
-# Provisioning never creates an app runtime sheet link; AGS apps read
+# Provisioning never creates an AGS app runtime sheet link; AGS apps read
 # `state/current/appearance/<configDir>.css` directly, and `config/<app>` is a
-# link to an immutable tag.
+# link to an immutable tag. wlogout is a real config directory (not an AGS
+# instance), so its generated sheet is exposed by a provisioning-owned link.
 #
 # Runs after runtime-seed (config-links-post-seed.yaml), so the palette target
 # normally exists. A fresh/incomplete state is tolerated: the links are still
@@ -46,9 +48,9 @@
   loop_control:
     label: "{{ item.spine }}"
 
-- name: Create the provisioning-owned stable palette consumer links
+- name: Create the provisioning-owned stable consumer links
   ansible.builtin.file:
-    src: "{{ state_links_state_current_palette_dir }}/{{ item.target }}"
+    src: "{{ state_links_state_current_dir }}/{{ item.base }}/{{ item.target }}"
     dest: "{{ state_links_spine_config_dir }}/{{ item.spine }}"
     state: link
     force: true
@@ -83,8 +85,10 @@
         == state_links_consumers | length
     fail_msg: >-
       a provisioning-owned stable consumer link does not resolve under
-      {{ state_links_state_current_palette_dir }}/. The runtime seed must
+      {{ state_links_state_current_dir }}/palette/ or
+      {{ state_links_state_current_appearance_dir }}/. The runtime seed must
       commit the v3 generation before the post-seed links are verified; a
-      dangling link would break the rofi/gtk/btop consumer at launch (v3
-      locality: provisioning owns the link, the runtime owns the palette).
+      dangling link would break the gtk/rofi/btop/wlogout consumer at launch
+      (v3 locality: provisioning owns the link, the runtime owns the palette
+      and generated appearance sheets).
   when: state_links_generation_manifest.stat.exists | default(false)

@@ -1,16 +1,19 @@
 # state_links role vars — provisioning-owned stable links for the non-runtime
-# palette consumers (Generations v3, dotfiles-v3 docs/107 §2.7).
+# palette and generated-appearance consumers (Generations v3, dotfiles-v3
+# docs/107 §2.7 and docs/108 W-2.5).
 
 # state_links_xdg_state_home: the runtime-owned state home. Honors
 #   $XDG_STATE_HOME with the spec default ~/.local/state, via
 #   ansible_facts.env (F4 lock). One XDG read for the whole role.
 state_links_xdg_state_home: "{{ ansible_facts.env.XDG_STATE_HOME | default(ansible_facts.env.HOME | default(ansible_facts.user_dir) + '/.local/state', true) }}"
 
-# state_links_state_current_dir / _palette_dir: the single committed `current`
-#   pointer and the generation-local palette directory the stable links name.
-#   Never a generation-specific path: `current` is the one atomic hop.
+# state_links_state_current_dir / _palette_dir / _appearance_dir: the single
+#   committed `current` pointer plus the generation-local palette and generated
+#   appearance directories the stable links name. Never a generation-specific
+#   path: `current` is the one atomic hop.
 state_links_state_current_dir: "{{ state_links_xdg_state_home | trim }}/dotfiles/current"
 state_links_state_current_palette_dir: "{{ state_links_state_current_dir }}/palette"
+state_links_state_current_appearance_dir: "{{ state_links_state_current_dir }}/appearance"
 
 # state_links_spine_config_dir: the config-in-spine root the config-links role
 #   exposes at ~/.config/<name>. The stable links are files INSIDE these
@@ -18,12 +21,19 @@ state_links_state_current_palette_dir: "{{ state_links_state_current_dir }}/pale
 #   <install>/apps/<tag>) is ever a destination here.
 state_links_spine_config_dir: "{{ install_dir | trim }}/config"
 
-# state_links_consumers: one stable link per non-runtime palette consumer.
-#   `spine` is the destination relative to <install>/config; `target` is the
-#   palette artifact relative to state/current/palette. The runtime never
-#   repoints these links; a new generation is visible through `current`.
+# state_links_consumers: one stable link per non-runtime consumer.
+#   `spine` is the destination relative to <install>/config; `base` is the
+#   generation directory under state/current (`palette` or `appearance`); and
+#   `target` is the artifact inside it. The runtime never repoints these links;
+#   a new generation is visible through `current`.
+#
+#   wlogout is the first generated-appearance consumer: the assets v0.14.0
+#   static style imports its sibling `appearance.css` last, and that link
+#   resolves to the runtime's `current/appearance/wlogout.css`. It never points
+#   through a generation directory or an `<install>/apps/<tag>` path.
 state_links_consumers:
-  - { spine: gtk-3.0/colors.css, target: colors.gtk.css }
-  - { spine: gtk-4.0/colors.css, target: colors.adw.css }
-  - { spine: rofi/colors.rasi, target: colors.rasi }
-  - { spine: btop/themes/colors.btop.theme, target: colors.btop.theme }
+  - { base: palette, spine: gtk-3.0/colors.css, target: colors.gtk.css }
+  - { base: palette, spine: gtk-4.0/colors.css, target: colors.adw.css }
+  - { base: palette, spine: rofi/colors.rasi, target: colors.rasi }
+  - { base: palette, spine: btop/themes/colors.btop.theme, target: colors.btop.theme }
+  - { base: appearance, spine: wlogout/appearance.css, target: wlogout.css }

@@ -1706,8 +1706,9 @@
          | difference(verify_skins_token_placeholders) | length) == 0
     fail_msg: >-
       {{ item.item }} is empty, has no {{ '{{SKIN_' }} placeholders, or names a
-      placeholder outside the v2 CSS token paths. The seven
-      <configDir>.gtk.css.j2 templates must all be real expander inputs whose
+      placeholder outside the v2 CSS token paths. The eight
+      <configDir>.gtk.css.j2 templates (seven AGS + wlogout) must all be real
+      expander inputs whose
       placeholders resolve against every v2 manifest
       ({{ verify_skins_manifest_names | join('/') }}); layout tokens are
       TSX-owned and must never be expanded into CSS. Re-run the assets playbook
@@ -2210,11 +2211,11 @@
   when: not ansible_check_mode
 
 # Generations v3: the consumer links are provisioning-owned and stable.
-# They name state/current/palette/<target> (one hop through the commit
-# pointer), never a generation-specific path and never an app tag. A stale
-# config copy or an AGS-tag-routed pointer fails the raw-target assertion;
-# following the link proves the palette entry actually resolves.
-- name: Check stable palette consumer links (link metadata)
+# They name state/current/<base>/<target> (one hop through the commit pointer),
+# never a generation-specific path and never an app tag. A stale config copy or
+# an AGS-tag-routed pointer fails the raw-target assertion; following the link
+# proves the palette or generated-appearance entry actually resolves.
+- name: Check stable consumer links (link metadata)
   ansible.builtin.stat:
     path: "{{ item.path }}"
     follow: false
@@ -2224,7 +2225,7 @@
   register: verify_consumer_symlink_checks
   when: not ansible_check_mode
 
-- name: Check stable palette consumer links resolve through current/palette
+- name: Check stable consumer links resolve through current/{palette,appearance}
   ansible.builtin.stat:
     path: "{{ item.path }}"
     follow: true
@@ -2234,21 +2235,22 @@
   register: verify_consumer_symlink_resolve_checks
   when: not ansible_check_mode
 
-- name: Assert each stable palette consumer link names current/palette and resolves
+- name: Assert each stable consumer link names current/<base> and resolves
   ansible.builtin.assert:
     that:
       - pair.0.stat.exists
       - pair.0.stat.islnk
-      - pair.0.stat.lnk_target == verify_state_current_palette_dir ~ '/' ~ pair.1.item.target
+      - pair.0.stat.lnk_target == verify_state_current_dir ~ '/' ~ pair.1.item.base ~ '/' ~ pair.1.item.target
       - pair.0.stat.lnk_target is not search('generations')
+      - pair.0.stat.lnk_target is not search('(^|/)apps/')
       - pair.1.stat.exists
       - pair.1.stat.isreg
     fail_msg: >-
       {{ pair.1.item.path }} is not the provisioning-owned stable link
-      {{ verify_state_current_palette_dir }}/{{ pair.1.item.target }} (v3 locality,
-      contracts generations.md §6). The state_links role owns these links;
-      the runtime never repoints them, and no consumer reads through an app
-      tag or a generation-specific path.
+      {{ verify_state_current_dir }}/{{ pair.1.item.base }}/{{ pair.1.item.target }}
+      (v3 locality, contracts generations.md §6; W-2.5). The state_links role
+      owns these links; the runtime never repoints them, and no consumer reads
+      through an app tag or a generation-specific path.
   loop: >-
     {{ verify_consumer_symlink_checks.results
        | zip(verify_consumer_symlink_resolve_checks.results) | list }}
@@ -2622,6 +2624,61 @@
       `@on_surface` / `@primary_container` — done-criterion 13, shell wiring).
       The wlogout_config role renders style.css.tpl → style.css; run the
       wlogout-config playbook (needs assets + default_palette first)
+  when: not ansible_check_mode
+
+# W-2.6: the generated appearance sheet is imported LAST so its same-specificity
+# paint rules win the GTK3 cascade. The palette import stays first (palette-only
+# fallback if the generated target is absent), and wallpaper/icons/layout/
+# transitions stay app-owned. A relative `appearance.css` import names the
+# stable provisioning link beside style.css, never a generation/app-tag path.
+- name: Check rendered wlogout style.css imports the generated appearance sheet last
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter | default('python3') }}"
+      - -c
+      - |
+        import re
+        import sys
+
+        text = open(sys.argv[1], encoding="utf-8").read()
+        imports = re.findall(
+            r'@import\s+(?:url\(\s*)?["\']([^"\']+)["\']', text
+        )
+        if not imports:
+            print("no @import rules found", file=sys.stderr)
+            raise SystemExit(1)
+        if not imports[0].endswith("colors.gtk.css"):
+            print(
+                f"first @import is {imports[0]!r}, expected the palette sheet",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if not imports[-1].endswith("appearance.css"):
+            print(
+                f"last @import is {imports[-1]!r}, expected appearance.css last",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if len(imports) < 2:
+            print("appearance.css import is missing", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"wlogout imports last: {imports[-1]}")
+      - "{{ verify_xdg_config_home }}/wlogout/style.css"
+  register: verify_wlogout_appearance_import
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert rendered wlogout style.css imports appearance.css last
+  ansible.builtin.assert:
+    that: verify_wlogout_appearance_import.rc == 0
+    fail_msg: >-
+      the rendered wlogout style.css does not import the generated appearance
+      sheet last (W-2.6): {{ verify_wlogout_appearance_import.stderr | default('') }}.
+      Expected the palette import first and `@import url("appearance.css");`
+      last, with wallpaper/icons/layout/transitions kept app-owned. The
+      wlogout_config role renders the pinned assets v0.14.0 style.css.tpl; run
+      the wlogout-config playbook (needs assets + runtime-seed first).
   when: not ansible_check_mode
 
 # S3: the template SOURCE moved to the pinned corpus, so the pre-S3 copy in the

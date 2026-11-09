@@ -440,6 +440,7 @@ _SKIN_TEMPLATE_FILES = (
     "ags-capture.gtk.css.j2",
     "ags-icme.gtk.css.j2",
     "ags-btop-studio.gtk.css.j2",
+    "wlogout.gtk.css.j2",
 )
 
 
@@ -1851,20 +1852,24 @@ class TestVerifyTasks:
 class TestVerifyConsumerLinks:
     """Generations v3: verify asserts the provisioning-owned stable links."""
 
-    def test_consumer_symlinks_include_rofi_gtk_and_btop_only(self) -> None:
+    def test_consumer_symlinks_include_palette_and_wlogout_appearance(self) -> None:
         links = _vars()["verify_consumer_symlinks"]
         paths = [str(link["path"]) for link in links]
-        targets = {str(link["path"]): str(link["target"]) for link in links}
-        for expected, target in (
-            ("config/gtk-3.0/colors.css", "colors.gtk.css"),
-            ("config/gtk-4.0/colors.css", "colors.adw.css"),
-            ("config/rofi/colors.rasi", "colors.rasi"),
-            ("config/btop/themes/colors.btop.theme", "colors.btop.theme"),
+        targets = {
+            str(link["path"]): (str(link["base"]), str(link["target"]))
+            for link in links
+        }
+        for expected, base, target in (
+            ("config/gtk-3.0/colors.css", "palette", "colors.gtk.css"),
+            ("config/gtk-4.0/colors.css", "palette", "colors.adw.css"),
+            ("config/rofi/colors.rasi", "palette", "colors.rasi"),
+            ("config/btop/themes/colors.btop.theme", "palette", "colors.btop.theme"),
+            ("config/wlogout/appearance.css", "appearance", "wlogout.css"),
         ):
             assert any(expected in path for path in paths), f"missing {expected}"
             assert any(
-                expected in path and target == targets[path] for path in paths
-            ), f"wrong target for {expected}"
+                expected in path and (base, target) == targets[path] for path in paths
+            ), f"wrong base/target for {expected}"
         assert not any("config/ags/colors.css" in path for path in paths), (
             "v3: the AGS app reads state/current/appearance directly; there is "
             "no runtime pointer through the app tag"
@@ -1874,10 +1879,10 @@ class TestVerifyConsumerLinks:
         tasks = _load_tasks()
         names = [str(task.get("name", "")) for task in tasks]
         resolve_name = (
-            "Check stable palette consumer links resolve through current/palette"
+            "Check stable consumer links resolve through current/{palette,appearance}"
         )
         assert_name = (
-            "Assert each stable palette consumer link names current/palette and resolves"
+            "Assert each stable consumer link names current/<base> and resolves"
         )
         assert resolve_name in names and assert_name in names
         assert names.index(resolve_name) < names.index(assert_name)
@@ -1887,19 +1892,22 @@ class TestVerifyConsumerLinks:
         assert str(stat.get("loop")) == "{{ verify_consumer_symlinks }}"
         check = tasks[names.index(assert_name)]
         that = " ".join(str(item) for item in _module(check).get("that", []))
-        assert "verify_state_current_palette_dir" in that
+        assert "verify_state_current_dir" in that
+        assert "pair.1.item.base" in that
+        assert "pair.1.item.target" in that
         assert "pair.0.stat.islnk" in that
         assert "pair.1.stat.isreg" in that
         assert "generations" in that
+        assert "apps/" in that
         # BUG-011: each pair entry is a registered task-result dict. The loop
-        # item (link path/target) lives under `.item`; reading it off the
+        # item (link path/base/target) lives under `.item`; reading it off the
         # result dict fails argument finalization on every host.
         fail_msg = str(_module(check).get("fail_msg", ""))
         assert "pair.1.item.path" in fail_msg
+        assert "pair.1.item.base" in fail_msg
         assert "pair.1.item.target" in fail_msg
         assert "pair.1.path" not in fail_msg
         assert "pair.1.target" not in fail_msg
-        assert "pair.1.item.target" in that
 
 
 @pytest.mark.integration
@@ -1914,10 +1922,8 @@ class TestVerifyConsumerLinkRender:
     """
 
     _PATH = _ANSIBLE_DIR / "playbooks" / "verify.yaml"
-    _START = "Check stable palette consumer links (link metadata)"
-    _ASSERT = (
-        "Assert each stable palette consumer link names current/palette and resolves"
-    )
+    _START = "Check stable consumer links (link metadata)"
+    _ASSERT = "Assert each stable consumer link names current/<base> and resolves"
 
     def _run(self, install: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
         ansible_playbook = shutil.which("ansible-playbook")
@@ -1978,6 +1984,43 @@ class TestVerifyConsumerLinkRender:
             )
             assert self._ASSERT in combined, combined[-5000:]
             assert "config/rofi/colors.rasi" in combined, combined[-5000:]
+            assert "is not the provisioning-owned stable link" in combined, (
+                "the failure must be the clean assert message; recap:\n"
+                + combined[-5000:]
+            )
+            self._assert_clean_render(combined)
+
+    @pytest.mark.parametrize(
+        "mutation", ["missing", "dangling", "wrong-target", "generation-path"]
+    )
+    def test_bad_wlogout_appearance_link_fails_cleanly_and_names_the_link(
+        self, mutation: str
+    ) -> None:
+        """W-2.5 negative locks: the wlogout sheet link must be present, resolve
+        and name current/appearance/wlogout.css — not the palette, a missing
+        file, a generation directory or an app tag."""
+        with tempfile.TemporaryDirectory() as tmp:
+            install, _home, _bin_dir, env = _synthetic_verify_machine(Path(tmp))
+            link = install / "config" / "wlogout" / "appearance.css"
+            link.unlink()
+            state_home = Path(env["XDG_STATE_HOME"])
+            current = state_home / "dotfiles" / "current"
+            if mutation == "dangling":
+                link.symlink_to(current / "appearance" / "missing.css")
+            elif mutation == "wrong-target":
+                link.symlink_to(current / "palette" / "colors.gtk.css")
+            elif mutation == "generation-path":
+                link.symlink_to(
+                    current.resolve() / "appearance" / "wlogout.css"
+                )
+            result = self._run(install, env)
+            combined = result.stdout + result.stderr
+            assert result.returncode != 0, (
+                f"verify must FAIL for a {mutation} wlogout appearance link; "
+                "recap:\n" + combined[-5000:]
+            )
+            assert self._ASSERT in combined, combined[-5000:]
+            assert "config/wlogout/appearance.css" in combined, combined[-5000:]
             assert "is not the provisioning-owned stable link" in combined, (
                 "the failure must be the clean assert message; recap:\n"
                 + combined[-5000:]
@@ -2067,10 +2110,11 @@ class TestVerifyVars:
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
-    def test_skins_pin_is_v0130_with_the_v2_contract_and_templates(self) -> None:
-        """REQ-026: v0.13.0 ships four manifests and the contracts v0.7.0 plane."""
+    def test_skins_pin_is_v0140_with_the_v2_contract_and_templates(self) -> None:
+        """REQ-033: v0.14.0 ships four manifests, eight templates and the
+        contracts v0.7.0 plane (wlogout joins the required target set)."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.13.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.14.0"
         assert str(data["verify_skins_expected_contract_tag"]) == "v0.7.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
@@ -2086,6 +2130,7 @@ class TestVerifyVars:
             "ags-capture.gtk.css.j2",
             "ags-icme.gtk.css.j2",
             "ags-btop-studio.gtk.css.j2",
+            "wlogout.gtk.css.j2",
         ]
         assert "verify_skins_templates_dir" in str(
             data["verify_skins_template_paths"]
@@ -2111,6 +2156,32 @@ class TestVerifyVars:
             "skin-manifest.schema.json",
             "skin-json.schema.json",
         ]
+
+    def test_wlogout_appearance_import_is_verified_last(self) -> None:
+        """W-2.6: verify reads the rendered static sheet and proves the
+        generated appearance import is LAST (same-specificity paint wins the
+        cascade) while the palette import stays first."""
+        tasks = _load_tasks()
+        names = [str(task.get("name", "")) for task in tasks]
+        check_name = (
+            "Check rendered wlogout style.css imports the generated appearance "
+            "sheet last"
+        )
+        assert_name = "Assert rendered wlogout style.css imports appearance.css last"
+        assert check_name in names and assert_name in names
+        check = tasks[names.index(check_name)]
+        assert _module_key(check) == "ansible.builtin.command"
+        script = "\n".join(str(part) for part in _module(check)["argv"])
+        assert "appearance.css" in script and "imports[-1]" in script
+        assert check.get("changed_when") is False
+        assert check.get("failed_when") is False
+        assert check.get("when") == "not ansible_check_mode"
+        assertion = tasks[names.index(assert_name)]
+        assert _module_key(assertion) == "ansible.builtin.assert"
+        assert "verify_wlogout_appearance_import.rc == 0" in str(
+            _module(assertion).get("that")
+        )
+        assert assertion.get("when") == "not ansible_check_mode"
 
     def test_wlogout_legacy_template_path_is_the_spine_residue(self) -> None:
         """S3: the probe points at the SPINE copy a pre-S3 `config_copies` run left
@@ -3429,7 +3500,7 @@ class TestVerifySkinPlane:
     def test_deployed_skin_plane_accepts_the_fourth_terminal_manifest(
         self, tmp_path: Path
     ) -> None:
-        """REQ-026: glass/flat/paper/terminal all expand through seven templates."""
+        """REQ-033: glass/flat/paper/terminal all expand through eight templates."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         manifests = sorted(
@@ -3484,7 +3555,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_rejects_a_missing_per_app_template(
         self, tmp_path: Path
     ) -> None:
-        """REQ-021: all seven <configDir> templates must be deployed."""
+        """REQ-021/REQ-033: every <configDir> template must be deployed."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         (install / "skins" / "templates" / "ags-clipboard.gtk.css.j2").unlink()
@@ -5134,6 +5205,8 @@ def _build_provisioned_layout(
         "ags-wallpaper-selector",
         "ags-icme",
         "ags-btop-studio",
+        # W-2.5: the non-AGS wlogout consumer also gets a generated sheet.
+        "wlogout",
     )
     appearance = state_generation / "appearance"
     appearance.mkdir()
@@ -5171,17 +5244,18 @@ def _build_provisioned_layout(
     (state_generation / "manifest.json").write_text(json.dumps(manifest) + "\n")
     state_current.symlink_to(Path("generations") / gen_hash)
     # Generations v3 stable links (state_links owns these): gtk/rofi/btop name
-    # current/palette/<target>; there is no AGS config pointer and no path
-    # through an app tag.
-    for rel, artifact in (
-        ("config/gtk-3.0/colors.css", "colors.gtk.css"),
-        ("config/gtk-4.0/colors.css", "colors.adw.css"),
-        ("config/rofi/colors.rasi", "colors.rasi"),
-        ("config/btop/themes/colors.btop.theme", "colors.btop.theme"),
+    # current/palette/<target>, wlogout names current/appearance/wlogout.css.
+    # There is no AGS config pointer and no path through an app tag.
+    for rel, base, artifact in (
+        ("config/gtk-3.0/colors.css", "palette", "colors.gtk.css"),
+        ("config/gtk-4.0/colors.css", "palette", "colors.adw.css"),
+        ("config/rofi/colors.rasi", "palette", "colors.rasi"),
+        ("config/btop/themes/colors.btop.theme", "palette", "colors.btop.theme"),
+        ("config/wlogout/appearance.css", "appearance", "wlogout.css"),
     ):
         pointer = install / rel
         pointer.parent.mkdir(parents=True, exist_ok=True)
-        pointer.symlink_to(state_current / "palette" / artifact)
+        pointer.symlink_to(state_current / base / artifact)
     state_cache_icons = state_home / "dotfiles" / "cache" / "icons" / "def456"
     state_cache_icons.mkdir(parents=True)
     # The samples verify asserts (verify_icons_samples): battery-0 predates the
@@ -5356,7 +5430,10 @@ def _build_provisioned_layout(
     # the spine-rendered .zshrc through the symlink.
     (home / ".zshenv").write_text(f'export ZDOTDIR="{xdg}/zsh"\n')
     (install / "config" / "wlogout" / "style.css").write_text(
-        '@import url("<STATE>/dotfiles/current/palette/colors.gtk.css");\nbutton { color: @on_surface; }\n'
+        '@import url("<STATE>/dotfiles/current/palette/colors.gtk.css");\n'
+        "button { color: @on_surface; }\n"
+        '#lock { background-image: image(url("<STATE>/dotfiles/current/icons/lock.svg")); }\n'
+        '@import url("appearance.css");\n'
     )
     # Rendered kitty config (kitty_config role): verify checks the FINAL
     # kitty.conf (through the ~/.config/kitty link) and greps the runtime

@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.50
+
+Provision the wlogout appearance consumer link (REQ-033, SKIN-WLOGOUT slice).
+
+- `state_links` adds the provisioning-owned stable link
+  `<install>/config/wlogout/appearance.css ->
+  $XDG_STATE_HOME/dotfiles/current/appearance/wlogout.css` beside the four
+  palette links. It names the one `current` commit pointer; no generation path
+  and no `<install>/apps/<tag>` route. The link is created even on a fresh
+  state root and asserted to resolve once a generation is committed.
+- `verify` re-asserts the raw link target as
+  `current/appearance/wlogout.css`, follows it to a regular file, and rejects a
+  generation directory or app-tag route. It also proves the rendered static
+  wlogout sheet imports the generated `appearance.css` **last** while the
+  palette import stays first (W-2.5/W-2.6).
+- `wlogout_config` renders the assets v0.14.0 template unchanged: the new
+  generated import is relative and needs no render variable. Wallpaper, icons,
+  layout IDs and transitions remain app-owned; there is no live-reload lane
+  (wlogout re-reads CSS on the next launch, W-2.8).
+- Every engine `*_assets_pinned_tag` mirror, the composition fixture
+  `assets.yaml` (tag + four checkout sources) and `program-tuple.yaml` move to
+  **dotfiles-assets v0.14.0**. `contracts: v0.8.0` and
+  `ags-platform: v1.0.1` stay unchanged. `dotfiles-v3` is not edited here; its
+  cutover must pin `dotfiles-assets: v0.14.0` and
+  `dotfiles-provision: v0.1.50` after this release.
+
 ## 0.1.49
 
 Mirror the seven v3 AGS app patch releases in the engine fixtures (REQ-032).

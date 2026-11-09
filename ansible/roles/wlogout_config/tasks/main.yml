@@ -19,6 +19,12 @@
 #   provisioning never routes it through an AGS app tag or a config copy.
 #   STATE_ROOT icons/wallpaper → current/{icons,wallpaper} in the same state
 #   root. font from the tunable shell vars (group_vars/all.yml).
+# - Since assets v0.14.0 the static template also ends with a relative
+#   `@import url("appearance.css");` (W-2.6). The `state_links` role creates
+#   `<spine>/config/wlogout/appearance.css` after the seed, so that import
+#   resolves to the generated `current/appearance/wlogout.css` at launch. The
+#   template therefore needs no new render variable: the generated import is
+#   relative to the rendered style.css.
 # - The `template` module has full check-mode support — no --check gate.
 # - User-scoped: NO become.
 

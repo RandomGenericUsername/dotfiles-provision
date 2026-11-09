@@ -181,7 +181,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.13.0
+verify_assets_pinned_tag: v0.14.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -225,9 +225,10 @@ verify_skins_manifest_names:
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
-#: v0.13.0 ships one `<configDir>.gtk.css.j2` per AGS app: the bar/settings
-#: template plus the six per-app targets. The expander renders `<configDir>.css`;
-#: a missing per-app template would leave that app's XDG skin pointer unbacked.
+#: v0.14.0 ships one `<configDir>.gtk.css.j2` per target: the seven AGS app
+#: templates plus the non-AGS wlogout consumer. The expander renders
+#: `<configDir>.css`; a missing template would leave that consumer's generated
+#: sheet unbacked (W-2.1/W-2.9).
 verify_skins_template_files:
   - ags.gtk.css.j2
   - ags-clipboard.gtk.css.j2
@@ -236,6 +237,7 @@ verify_skins_template_files:
   - ags-capture.gtk.css.j2
   - ags-icme.gtk.css.j2
   - ags-btop-studio.gtk.css.j2
+  - wlogout.gtk.css.j2
 verify_skins_template_paths: >-
   {{ verify_skins_template_files | map('regex_replace', '^',
      verify_skins_templates_dir ~ '/') | list }}
@@ -1038,17 +1040,20 @@ verify_ags_platform_unit_files:
 verify_gui_tools_app_files: []
 
 # verify_consumer_symlinks: the provisioning-owned stable links for the
-#   NON-runtime palette consumers (Generations v3, contracts generations.md
-#   §6). The state_links role owns them; the runtime never repoints them. Each
-#   link names state/current/palette/<target>, never a generation-specific
-#   path and never an AGS app tag. `config/ags/colors.css` is deliberately
-#   absent: AGS apps read state/current/appearance/<configDir>.css directly,
-#   and config/ags is a symlink into an immutable tag.
+#   NON-runtime consumers (Generations v3, contracts generations.md §6, and
+#   dotfiles-v3 docs/108 W-2.5). The state_links role owns them; the runtime
+#   never repoints them. Each link names state/current/<base>/<target>, never a
+#   generation-specific path and never an AGS app tag. `config/ags/colors.css`
+#   is deliberately absent: AGS apps read
+#   state/current/appearance/<configDir>.css directly, and config/ags is a
+#   symlink into an immutable tag. wlogout is a real config directory, so its
+#   generated sheet is exposed as a stable provisioning-owned link.
 verify_consumer_symlinks:
-  - { path: "{{ install_dir | trim }}/config/gtk-3.0/colors.css", target: colors.gtk.css }
-  - { path: "{{ install_dir | trim }}/config/gtk-4.0/colors.css", target: colors.adw.css }
-  - { path: "{{ install_dir | trim }}/config/rofi/colors.rasi", target: colors.rasi }
-  - { path: "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme", target: colors.btop.theme }
+  - { path: "{{ install_dir | trim }}/config/gtk-3.0/colors.css", base: palette, target: colors.gtk.css }
+  - { path: "{{ install_dir | trim }}/config/gtk-4.0/colors.css", base: palette, target: colors.adw.css }
+  - { path: "{{ install_dir | trim }}/config/rofi/colors.rasi", base: palette, target: colors.rasi }
+  - { path: "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme", base: palette, target: colors.btop.theme }
+  - { path: "{{ install_dir | trim }}/config/wlogout/appearance.css", base: appearance, target: wlogout.css }
 
 # verify_app_tag_forbidden_runtime_artifacts: runtime-owned names that must
 #   never exist inside an immutable app tag (contracts generations.md §6).
