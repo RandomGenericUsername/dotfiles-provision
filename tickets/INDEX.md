@@ -30,7 +30,7 @@
 - [REQ-031-platform-v101-mirror/ticket.md](./REQ-031-platform-v101-mirror/ticket.md) — Mirror ags-platform v1.0.1 in the engine pins | `done` | tag: v0.1.48 | worktree: .worktrees/REQ-031/ | branch: ticket/REQ-031-platform-v101-mirror
 - [REQ-032-app-patch-tags/ticket.md](./REQ-032-app-patch-tags/ticket.md) — Mirror the seven v3 app patch releases in the engine fixtures | `done` | worktree: .worktrees/REQ-032/ | branch: ticket/REQ-032-app-patch-tags | tag: v0.1.49
 - [REQ-033-skin-wlogout/ticket.md](./REQ-033-skin-wlogout/ticket.md) — Provision the wlogout appearance consumer link (SKIN-WLOGOUT slice) | `done` | worktree: .worktrees/REQ-033/ | branch: ticket/REQ-033-skin-wlogout | tag: v0.1.50
-- [REQ-034-host-defaults-mirrors/ticket.md](./REQ-034-host-defaults-mirrors/ticket.md) — Mirror contracts v0.9.0 and assets v0.15.0 for the host-defaults cutover | `in-progress` | worktree: .worktrees/REQ-034/ | branch: ticket/REQ-034-host-defaults-mirrors
+- [REQ-034-host-defaults-mirrors/ticket.md](./REQ-034-host-defaults-mirrors/ticket.md) — Mirror contracts v0.9.0 and assets v0.15.0 for the host-defaults cutover | `done` | worktree: .worktrees/REQ-034/ | branch: ticket/REQ-034-host-defaults-mirrors | tag: v0.1.51
 
 ## Bugs
 
