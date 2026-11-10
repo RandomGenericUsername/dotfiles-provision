@@ -136,7 +136,7 @@ class TestWlogoutConfigTasks:
         assert not missing, f"render task does not define template vars: {sorted(missing)}"
 
     def test_render_context_matches_v0151_static_template(self) -> None:
-        """v0.15.2 static style owns no typography; only structure vars remain."""
+        """v0.15.3 static style owns no typography; only structure vars remain."""
         task = _render_task()
         vars_block = task.get("vars")
         assert isinstance(vars_block, dict)

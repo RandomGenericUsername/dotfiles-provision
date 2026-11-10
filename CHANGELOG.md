@@ -1,3 +1,9 @@
+## 0.1.57
+
+Pin-only release: mirror `dotfiles-assets v0.15.3` (wlogout focused/hovered
+cards retain the card background; ring/ink only). Uses the local
+`pin-audit`/`gates-pin` lane; no behavior or contract change.
+
 ## 0.1.56
 
 Pin-only release: mirror `dotfiles-assets v0.15.2` (wlogout card mapping and
