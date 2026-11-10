@@ -33,6 +33,7 @@
 - [REQ-034-host-defaults-mirrors/ticket.md](./REQ-034-host-defaults-mirrors/ticket.md) — Mirror contracts v0.9.0 and assets v0.15.0 for the host-defaults cutover | `done` | worktree: .worktrees/REQ-034/ | branch: ticket/REQ-034-host-defaults-mirrors | tag: v0.1.51
 - [REQ-035-assets-v0151/ticket.md](./REQ-035-assets-v0151/ticket.md) — Mirror dotfiles-assets v0.15.1 (wlogout static ownership fix) | `done` | worktree: .worktrees/REQ-035/ | branch: ticket/REQ-035-assets-v0151 | tag: v0.1.53
 - [REQ-036-assets-v0152-pin/ticket.md](./REQ-036-assets-v0152-pin/ticket.md) — Mirror dotfiles-assets v0.15.2 and add the local pin-only gate lane | `done` | worktree: .worktrees/REQ-036/ | branch: ticket/REQ-036-assets-v0152-pin | tag: v0.1.56
+- [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `in-progress` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0
 
 ## Bugs
 
