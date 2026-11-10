@@ -4,10 +4,16 @@
 This is deliberately narrow: it catches stale asset/contract/platform tags in
 role vars and the fixture tuple before a pin-only release enters the (much more
 expensive) full gates. It does not replace the full gates for behavior changes.
+
+Skin consumer coverage is structural, not a schema validator: the deployed
+skin plane must name exactly the released five manifests and the released eight
+`<configDir>.gtk.css.j2` targets. In particular, `terminal-host` is part of the
+v0.16.0 release and must not silently drop out of `verify` again.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,7 +21,30 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURE = ROOT / "tests/fixtures/composition/dotfiles/provisioning"
+
+# Released dotfiles-assets v0.16.0 skin plane. Keep these ordered sets explicit:
+# the audit is a pin/structural check, so a missing or extra name is a drift.
+EXPECTED_SKIN_MANIFEST_NAMES = (
+    "glass",
+    "flat",
+    "paper",
+    "terminal",
+    "terminal-host",
+)
+EXPECTED_SKIN_TARGET_FILES = (
+    "ags.gtk.css.j2",
+    "ags-clipboard.gtk.css.j2",
+    "ags-notifications.gtk.css.j2",
+    "ags-wallpaper-selector.gtk.css.j2",
+    "ags-capture.gtk.css.j2",
+    "ags-icme.gtk.css.j2",
+    "ags-btop-studio.gtk.css.j2",
+    "wlogout.gtk.css.j2",
+)
+
+
+def _fixture(root: Path) -> Path:
+    return root / "tests/fixtures/composition/dotfiles/provisioning"
 
 
 def _load(path: Path) -> Any:
@@ -23,19 +52,65 @@ def _load(path: Path) -> Any:
         return yaml.safe_load(handle)
 
 
-def _role_vars() -> list[tuple[Path, dict[str, Any]]]:
+def _role_vars(root: Path) -> list[tuple[Path, dict[str, Any]]]:
     found: list[tuple[Path, dict[str, Any]]] = []
-    for path in sorted((ROOT / "ansible/roles").glob("*/vars/main.yml")):
+    for path in sorted((root / "ansible/roles").glob("*/vars/main.yml")):
         data = _load(path)
         if isinstance(data, dict):
             found.append((path, data))
     return found
 
 
-def main() -> int:
-    assets = _load(FIXTURE / "assets.yaml")
-    tuple_data = _load(FIXTURE / "program-tuple.yaml")
-    apps = _load(FIXTURE / "apps.yaml")
+def _verify_vars(root: Path) -> dict[str, Any]:
+    data = _load(root / "ansible/roles/verify/vars/main.yml")
+    if not isinstance(data, dict):
+        raise SystemExit("ansible/roles/verify/vars/main.yml must be a mapping")
+    return data
+
+
+def _skin_plane_errors(root: Path) -> list[str]:
+    """Check the released manifest names and consumer-target set exactly.
+
+    This intentionally checks names only. The deployed skin payload is
+    validated by `verify`; a pin audit must stay cheap and structural.
+    """
+    verify_vars = _verify_vars(root)
+    errors: list[str] = []
+
+    manifest_names = [
+        str(name) for name in verify_vars.get("verify_skins_manifest_names", [])
+    ]
+    expected_manifests = list(EXPECTED_SKIN_MANIFEST_NAMES)
+    if len(manifest_names) != len(expected_manifests) or set(manifest_names) != set(
+        expected_manifests
+    ):
+        errors.append(
+            "verify_skins_manifest_names="
+            f"{manifest_names!r}, expected exactly {expected_manifests!r} "
+            "(glass, flat, paper, terminal, terminal-host)"
+        )
+
+    target_files = [
+        str(name) for name in verify_vars.get("verify_skins_template_files", [])
+    ]
+    expected_targets = list(EXPECTED_SKIN_TARGET_FILES)
+    if len(target_files) != len(expected_targets) or set(target_files) != set(
+        expected_targets
+    ):
+        errors.append(
+            "verify_skins_template_files="
+            f"{target_files!r}, expected exactly the eight released skin targets "
+            f"{expected_targets!r}"
+        )
+
+    return errors
+
+
+def audit(root: Path = ROOT) -> tuple[list[str], dict[str, str | int]]:
+    fixture = _fixture(root)
+    assets = _load(fixture / "assets.yaml")
+    tuple_data = _load(fixture / "program-tuple.yaml")
+    apps = _load(fixture / "apps.yaml")
     assets_tag = str(assets["assets"]["tag"])
     contracts_tag = str(tuple_data["contracts"])
     platform_tag = str(tuple_data["ags-platform"])
@@ -46,8 +121,8 @@ def main() -> int:
             f"{tuple_data['dotfiles-assets']!r}, expected {assets_tag!r}"
         )
 
-    for path, data in _role_vars():
-        rel = path.relative_to(ROOT)
+    for path, data in _role_vars(root):
+        rel = path.relative_to(root)
         for key, value in data.items():
             if not isinstance(value, str):
                 continue
@@ -72,7 +147,7 @@ def main() -> int:
         "btop-theme-studio": "v0.5.1",
     }
     fixture_apps = _load(
-        ROOT / "tests/fixtures/ags-apps/app-list/all-standalone.apps.yaml"
+        root / "tests/fixtures/ags-apps/app-list/all-standalone.apps.yaml"
     )
     by_app = {str(item["app"]): str(item["tag"]) for item in fixture_apps["apps"]}
     if by_app != expected_app_tags:
@@ -81,8 +156,32 @@ def main() -> int:
             f"got {by_app!r}, expected {expected_app_tags!r}"
         )
     if apps.get("apps") is None:
-        errors.append(f"{FIXTURE / 'apps.yaml'}: missing apps list")
+        errors.append(f"{fixture / 'apps.yaml'}: missing apps list")
 
+    errors.extend(_skin_plane_errors(root))
+
+    summary: dict[str, str | int] = {
+        "assets": assets_tag,
+        "contracts": contracts_tag,
+        "platform": platform_tag,
+        "apps": len(expected_app_tags),
+        "skins": len(EXPECTED_SKIN_MANIFEST_NAMES),
+        "targets": len(EXPECTED_SKIN_TARGET_FILES),
+    }
+    return errors, summary
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--root",
+        default=str(ROOT),
+        help="repo root to audit (defaults to this script's checkout)",
+    )
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+
+    errors, summary = audit(root)
     if errors:
         print("pin-audit: FAIL", file=sys.stderr)
         for error in errors:
@@ -90,8 +189,9 @@ def main() -> int:
         return 1
     print(
         "pin-audit: PASS "
-        f"(assets={assets_tag}, contracts={contracts_tag}, platform={platform_tag}, "
-        f"apps={len(expected_app_tags)})"
+        f"(assets={summary['assets']}, contracts={summary['contracts']}, "
+        f"platform={summary['platform']}, apps={summary['apps']}, "
+        f"skins={summary['skins']}, targets={summary['targets']})"
     )
     return 0
 

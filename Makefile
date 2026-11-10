@@ -103,8 +103,9 @@ docs-check:
 gates: $(GATES)
 
 # Pin-only preflight: all engine asset/contract/platform mirrors match the
-# composition fixture. Use `gates-pin` for version/fixture-only changes; keep
-# `gates` (full test + hermetic) for behavior/schema changes.
+# composition fixture, and the skin plane names exactly the released five
+# manifests + eight consumer targets. Use `gates-pin` for version/fixture-only
+# changes; keep `gates` (full test + hermetic) for behavior/schema changes.
 pin-audit:
 	python3 scripts/pin-audit.py
 
