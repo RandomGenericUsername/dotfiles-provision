@@ -281,6 +281,7 @@ _SKIN_CONTRACT_BODIES = {
     )
     + "\n",
     "appearance-artifact.schema.json": '{"title": "appearance artifact"}\n',
+    "generation-manifest.schema.json": '{"title": "generation manifest"}\n',
     "skin-token.schema.json": '{"title": "skin token"}\n',
     "skin-manifest.schema.json": '{"title": "skin manifest"}\n',
     "skin-json.schema.json": '{"title": "resolved skin"}\n',
@@ -464,8 +465,26 @@ def _write_deployed_skins(spine: Path) -> None:
             {
                 "schema_major": 2,
                 "canonical": {
-                    "tag": "v0.7.0",
+                    "tag": "v0.9.0",
                     "vendored": True,
+                    "paths": [
+                        "schemas/appearance-manifest.schema.json",
+                        "schemas/appearance-json.schema.json",
+                        "schemas/appearance-artifact.schema.json",
+                        "schemas/generation-manifest.schema.json",
+                        "schemas/skin-token.schema.json",
+                        "schemas/skin-manifest.schema.json",
+                        "schemas/skin-json.schema.json",
+                    ],
+                    "vendored_paths": [
+                        "skins/contracts/appearance-manifest.schema.json",
+                        "skins/contracts/appearance-json.schema.json",
+                        "skins/contracts/appearance-artifact.schema.json",
+                        "skins/contracts/generation-manifest.schema.json",
+                        "skins/contracts/skin-token.schema.json",
+                        "skins/contracts/skin-manifest.schema.json",
+                        "skins/contracts/skin-json.schema.json",
+                    ],
                     "delegates": {
                         "manifest": "skins/contracts/appearance-manifest.schema.json",
                         "json": "skins/contracts/appearance-json.schema.json",
@@ -488,13 +507,21 @@ def _write_deployed_skins(spine: Path) -> None:
         )
         + "\n"
     )
-    pin_lines = ["contracts=v0.7.0\n"]
+    pin_lines = ["contracts=v0.9.0\n"]
     for name, body in _SKIN_CONTRACT_BODIES.items():
         (contracts / name).write_text(body)
         pin_lines.append(
             f"sha256 {hashlib.sha256(body.encode()).hexdigest()} {name}\n"
         )
     (contracts / "PIN").write_text("".join(pin_lines))
+
+
+def _rewrite_skin_schema(install: Path, mutate: Callable[[dict[str, Any]], None]) -> None:
+    """Mutate the deployed skins envelope through the production JSON shape."""
+    path = install / "skins" / "schema.json"
+    data = json.loads(path.read_text())
+    mutate(data)
+    path.write_text(json.dumps(data) + "\n")
 
 
 def _verify_assets_extra_vars(spine: Path) -> dict[str, object]:
@@ -2110,12 +2137,12 @@ class TestVerifyVars:
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
-    def test_skins_pin_is_v0140_with_the_v2_contract_and_templates(self) -> None:
-        """REQ-033: v0.15.0 ships four manifests, eight templates and the
-        contracts v0.7.0 plane (wlogout joins the required target set)."""
+    def test_skins_pin_is_v0150_with_the_v09_contract_and_templates(self) -> None:
+        """BUG-012: assets v0.15.0 ships four manifests, eight templates and the
+        contracts v0.9.0 plane, including the vendored generation schema."""
         data = _vars()
         assert str(data["verify_assets_pinned_tag"]) == "v0.15.0"
-        assert str(data["verify_skins_expected_contract_tag"]) == "v0.7.0"
+        assert str(data["verify_skins_expected_contract_tag"]) == "v0.9.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
             "flat",
@@ -2152,6 +2179,7 @@ class TestVerifyVars:
             "appearance-manifest.schema.json",
             "appearance-json.schema.json",
             "appearance-artifact.schema.json",
+            "generation-manifest.schema.json",
             "skin-token.schema.json",
             "skin-manifest.schema.json",
             "skin-json.schema.json",
@@ -3597,6 +3625,99 @@ class TestVerifySkinPlane:
         output = result.stdout + result.stderr
         assert result.returncode != 0, "an unknown placeholder must fail verify"
         assert "placeholder" in output, output
+
+    def test_skin_plane_accepts_the_assets_v0150_v09_envelope(
+        self, tmp_path: Path
+    ) -> None:
+        """BUG-012: the released assets v0.15.0 skins schema names v0.9.0 and
+        vendors the fourth canonical (generation) schema."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        schema = json.loads((install / "skins" / "schema.json").read_text())
+        assert schema["canonical"]["tag"] == "v0.9.0"
+        assert "skins/contracts/generation-manifest.schema.json" in schema[
+            "canonical"
+        ]["vendored_paths"]
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, output
+        assert "failed=0" in output, output
+
+    @pytest.mark.parametrize("tag", ["v0.7.0", "v0.14.0"])
+    def test_skin_plane_rejects_a_stale_contract_tag(
+        self, tmp_path: Path, tag: str
+    ) -> None:
+        """BUG-012: a pre-host-defaults canonical tag (or an assets tag posing
+        as one) must fail even though the rest of the envelope is v2."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        _rewrite_skin_schema(
+            install, lambda data: data["canonical"].__setitem__("tag", tag)
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, (
+            f"canonical tag {tag} must fail the v0.9.0 envelope gate"
+        )
+        assert "is not the pinned Appearance v2 envelope" in output, output
+        assert "v0.9.0" in output, output
+
+    def test_skin_plane_rejects_a_missing_canonical_tag(
+        self, tmp_path: Path
+    ) -> None:
+        """BUG-012: the canonical tag is mandatory, not an optional extra."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        _rewrite_skin_schema(
+            install, lambda data: data["canonical"].pop("tag", None)
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, f"a missing canonical tag must fail verify: {output}"
+
+    def test_skin_plane_rejects_a_missing_generation_vendored_path(
+        self, tmp_path: Path
+    ) -> None:
+        """BUG-012: v0.9.0 vendors generation-manifest.schema.json; dropping it
+        from the envelope must fail rather than silently pass the delegate set."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        _rewrite_skin_schema(
+            install,
+            lambda data: data["canonical"]["vendored_paths"].remove(
+                "skins/contracts/generation-manifest.schema.json"
+            ),
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, (
+            "a missing generation vendored path must fail the v0.9.0 envelope"
+        )
+        assert "is not the pinned Appearance v2 envelope" in output, output
+
+    def test_skin_plane_rejects_a_missing_generation_contract(
+        self, tmp_path: Path
+    ) -> None:
+        """BUG-012: the generation contract is PIN-hashed like every vendored
+        schema, so its absence must fail the contract-count/hash checks."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        (install / "skins" / "contracts" / "generation-manifest.schema.json").unlink()
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, (
+            f"a missing vendored generation contract must fail verify: {output}"
+        )
 
     def test_skin_plane_rejects_a_tampered_contract(self, tmp_path: Path) -> None:
         """A vendored contract byte change must fail the PIN hash gate."""

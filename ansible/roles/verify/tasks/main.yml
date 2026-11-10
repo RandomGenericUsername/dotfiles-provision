@@ -1772,6 +1772,13 @@
          | dict2items | map(attribute='key') | sort | list)
         == ['artifact', 'json', 'manifest']
       - >-
+        ['appearance-manifest.schema.json', 'appearance-json.schema.json',
+         'appearance-artifact.schema.json', 'generation-manifest.schema.json']
+        | difference(
+            (verify_skins_schema_raw.content | b64decode | from_json).canonical.vendored_paths
+            | map('basename') | list)
+        | length == 0
+      - >-
         ((verify_skins_schema_raw.content | b64decode | from_json).frozen.token_groups
          | dict2items | map(attribute='key') | sort | list)
         == ['ink', 'layout', 'state', 'surface', 'type']
@@ -1782,7 +1789,8 @@
       {{ verify_skins_schema_file }} is not the pinned Appearance v2 envelope:
       expected schema_major {{ verify_assets_schema_support.skins }}, canonical
       tag {{ verify_skins_expected_contract_tag }}, the three vendored delegates
-      (manifest/json/artifact), the five token groups
+      (manifest/json/artifact) plus the vendored generation-manifest schema,
+      the five token groups
       ({{ verify_skins_manifest_groups | join(', ') }}) and the resolved
       tokens.json contract. Re-run the assets playbook against the pinned
       {{ verify_assets_pinned_tag }} corpus.

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.52
+
+Accept the released contracts v0.9.0 skins envelope shipped by assets v0.15.0
+(BUG-012, live SKIN-HOST-DEFAULTS cutover).
+
+- `verify_skins_expected_contract_tag` moves from **v0.7.0** to **v0.9.0**,
+  matching the assets v0.15.0 `skins/schema.json` and `skins/contracts/PIN`.
+  The live `apply`/`verify` no longer rejects a correctly deployed v0.15.0
+  corpus at the skins envelope assertion.
+- The deployed-envelope assertion keeps the schema_major, canonical tag,
+  manifest/json/artifact delegate, five token-group and resolved `tokens.json`
+  checks and now explicitly requires the fourth canonical vendored schema,
+  `generation-manifest.schema.json`, in `canonical.vendored_paths`.
+- `verify_skins_contract_files` includes `generation-manifest.schema.json`, so
+  the PIN sha256 assertion covers all seven v0.9.0 vendored contracts.
+- Regression tests prove the v0.15.0/v0.9.0 fixture passes, stale v0.7.0 and
+  v0.14.0 canonical tags fail, a missing canonical tag or generation path
+  fails, and the host-bearing contracts v0.9.0 generation fixture stays valid.
+  Contracts v0.9.0 / assets v0.15.0 mirrors and all v3 behavior are unchanged.
+
 ## 0.1.51
 
 Mirror contracts v0.9.0 and assets v0.15.0 for the host-defaults cutover

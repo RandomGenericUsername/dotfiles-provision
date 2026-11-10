@@ -490,13 +490,18 @@ verify_skins_contract_files:
   - appearance-manifest.schema.json
   - appearance-json.schema.json
   - appearance-artifact.schema.json
+  - generation-manifest.schema.json
   - skin-token.schema.json
   - skin-manifest.schema.json
   - skin-json.schema.json
 verify_skins_contract_paths: >-
   {{ verify_skins_contract_files | map('regex_replace', '^',
      verify_skins_contracts_dir ~ '/') | list }}
-verify_skins_expected_contract_tag: v0.7.0
+#: Assets v0.15.0 re-vendored the skins contracts at v0.9.0 (the
+#: host-defaults release). The PIN, the four canonical vendored schemas
+#: (appearance manifest/json/artifact + generation) and the local schema
+#: envelope must all name the same tag.
+verify_skins_expected_contract_tag: v0.9.0
 #: The resolved runtime document (`tokens.json`) is validated by the vendored
 #: `appearance-json` contract: version 2 plus the five fully resolved groups.
 verify_skins_resolved_token_groups:
