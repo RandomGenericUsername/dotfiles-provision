@@ -135,17 +135,18 @@ class TestWlogoutConfigTasks:
         missing = template_vars - set(vars_block.keys())
         assert not missing, f"render task does not define template vars: {sorted(missing)}"
 
-    def test_render_uses_tunable_font(self) -> None:
-        """The font must come from the tunable shell vars, never hardcoded."""
+    def test_render_context_matches_v0151_static_template(self) -> None:
+        """v0.15.1 static style owns no typography; only structure vars remain."""
         task = _render_task()
         vars_block = task.get("vars")
         assert isinstance(vars_block, dict)
-        assert "{{ shell.font_family }}" == vars_block.get("SYSTEM_FONT_FAMILY"), (
-            "SYSTEM_FONT_FAMILY must derive from shell.font_family (tunable)"
-        )
-        assert "{{ shell.font_size_px }}" == vars_block.get("FONT_SIZE_PX"), (
-            "FONT_SIZE_PX must derive from shell.font_size_px (tunable)"
-        )
+        assert "SYSTEM_FONT_FAMILY" not in vars_block
+        assert "FONT_SIZE_PX" not in vars_block
+        assert set(vars_block) == {
+            "COLORS_FILE_PATH",
+            "STATE_ROOT",
+            "CURRENT_WALLPAPER_SYMLINK",
+        }
 
     def test_no_become_anywhere_in_role(self) -> None:
         for task in _load_tasks():

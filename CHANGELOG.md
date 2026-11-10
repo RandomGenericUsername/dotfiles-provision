@@ -1,3 +1,10 @@
+## 0.1.53
+
+Mirror `dotfiles-assets v0.15.1` (wlogout static stylesheet now owns only
+structure/motion; generated skin owns paint/rhythm) and adopt the 3-variable
+wlogout render context. Contracts `v0.9.0` and runtime-independent behavior are
+unchanged.
+
 # Changelog
 
 ## 0.1.52

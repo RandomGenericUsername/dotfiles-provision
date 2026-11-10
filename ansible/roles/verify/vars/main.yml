@@ -181,7 +181,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.15.0
+verify_assets_pinned_tag: v0.15.1
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -225,7 +225,7 @@ verify_skins_manifest_names:
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
-#: v0.15.0 ships one `<configDir>.gtk.css.j2` per target: the seven AGS app
+#: v0.15.1 ships one `<configDir>.gtk.css.j2` per target: the seven AGS app
 #: templates plus the non-AGS wlogout consumer. The expander renders
 #: `<configDir>.css`; a missing template would leave that consumer's generated
 #: sheet unbacked (W-2.1/W-2.9).
@@ -497,7 +497,7 @@ verify_skins_contract_files:
 verify_skins_contract_paths: >-
   {{ verify_skins_contract_files | map('regex_replace', '^',
      verify_skins_contracts_dir ~ '/') | list }}
-#: Assets v0.15.0 re-vendored the skins contracts at v0.9.0 (the
+#: Assets v0.15.1 re-vendored the skins contracts at v0.9.0 (the
 #: host-defaults release). The PIN, the four canonical vendored schemas
 #: (appearance manifest/json/artifact + generation) and the local schema
 #: envelope must all name the same tag.
