@@ -1,3 +1,29 @@
+## 0.1.59
+
+Phase 0 hardening for the skin consumer plane. Behavior change release; full
+`make gates` + `make ci-gates-parity` (not only `gates-pin`).
+
+- `scripts/pin-audit.py` now fails when `verify_skins_manifest_names` is not
+  exactly the released five manifests (`glass`, `flat`, `paper`, `terminal`,
+  `terminal-host`) or when `verify_skins_template_files` is not exactly the
+  released eight consumer targets (seven AGS targets plus `wlogout`). It stays
+  a structural pin audit, not a schema validator. Regression tests prove a
+  missing `terminal-host`, an extra manifest, a missing wlogout target, and an
+  extra target all fail.
+- `wlogout_config` writes an empty provisioning-owned
+  `<install>/config/wlogout/appearance.css` fallback only when no appearance
+  file/link exists. The static `style.css` can therefore import
+  `appearance.css` last during early bootstrap without a GTK import error. An
+  existing stable symlink is preserved (stat + create-if-absent,
+  `copy force: false`); the post-seed `state_links` role replaces a regular
+  fallback with the real `current/appearance/wlogout.css` link, so no stale
+  fallback survives a seed. No runtime artifact enters an app tag and there is
+  no live-reload lane.
+- Refresh the terminal-host test fixture (`terminal-host.toml` + the fifth
+  manifest in the deployed-skin helper) and the stale wlogout static-template
+  assertions left from the v0.16.0 pin release. No composition/runtime/app/
+  contract files change and no apply runs.
+
 ## 0.1.58
 
 Pin-only release: mirror `dotfiles-assets v0.16.0` (`terminal-host` skin) and
