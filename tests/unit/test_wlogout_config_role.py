@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -157,6 +158,53 @@ def _imports(text: str) -> list[str]:
     return re.findall(r'@import\s+(?:url\(\s*)?["\']([^"\']+)["\']', text)
 
 
+def _gtk3_css_probe(css_path: Path) -> subprocess.CompletedProcess[str] | None:
+    """Parse a stylesheet with the system GTK3 CssProvider, if GI is available."""
+    probe = (
+        "import gi\n"
+        "gi.require_version('Gtk', '3.0')\n"
+        "from gi.repository import Gtk\n"
+        "import sys\n"
+        "errors = []\n"
+        "provider = Gtk.CssProvider()\n"
+        "provider.connect('parsing-error', "
+        "lambda provider, section, error: errors.append(error.message))\n"
+        "provider.load_from_path(sys.argv[1])\n"
+        "if errors:\n"
+        "    raise SystemExit('; '.join(errors))\n"
+        "print('gtk3 css ok')\n"
+    )
+    candidates = [sys.executable, shutil.which("python3"), "/usr/bin/python3"]
+    interpreter: str | None = None
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        check = subprocess.run(
+            [
+                candidate,
+                "-c",
+                "import gi; gi.require_version('Gtk', '3.0'); "
+                "from gi.repository import Gtk",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode == 0:
+            interpreter = candidate
+            break
+    if interpreter is None:
+        return None
+    return subprocess.run(
+        [interpreter, "-c", probe, str(css_path)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+
 class TestWlogoutConfigTemplate:
     def test_template_imports_generated_appearance_last(self) -> None:
         """W-2.6: the palette import stays first (palette-only fallback) and
@@ -194,14 +242,17 @@ class TestWlogoutConfigTemplate:
             "the static template must not expand generated skin tokens"
         )
 
-    def test_template_uses_palette_semantic_roles(self) -> None:
-        """v0.6.4: the template consumes palette.v1 semantic roles, not the
-        retired CSG carrier tokens (`@color_00..@color_15`)."""
+    def test_static_template_owns_no_generated_paint(self) -> None:
+        """v0.16.0: the static sheet is structure only; the generated appearance
+        sheet owns palette roles. The retired CSG carrier tokens stay absent."""
         text = _template().read_text()
         for bad in ("@color_", "@color16", "@color10", "@color7;"):
             assert bad not in text, f"template still uses retired carrier token {bad}"
-        for good in ("@on_surface", "@primary_container"):
-            assert good in text, f"template must use palette role {good}"
+        for generated in ("@on_surface", "@primary_container"):
+            assert generated not in text, (
+                "the static template must not own generated palette/skin paint "
+                f"({generated}); the appearance sheet imported last does"
+            )
 
     def test_template_has_no_stale_paths(self) -> None:
         """gt-4-2 follow-up lock: style.css.tpl must reference the RUNTIME
@@ -271,6 +322,79 @@ class TestPreS3Prune:
         )
 
 
+class TestWlogoutAppearanceFallback:
+    """Phase 0: keep wlogout usable before the first runtime generation exists.
+
+    The static sheet imports `appearance.css` LAST. The generated target is not
+    present during early bootstrap, so the role owns an empty provisioning-spine
+    fallback; `state_links` replaces it with the real stable link after seeding.
+    """
+
+    def _stat_task(self) -> dict[str, object]:
+        matches = [t for t in _load_tasks() if _module_key(t) == "ansible.builtin.stat"]
+        assert len(matches) == 1, "expected one stat task for the appearance path"
+        return matches[0]
+
+    def _copy_task(self) -> dict[str, object]:
+        matches = [t for t in _load_tasks() if _module_key(t) == "ansible.builtin.copy"]
+        assert len(matches) == 1, "expected one create-if-absent fallback task"
+        return matches[0]
+
+    def test_fallback_path_is_the_provisioning_spine(self) -> None:
+        data = _vars()
+        assert data["wlogout_config_appearance_path"] == (
+            "{{ wlogout_config_spine_dir }}/appearance.css"
+        )
+        assert "apps/" not in str(data["wlogout_config_appearance_path"])
+        module = _module(self._copy_task())
+        assert module["dest"] == "{{ wlogout_config_appearance_path }}"
+
+    def test_stat_sees_the_link_itself(self) -> None:
+        module = _module(self._stat_task())
+        assert module["path"] == "{{ wlogout_config_appearance_path }}"
+        assert module["follow"] is False, (
+            "stat must not follow a stable symlink; the fallback preserves it"
+        )
+        assert self._stat_task().get("register") == "wlogout_config_appearance_check"
+
+    def test_fallback_is_created_only_when_absent(self) -> None:
+        task = self._copy_task()
+        assert task.get("when") == "not wlogout_config_appearance_check.stat.exists"
+        module = _module(task)
+        assert module["force"] is False, (
+            "copy must never clobber a pre-existing file or stable symlink"
+        )
+        assert module["mode"] == "0644"
+        assert "state" not in module, "the fallback is a regular file, never a link"
+
+    def test_fallback_content_is_empty_palette_only_css(self) -> None:
+        content = str(_module(self._copy_task())["content"])
+        assert "Provisioning-owned wlogout appearance fallback" in content
+        assert "@import" not in content, (
+            "the empty fallback must not duplicate the palette import owned by "
+            "the static style.css"
+        )
+        assert "{{" not in content and "{%" not in content, "no unresolved Jinja"
+
+    def test_fallback_runs_after_the_style_render(self) -> None:
+        names = [str(t.get("name", "")) for t in _load_tasks()]
+        render = names.index("Render wlogout style.css")
+        fallback = names.index(
+            "Create the palette-only wlogout appearance fallback when none exists"
+        )
+        assert fallback > render
+
+    def test_no_live_reload_lane(self) -> None:
+        # Serialize the parsed tasks (comments excluded): the role documents
+        # "no live-reload lane" in its header, which must not trip this guard.
+        text = yaml.safe_dump(_load_tasks()).lower()
+        for forbidden in ("systemctl", "inotify", "reload", "watch"):
+            assert forbidden not in text, (
+                "wlogout re-reads CSS on the next launch; provisioning adds no "
+                f"live-reload lane ({forbidden})"
+            )
+
+
 class TestWlogoutConfigPlaybook:
     def test_syntax_check_exits_zero(self) -> None:
         ansible_playbook = shutil.which("ansible-playbook")
@@ -334,9 +458,7 @@ class TestWlogoutConfigPlaybook:
             text = rendered.read_text()
             assert "{{" not in text and "{%" not in text, "unresolved Jinja: " + text
             assert "@import" in text, "rendered style.css must import colors.css"
-            assert "@on_surface" in text, (
-                "rendered style.css must use palette.v1 semantic roles"
-            )
+            assert "@import url" in text, "rendered style.css must keep the palette import"
             imports = _imports(text)
             assert imports[0].endswith("colors.gtk.css"), (
                 "the rendered palette import must stay first"
@@ -352,6 +474,72 @@ class TestWlogoutConfigPlaybook:
                 "the pre-S3 style.css.tpl residue must be pruned on the same pass — a "
                 "template nobody renders must not survive in the directory wlogout loads"
             )
+            fallback = wlogout_dir / "appearance.css"
+            assert fallback.is_file(), "fresh no-link run must create the fallback sheet"
+            assert not fallback.is_symlink(), "the fallback is a regular spine file"
+            assert "Provisioning-owned wlogout appearance fallback" in fallback.read_text()
+
+    def _run_role(self, install: Path) -> subprocess.CompletedProcess[str]:
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("ANSIBLE_")}
+        env["ANSIBLE_CONFIG"] = str(_ANSIBLE_DIR / "ansible.cfg")
+        return subprocess.run(
+            [
+                ansible_playbook,
+                str(_PLAYBOOKS_DIR / "wlogout-config.yaml"),
+                "-e",
+                f"install_dir={install}",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+
+    def _stage_role(self, install: Path) -> Path:
+        wlogout_dir = install / "config" / "wlogout"
+        (install / "config" / "ags").mkdir(parents=True)
+        (install / "generated" / "icons").mkdir(parents=True)
+        (install / "wallpapers").mkdir(parents=True)
+        (install / "config" / "ags" / "colors.css").write_text(
+            "@define-color color_15 #fff;\n"
+        )
+        assets_templates.seed_install(install, "wlogout_config")
+        wlogout_dir.mkdir(parents=True, exist_ok=True)
+        (install / "generated" / "icons" / "lock.svg").write_text("")
+        (install / "wallpapers" / "default.png").write_bytes(b"\x89PNG")
+        return wlogout_dir
+
+    def test_existing_stable_symlink_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            install = Path(tmp) / "install"
+            wlogout_dir = self._stage_role(install)
+            stable_target = Path(tmp) / "stable-wlogout.css"
+            stable_target.write_text("/* stable generation */\n")
+            appearance = wlogout_dir / "appearance.css"
+            appearance.symlink_to(stable_target)
+            previous = os.readlink(appearance)
+
+            result = self._run_role(install)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert appearance.is_symlink(), "the fallback task clobbered the stable link"
+            assert os.readlink(appearance) == previous
+            assert appearance.read_text() == "/* stable generation */\n"
+
+    def test_fallback_parses_with_gtk3(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            install = Path(tmp) / "install"
+            wlogout_dir = self._stage_role(install)
+            result = self._run_role(install)
+            assert result.returncode == 0, result.stdout + result.stderr
+            fallback = wlogout_dir / "appearance.css"
+            probe = _gtk3_css_probe(fallback)
+            if probe is None:
+                pytest.skip("no system GTK3 PyGObject available for the CssProvider probe")
+            assert probe.returncode == 0, probe.stdout + probe.stderr
+            assert "gtk3 css ok" in probe.stdout
 
 
 if __name__ == "__main__":

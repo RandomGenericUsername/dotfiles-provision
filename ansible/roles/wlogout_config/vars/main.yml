@@ -15,6 +15,14 @@ wlogout_config_spine_dir: "{{ install_dir | trim }}/config/wlogout"
 wlogout_config_assets_pinned_tag: v0.16.0
 wlogout_config_assets_templates_dir: "{{ install_dir | trim }}/assets/{{ wlogout_config_assets_pinned_tag }}/templates"
 
+# wlogout_config_appearance_path: the sibling generated-appearance sheet the
+#   static style.css imports LAST. Before the first runtime generation exists
+#   this role creates an empty palette-only fallback regular file; after the
+#   seed `state_links` force-replaces it with the stable
+#   `current/appearance/wlogout.css` symlink. A pre-existing link/file is never
+#   clobbered here (stat + create-if-absent, copy force: false).
+wlogout_config_appearance_path: "{{ wlogout_config_spine_dir }}/appearance.css"
+
 # wlogout_config_legacy_template_path: the PRE-S3 residue this role removes. Before
 #   the template moved to the corpus, `config_copies` copied the whole wlogout dir
 #   (including style.css.tpl) into the spine, so a host provisioned before S3 still

@@ -75,12 +75,21 @@ dotfiles-provision apply -e runtime_palette_producer=tpr
 The `assets` role mirrors the pinned `dotfiles-assets` `skins/` class to
 `<install>/skins` — the runtime's first skin root, ahead of `<install>/config/skins`
 and the `<install>/assets/<tag>/skins` checkout. The copy is data only
-(manifests, the seven `<configDir>.gtk.css.j2` templates, the vendored
-`contracts/` + PIN and `schema.json`); the runtime derives, caches and
-reconciles skins, and owns `config/<configDir>/skin.css` / `skin.json`.
-Provisioning guarantees only the spine data and each AGS app's config dir +
-`$XDG_CONFIG_HOME` link, so a fresh install is green before the first
-reconcile; `verify` checks the pointers only when they exist.
+(five manifests, the eight `<configDir>.gtk.css.j2` templates — seven AGS
+targets plus wlogout — the vendored `contracts/` + PIN and `schema.json`); the
+runtime derives, caches and reconciles skins, and owns
+`config/<configDir>/skin.css` / `skin.json`. Provisioning guarantees only the
+spine data and each AGS app's config dir + `$XDG_CONFIG_HOME` link, so a fresh
+install is green before the first reconcile; `verify` checks the pointers only
+when they exist. `wlogout_config` also writes an empty
+`<install>/config/wlogout/appearance.css` fallback when no generated sheet/link
+exists yet; the post-seed `state_links` pass replaces it with the stable
+`current/appearance/wlogout.css` link.
+
+`make pin-audit` (part of `make gates-pin`) structurally asserts that
+`verify_skins_manifest_names` is exactly the released five manifests and that
+`verify_skins_template_files` is exactly the eight consumer targets, alongside
+the assets/contracts/platform pin mirrors.
 
 ## Always-on AGS supervision (REQ-023)
 

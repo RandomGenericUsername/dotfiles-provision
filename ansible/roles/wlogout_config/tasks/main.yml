@@ -25,7 +25,17 @@
 #   resolves to the generated `current/appearance/wlogout.css` at launch. The
 #   template therefore needs no new render variable: the generated import is
 #   relative to the rendered style.css.
-# - The `template` module has full check-mode support — no --check gate.
+# - BOOTSTRAP FALLBACK: before the first generation exists, that relative
+#   import would name a missing file and GTK emits an import error. This role
+#   writes an empty, palette-only `appearance.css` regular file in the
+#   provisioning-owned config spine ONLY when the path does not exist. An
+#   existing stable symlink is preserved (stat + create-if-absent). The
+#   post-seed `state_links` role force-replaces the fallback with the real
+#   `current/appearance/wlogout.css` link, so no fallback survives a seed.
+#   No runtime artifact is written to an app tag and there is no live-reload
+#   lane; wlogout re-reads its CSS on the next launch.
+# - The `template` and `copy` modules have full check-mode support — no --check
+#   gate.
 # - User-scoped: NO become.
 
 - name: Assert install_dir seam is provided
@@ -64,3 +74,32 @@
     # followed wallpaper changes.
     STATE_ROOT: "{{ wlogout_config_state_root | trim }}"
     CURRENT_WALLPAPER_SYMLINK: "{{ wlogout_config_state_root | trim }}/dotfiles/current/wallpaper.png"
+
+# Bootstrap fallback (W-2.6): style.css imports `appearance.css` LAST, but the
+# generated `current/appearance/wlogout.css` does not exist until the runtime
+# commits its first generation. Without a sibling sheet the relative import
+# makes GTK report an import error during early bootstrap. Write an EMPTY
+# palette-only sheet in the provisioning-owned spine only when nothing is
+# present. `follow: false` sees the link itself: any existing regular file or
+# stable symlink is preserved, and the post-seed state_links role replaces a
+# regular fallback with the real generated link (`state: link force: true`).
+- name: Stat the wlogout appearance sheet or stable consumer link
+  ansible.builtin.stat:
+    path: "{{ wlogout_config_appearance_path }}"
+    follow: false
+  register: wlogout_config_appearance_check
+
+- name: Create the palette-only wlogout appearance fallback when none exists
+  ansible.builtin.copy:
+    dest: "{{ wlogout_config_appearance_path }}"
+    content: |
+      /*
+       * Provisioning-owned wlogout appearance fallback.
+       * The runtime has not committed a generated current/appearance/wlogout.css
+       * yet, so this empty sheet keeps the static style.css import resolvable.
+       * state_links replaces this regular file with the stable generation link
+       * after the seed; the runtime never writes into the provisioning spine.
+       */
+    mode: "0644"
+    force: false
+  when: not wlogout_config_appearance_check.stat.exists
