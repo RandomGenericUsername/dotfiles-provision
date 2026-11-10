@@ -290,9 +290,10 @@ _SKIN_CONTRACT_BODIES = {
 
 def _skin_manifest_body(name: str) -> str:
     """A minimal v2-shape manifest: schemaVersion, name and the v2 token paths."""
-    panel_radius = 0 if name == "terminal" else 12
+    terminal_like = name in {"terminal", "terminal-host"}
+    panel_radius = 0 if terminal_like else 12
     font_family = (
-        "JetBrainsMono Nerd Font, monospace" if name == "terminal" else "inherit"
+        "JetBrainsMono Nerd Font, monospace" if terminal_like else "inherit"
     )
     lines = [
         "schemaVersion = 2",
@@ -453,7 +454,7 @@ def _write_deployed_skins(spine: Path) -> None:
     contracts = skins / "contracts"
     for directory in (manifests, templates, contracts):
         directory.mkdir(parents=True, exist_ok=True)
-    for name in ("glass", "flat", "paper", "terminal"):
+    for name in ("glass", "flat", "paper", "terminal", "terminal-host"):
         (manifests / f"{name}.toml").write_text(_skin_manifest_body(name))
     for template in _SKIN_TEMPLATE_FILES:
         (templates / template).write_text(
@@ -2138,7 +2139,7 @@ class TestVerifyVars:
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_skins_pin_is_v0150_with_the_v09_contract_and_templates(self) -> None:
-        """BUG-012: assets v0.16.0 ships four manifests, eight templates and the
+        """BUG-012: assets v0.16.0 ships five manifests, eight templates and the
         contracts v0.9.0 plane, including the vendored generation schema."""
         data = _vars()
         assert str(data["verify_assets_pinned_tag"]) == "v0.16.0"
@@ -2148,6 +2149,7 @@ class TestVerifyVars:
             "flat",
             "paper",
             "terminal",
+            "terminal-host",
         ]
         assert [str(item) for item in data["verify_skins_template_files"]] == [
             "ags.gtk.css.j2",

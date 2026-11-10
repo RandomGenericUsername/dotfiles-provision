@@ -341,6 +341,31 @@ class TestStableLinksExecution:
             assert not str(link.resolve()).startswith(str(install / "apps")), spine
             assert "generations" not in os.readlink(link), spine
 
+    def test_post_seed_replaces_the_wlogout_fallback_with_the_stable_link(
+        self, tmp_path: Path
+    ) -> None:
+        install = tmp_path / "install"
+        home = tmp_path / "home"
+        config = tmp_path / "config"
+        state = tmp_path / "state"
+        for path in (home, config, state):
+            path.mkdir()
+        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes", "wlogout"):
+            (install / "config" / spine).mkdir(parents=True)
+        fallback = install / "config" / "wlogout" / "appearance.css"
+        fallback.write_text("/* provisioning fallback, must not survive a seed */\n")
+        _stage_palette(state, manifest=True)
+
+        result = _run_post_seed(install, home, config, state)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert fallback.is_symlink(), "state_links must replace the regular fallback"
+        assert os.readlink(fallback) == str(
+            state / "dotfiles" / "current" / "appearance" / "wlogout.css"
+        )
+        assert fallback.read_text() == "/* appearance */\n", (
+            "no stale fallback content may remain after the seed"
+        )
+
     def test_post_seed_tolerates_a_fresh_state_root(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
         home = tmp_path / "home"
