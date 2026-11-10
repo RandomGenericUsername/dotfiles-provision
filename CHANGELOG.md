@@ -1,3 +1,9 @@
+## 0.1.55
+
+Pin-only release: mirror `dotfiles-assets v0.15.2` (wlogout card mapping and
+panel-aligned geometry) and add the local `pin-audit` / `gates-pin` lane for
+version/fixture-only changes. No runtime behavior or contracts change.
+
 ## 0.1.53
 
 Mirror `dotfiles-assets v0.15.1` (wlogout static stylesheet now owns only

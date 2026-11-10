@@ -8,11 +8,11 @@ wlogout_config_spine_dir: "{{ install_dir | trim }}/config/wlogout"
 #   mirror of the assets pin and the `templates` class inside the pinned checkout.
 #   S3: style.css.tpl moved to `dotfiles-assets` (`templates/wlogout/`), so the
 #   render reads the checkout the assets role materializes before this role runs.
-#   v0.15.1 adds the trailing `@import url("appearance.css");` (W-2.6) but no
+#   v0.15.2 adds the trailing `@import url("appearance.css");` (W-2.6) but no
 #   new render variable — the import is relative to the rendered style.css and
 #   the `state_links` role owns the adjacent appearance.css link.
 #   Parity-locked by the required-var parity test; trim lock on the seam.
-wlogout_config_assets_pinned_tag: v0.15.1
+wlogout_config_assets_pinned_tag: v0.15.2
 wlogout_config_assets_templates_dir: "{{ install_dir | trim }}/assets/{{ wlogout_config_assets_pinned_tag }}/templates"
 
 # wlogout_config_legacy_template_path: the PRE-S3 residue this role removes. Before
