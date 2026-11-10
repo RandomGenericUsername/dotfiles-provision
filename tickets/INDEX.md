@@ -85,3 +85,4 @@
 - [REQ-009-consume-csg-v021-runtime-v023](./REQ-009-consume-csg-v021-runtime-v023/ticket.md) — Consume csg v0.2.1 + runtime v0.2.3 in one pin release (engine v0.1.17) | `done` | openspec: none | tag: v0.1.17
 - [REQ-008-ags-app-install-topology](./REQ-008-ags-app-install-topology/ticket.md) — Generic per-app AGS install topology and one-owner cutover | `done` | worktree .worktrees/REQ-008, branch ticket/REQ-008-ags-app-install-topology | tags: v0.1.18 (topology), v0.1.19 (adoption tuple)
 - [REQ-037-assets-v0153/ticket.md](./REQ-037-assets-v0153/ticket.md) — Mirror dotfiles-assets v0.15.3 (wlogout card-state correctness) | `done` | worktree: .worktrees/REQ-037/ | branch: ticket/REQ-037-assets-v0153 | tag: v0.1.57
+- [REQ-038-assets-v0160/ticket.md](./REQ-038-assets-v0160/ticket.md) — Mirror dotfiles-assets v0.16.0 (terminal-host skin) | `done` | worktree: .worktrees/REQ-038/ | branch: ticket/REQ-038-assets-v0160 | tag: v0.1.58

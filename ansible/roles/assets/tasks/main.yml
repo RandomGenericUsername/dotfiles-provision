@@ -178,7 +178,7 @@
   when: not ansible_check_mode
 
 # REQ-020: the skins class ships its local schema envelope at skins/schema.json
-# (schema_major 2 in the v0.15.3 corpus, delegating token types to the vendored
+# (schema_major 2 in the v0.16.0 corpus, delegating token types to the vendored
 # contracts/PIN). Read it with the other class contracts before the first copy
 # so a tag carrying an unreadable skin plane fails before any data lands.
 - name: Read the pinned skins schema contract

@@ -2700,7 +2700,7 @@
       sheet last (W-2.6): {{ verify_wlogout_appearance_import.stderr | default('') }}.
       Expected the palette import first and `@import url("appearance.css");`
       last, with wallpaper/icons/layout/transitions kept app-owned. The
-      wlogout_config role renders the pinned assets v0.15.3 style.css.tpl; run
+      wlogout_config role renders the pinned assets v0.16.0 style.css.tpl; run
       the wlogout-config playbook (needs assets + runtime-seed first).
   when: not ansible_check_mode
 

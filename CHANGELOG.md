@@ -1,3 +1,9 @@
+## 0.1.58
+
+Pin-only release: mirror `dotfiles-assets v0.16.0` (`terminal-host` skin) and
+include the fifth manifest in verify expectations. Uses `gates-pin`; no
+behavior or contract change.
+
 ## 0.1.57
 
 Pin-only release: mirror `dotfiles-assets v0.15.3` (wlogout focused/hovered
