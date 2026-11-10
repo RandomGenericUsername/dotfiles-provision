@@ -3527,16 +3527,22 @@ class TestVerifySkinPlane:
         assert "changed=0" in output
         assert "failed=0" in output
 
-    def test_deployed_skin_plane_accepts_the_fourth_terminal_manifest(
+    def test_deployed_skin_plane_accepts_the_fifth_terminal_host_manifest(
         self, tmp_path: Path
     ) -> None:
-        """REQ-033: glass/flat/paper/terminal all expand through eight templates."""
+        """REQ-033/REQ-038: all five manifests expand through eight templates."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         manifests = sorted(
             path.name for path in (install / "skins" / "manifests").iterdir()
         )
-        assert manifests == ["flat.toml", "glass.toml", "paper.toml", "terminal.toml"]
+        assert manifests == [
+            "flat.toml",
+            "glass.toml",
+            "paper.toml",
+            "terminal-host.toml",
+            "terminal.toml",
+        ]
         result = _run_verify_skin_tasks(
             tmp_path, _selected_verify_skin_tasks(), install
         )
