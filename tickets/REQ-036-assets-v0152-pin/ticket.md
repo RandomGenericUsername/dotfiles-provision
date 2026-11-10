@@ -2,7 +2,7 @@
 id: REQ-036
 title: "Mirror dotfiles-assets v0.15.2 and add the local pin-only gate lane"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -27,14 +27,32 @@ seven-app inventory against the composition fixture.
 
 ## Acceptance
 
-- [ ] Every engine assets pin/mirror and fixture moves to `v0.15.2`.
-- [ ] `scripts/pin-audit.py` passes; `make gates-pin` is documented and
+- [x] Every engine assets pin/mirror and fixture moves to `v0.15.2`.
+- [x] `scripts/pin-audit.py` passes; `make gates-pin` is documented and
       executable.
-- [ ] Fast wlogout render test passes with the existing 3-variable context.
-- [ ] Engine `0.1.54`, annotated tag `v0.1.54`, release with only wheel/sdist;
+- [x] Fast wlogout render test passes with the existing 3-variable context.
+- [x] Engine `0.1.54`, annotated tag `v0.1.54`, release with only wheel/sdist;
       no apply.
-- [ ] Full `make gates` remains the policy for behavior/schema releases; this
+- [x] Full `make gates` remains the policy for behavior/schema releases; this
       ticket records that the pin-only lane was used.
+
+## Evidence
+
+Implementation commit mirrors assets `v0.15.2`, adds `scripts/pin-audit.py` and
+`make gates-pin`, and updates the fast wlogout render expectation. This is a
+pin-only release; the full `make gates` suite was last green on `v0.1.53`.
+
+- `make gates-pin` → rc 0:
+  - `pin-audit: PASS (assets=v0.15.2, contracts=v0.9.0, platform=v1.0.1, apps=7)`
+  - `ruff`: All checks passed
+  - `docs-check`: rc 0
+  - `ci-gates-parity`: PASS
+- Fast wlogout render test: **11 passed, 6 skipped**.
+- Release: engine `0.1.54`, annotated tag `v0.1.54`, GitHub Release with only
+  its wheel/sdist; no apply.
+
+The pin-only lane is now the documented local path for version/fixture-only
+changes; behavior/schema changes continue to require full `make gates`.
 
 ## Evidence / Verify
 
