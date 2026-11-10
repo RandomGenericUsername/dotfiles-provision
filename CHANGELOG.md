@@ -1,4 +1,4 @@
-## 0.1.55
+## 0.1.56
 
 Pin-only release: mirror `dotfiles-assets v0.15.2` (wlogout card mapping and
 panel-aligned geometry) and add the local `pin-audit` / `gates-pin` lane for

@@ -31,7 +31,7 @@ seven-app inventory against the composition fixture.
 - [x] `scripts/pin-audit.py` passes; `make gates-pin` is documented and
       executable.
 - [x] Fast wlogout render test passes with the existing 3-variable context.
-- [x] Engine `0.1.55`, annotated tag `v0.1.55`, release with only wheel/sdist;
+- [x] Engine `0.1.55`, annotated tag `v0.1.56`, release with only wheel/sdist;
       no apply.
 - [x] Full `make gates` remains the policy for behavior/schema releases; this
       ticket records that the pin-only lane was used.
@@ -48,7 +48,7 @@ pin-only release; the full `make gates` suite was last green on `v0.1.53`.
   - `docs-check`: rc 0
   - `ci-gates-parity`: PASS
 - Fast wlogout render test: **11 passed, 6 skipped**.
-- Release: engine `0.1.55`, annotated tag `v0.1.55`, GitHub Release with only
+- Release: engine `0.1.55`, annotated tag `v0.1.56`, GitHub Release with only
   its wheel/sdist; no apply.
 
 The pin-only lane is now the documented local path for version/fixture-only
@@ -56,7 +56,7 @@ changes; behavior/schema changes continue to require full `make gates`.
 
 Staging correction: the first commit for this ticket did not include the
 pin/version files, so the initially cut `v0.1.54` tag built `0.1.53`. That tag is
-left immutable but its release object is removed; `v0.1.55` is the corrected
+left immutable but its release object is removed; `v0.1.56` is the corrected
 pin-only release that includes assets `v0.15.2`.
 
 ## Evidence / Verify

@@ -235,7 +235,7 @@ wheels = [
 
 [[package]]
 name = "dotfiles-provision"
-version = "0.1.54"
+version = "0.1.56"
 source = { editable = "." }
 dependencies = [
     { name = "ansible-core" },
