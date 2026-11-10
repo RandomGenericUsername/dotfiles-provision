@@ -28,7 +28,7 @@ GATES := test lint hermetic lock-check docs-check
 # disposable root container. Both are developer proofs, not stock-runner gates.
 FAST := -m "not integration and not container_target"
 
-.PHONY: help sync collections install test test-integration lint format gates gates-ci hermetic lock-check docs-check build assets-parity ci-gates-parity clean
+.PHONY: help sync collections install test test-integration lint format gates gates-ci gates-pin pin-audit hermetic lock-check docs-check build assets-parity ci-gates-parity clean
 
 help:
 	@echo "sync             Install the env from uv.lock (uv sync --frozen)"
@@ -101,6 +101,14 @@ docs-check:
 	@grep -q "MIT License" LICENSE || { echo "LICENSE is not the MIT text"; exit 1; }
 
 gates: $(GATES)
+
+# Pin-only preflight: all engine asset/contract/platform mirrors match the
+# composition fixture. Use `gates-pin` for version/fixture-only changes; keep
+# `gates` (full test + hermetic) for behavior/schema changes.
+pin-audit:
+	python3 scripts/pin-audit.py
+
+gates-pin: pin-audit lint docs-check ci-gates-parity
 
 # Alias kept so a CI parity check and a local run name the same set.
 gates-ci: $(GATES)
