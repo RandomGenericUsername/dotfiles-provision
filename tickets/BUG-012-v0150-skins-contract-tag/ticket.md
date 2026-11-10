@@ -63,25 +63,83 @@ Appearance v2 envelope: expected schema_major 2, canonical tag v0.7.0 ...
 
 ## Acceptance
 
-- [ ] `verify_skins_expected_contract_tag` is **v0.9.0**; every related
+- [x] `verify_skins_expected_contract_tag` is **v0.9.0**; every related
       skins/appearance schema-envelope mirror under `ansible/roles/verify`
       agrees.
-- [ ] The deployed envelope assertion accepts the released assets v0.15.0
+- [x] The deployed envelope assertion accepts the released assets v0.15.0
       shape and includes `generation-manifest.schema.json` in the hash-checked
       contract set, without weakening schema_major, canonical tag, delegates,
       token groups or resolved `tokens.json` checks.
-- [ ] Tests cover the v0.15.0/v0.9.0 positive fixture, reject stale v0.7.0 /
+- [x] Tests cover the v0.15.0/v0.9.0 positive fixture, reject stale v0.7.0 /
       v0.14.0 canonical tags, reject a missing/wrong canonical tag, and keep the
       contracts v0.9.0 host-bearing generation fixture green.
-- [ ] v0.1.51's contracts v0.9.0 / assets v0.15.0 mirrors and all v3 behavior
+- [x] v0.1.51's contracts v0.9.0 / assets v0.15.0 mirrors and all v3 behavior
       are preserved.
-- [ ] Targeted verify/assets/skins tests, `make gates` and
+- [x] Targeted verify/assets/skins tests, `make gates` and
       `make ci-gates-parity` pass; engine `0.1.52`; annotated tag `v0.1.52`;
       GitHub Release carries only the 0.1.52 sdist/wheel; no apply.
 
 ## Evidence
 
-Recorded after the gates complete.
+Implementation commit `7bced357`; planning commit `0bef479`.
+
+Exact changes:
+
+- `ansible/roles/verify/vars/main.yml`:
+  `verify_skins_expected_contract_tag: v0.7.0` → **`v0.9.0`**;
+  `verify_skins_contract_files` gains
+  `generation-manifest.schema.json` (seven names → eight including `PIN`).
+- `ansible/roles/verify/tasks/main.yml`: the envelope assertion keeps
+  `schema_major == 2`, the `v0.9.0` canonical tag, the exact
+  `artifact/json/manifest` delegate keys, the five token groups and the
+  `appearance-json.schema.json` resolved-document path, and adds an explicit
+  check that `canonical.vendored_paths` contains all four canonical schemas:
+  `appearance-manifest`, `appearance-json`, `appearance-artifact` and
+  `generation-manifest`. No check was relaxed.
+- `ansible/roles/assets/tasks/main.yml`: stale comment corrected to
+  `schema_major 2` / assets v0.15.0 (no behavior change).
+- `tests/unit/test_verify_role.py`: the deployed fixture now models the real
+  v0.15.0 `skins/schema.json` (`canonical.tag v0.9.0`, seven canonical paths,
+  vendored generation schema) and the PIN (`contracts=v0.9.0`); adds positive
+  v0.15.0/v0.9.0, stale v0.7.0/v0.14.0, missing canonical tag, missing
+  generation path and missing generation contract cases.
+- `pyproject.toml`/`uv.lock` `0.1.51` → `0.1.52`, plus the `CHANGELOG.md`
+  0.1.52 entry.
+
+Audit against the deployed assets v0.15.0 `skins/schema.json` (read-only):
+schema_major `2`; canonical.tag `v0.9.0`; `canonical.vendored` `true`;
+delegates exactly `artifact`/`json`/`manifest`; `generation-manifest.schema.json`
+present in `canonical.paths` and `canonical.vendored_paths` (the released
+envelope keeps generation as a vendored canonical schema, not a fourth
+delegates key); five `frozen.token_groups`; resolved document
+`skins/contracts/appearance-json.schema.json`; PIN `contracts=v0.9.0` with
+seven sha256 lines. A direct Ansible probe of those exact conditions against
+`/home/inumaki/.local/share/dotfiles/assets/v0.15.0/skins/schema.json` →
+`All assertions passed`, `failed=0`.
+
+Gates and tests:
+
+- Targeted `TestVerifySkinPlane` + assets schema contract +
+  `test_skins_pin_is_v0150...` → **25 passed** (380.31s).
+- Targeted new envelope cases → **6 passed** (153.68s).
+- `TestVerifyRuntime::test_verify_accepts_a_host_bearing_generation` (contracts
+  v0.9.0 host-bearing generation fixture) → **1 passed** (276.64s).
+- `make gates` → **rc 0** (`/tmp/opencode/bug012-gates.log`):
+  - `test`: **1017 passed, 3 skipped, 67 deselected** in 2333.40s
+  - `lint`: **All checks passed**
+  - `hermetic`: **984 passed, 36 skipped, 67 deselected** in 2200.61s
+  - `lock-check`: **Resolved 33 packages**
+  - `docs-check`: rc 0 (silent; no missing docs/symlink)
+- `make ci-gates-parity` →
+  `PASS gates=['docs-check', 'hermetic', 'lint', 'lock-check', 'test'] jobs=[...]`.
+- `make build` → rc 0; built `dotfiles_provision-0.1.52.tar.gz` and
+  `dotfiles_provision-0.1.52-py3-none-any.whl`; wheel content check PASS.
+
+Release: engine `0.1.52`, annotated tag `v0.1.52` on the fast-forward merge
+commit, GitHub Release carries only the 0.1.52 sdist and wheel. No apply and no
+live-host or composition edit. Composition can install installer v0.1.52 and
+then apply/verify against the already pinned contracts v0.9.0 / assets v0.15.0 /
+runtime v1.1.0 tuple.
 
 ## Non-goals
 
