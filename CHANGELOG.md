@@ -1,3 +1,18 @@
+## 0.1.62
+
+Pin-only release: mirror `dotfiles-assets v0.18.1` (the rofi generated
+appearance import-order fix). Contracts stay `v0.11.0`; uses `gates-pin`, with
+no behavior or schema change.
+
+- Move every engine `*_assets_pinned_tag` mirror plus the composition fixture
+  (`assets.yaml`, `program-tuple.yaml`) to assets `v0.18.1`.
+- Keep `scripts/pin-audit.py` fail-closed over the unchanged skin envelope:
+  five manifests, ten CSS targets and the rofi `rasi` artifact.
+- `v0.18.1` fixes the static rofi launcher config to import the generated
+  `appearance.rasi` last, so the collected panel/card/control/cell radii win
+  over the static fallback. The engine only re-pins the corpus; no apply,
+  runtime/assets/composition/app edits or live state writes.
+
 ## 0.1.61
 
 Pin-only release: mirror `dotfiles-assets v0.18.0` (host rectangle radii) and
