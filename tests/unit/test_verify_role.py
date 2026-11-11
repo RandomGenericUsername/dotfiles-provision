@@ -5972,11 +5972,11 @@ def _build_provisioned_layout(
         '@import url("appearance.css");\n'
     )
     # Rendered kitty config (kitty_config role): verify checks the FINAL
-    # kitty.conf (through the ~/.config/kitty link) and greps the runtime
-    # palette include line (current/colors.kitty).
+    # kitty.conf (through the ~/.config/kitty link) for the absolute palette
+    # include first, generated appearance.conf second and local.conf last.
     (install / "config" / "kitty" / "kitty.conf").write_text(
         "# managed by provisioning\n"
-        "include <STATE>/dotfiles/current/colors.kitty\n"
+        f"include {state_home}/dotfiles/current/colors.kitty\n"
         "include appearance.conf\n"
         "include local.conf\n"
         "auto_reload_config -1\n"
