@@ -76,10 +76,19 @@ def _render_task() -> dict[str, object]:
     return matches[0]
 
 
-def _local_conf_task() -> dict[str, object]:
-    matches = [t for t in _load_tasks() if _module_key(t) == "ansible.builtin.copy"]
-    assert len(matches) == 1, f"expected exactly one copy task; found {len(matches)}"
+def _copy_task(dest: str) -> dict[str, object]:
+    matches = [
+        t
+        for t in _load_tasks()
+        if _module_key(t) == "ansible.builtin.copy"
+        and str(_module(t).get("dest")) == dest
+    ]
+    assert len(matches) == 1, f"expected exactly one copy task for {dest}; found {len(matches)}"
     return matches[0]
+
+
+def _local_conf_task() -> dict[str, object]:
+    return _copy_task("{{ kitty_config_spine_dir }}/local.conf")
 
 
 
@@ -90,11 +99,7 @@ def _vars() -> dict[str, Any]:
 
 
 class TestKittyConfigRoleTree:
-    _REQUIRED_FILES = (
-        "tasks/main.yml",
-        "vars/main.yml",
-        "templates/kitty.conf.j2",
-    )
+    _REQUIRED_FILES = ("tasks/main.yml", "vars/main.yml")
 
     def test_role_tree_exists(self) -> None:
         for relative in self._REQUIRED_FILES:
@@ -116,16 +121,27 @@ class TestKittyConfigTasks:
         that = str(_module(first).get("that", ""))
         assert "install_dir is defined" in that
 
-    def test_render_task_targets_final_kitty_conf(self) -> None:
+    def test_render_task_reads_the_pinned_kitty_body(self) -> None:
         task = _render_task()
         module = _module(task)
-        assert str(module.get("dest")) == "{{ kitty_config_spine_dir }}/kitty.conf", (
-            "render dest must be {{ kitty_config_spine_dir }}/kitty.conf (final, not .j2)"
+        assert str(module.get("src")) == (
+            "{{ kitty_config_assets_templates_dir }}/kitty/kitty.conf.j2"
+        ), "render src must be the pinned assets kitty.conf.j2 body"
+        dest = str(module.get("dest"))
+        assert "kitty_config_corpus_template_path" in dest
+        assert "kitty_config_spine_dir ~ '/kitty.conf'" in dest, (
+            "the check-mode branch must target the final kitty.conf"
         )
-        assert str(module.get("src")) == "kitty.conf.j2", (
-            "render src must be the role-local wrapper; it renders the pinned "
-            "assets body and inserts the generated appearance hop"
-        )
+
+    def test_final_copy_writes_the_appearance_include(self) -> None:
+        task = _copy_task("{{ kitty_config_spine_dir }}/kitty.conf")
+        module = _module(task)
+        content = str(module.get("content"))
+        assert "lookup('ansible.builtin.file', kitty_config_corpus_template_path" in content
+        assert "kitty_config_appearance_include" in content
+        assert task.get("when") == "not ansible_check_mode"
+        include = str(_vars()["kitty_config_appearance_include"])
+        assert include == "include appearance.conf\ninclude local.conf"
 
     def test_local_conf_copy_is_create_only(self) -> None:
         """local.conf must be created ONLY IF ABSENT (force: false) so a user's
@@ -196,20 +212,7 @@ class TestKittyConfigVars:
 
 
 class TestKittyConfigTemplate:
-    def test_wrapper_renders_the_corpus_body_and_inserts_appearance(self) -> None:
-        """The role owns only the one generated hop; the corpus owns structure."""
-        wrapper = (_ROLES_DIR / "templates" / "kitty.conf.j2").read_text()
-        assert "lookup('ansible.builtin.template', kitty_config_assets_template_path)" in wrapper
-        assert "replace('include local.conf'" in wrapper
-        assert "include appearance.conf" in wrapper
-        assert "include local.conf" in wrapper
-        data = _vars()
-        path = str(data["kitty_config_assets_template_path"])
-        assert path == (
-            "{{ kitty_config_assets_templates_dir }}/kitty/kitty.conf.j2"
-        )
-
-    def test_template_contains_the_exact_managed_config(self) -> None:
+    def test_corpus_body_is_the_pinned_template(self) -> None:
         text = assets_templates.template_file(_KITTY_TEMPLATE, "kitty_config").read_text()
         assert "include {{ kitty_config_state_current_dir }}/colors.kitty" in text, (
             "the template must include the runtime palette at the absolute state path"

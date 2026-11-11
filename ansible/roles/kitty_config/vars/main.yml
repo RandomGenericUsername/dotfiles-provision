@@ -29,10 +29,17 @@ kitty_config_spine_dir: "{{ install_dir | trim }}/config/kitty"
 #   parity test; trim lock on the seam.
 kitty_config_assets_pinned_tag: v0.19.0
 kitty_config_assets_templates_dir: "{{ install_dir | trim }}/assets/{{ kitty_config_assets_pinned_tag }}/templates"
-# kitty_config_assets_template_path: the static corpus body. The role-local
-#   wrapper renders it, then inserts the generated appearance.conf include
-#   before local.conf so user overrides still win.
-kitty_config_assets_template_path: "{{ kitty_config_assets_templates_dir }}/kitty/kitty.conf.j2"
+# kitty_config_corpus_template_path: the scratch file the corpus body renders
+#   to before the final assembly. Deterministic (never a mkdtemp path) so the
+#   template stays check-mode safe and re-runs content-compare cleanly. The
+#   final file adds the generated appearance.conf include before local.conf.
+kitty_config_corpus_template_path: "{{ kitty_config_spine_dir }}/.kitty.conf.corpus"
+# kitty_config_appearance_include: the two-line replacement for the corpus
+#   body's `include local.conf` line. A YAML block scalar carries the newline;
+#   Jinja string literals do not interpret `\n`.
+kitty_config_appearance_include: |-
+  include appearance.conf
+  include local.conf
 
 # kitty_config_xdg_state_home: the state home the runtime owns
 #   ($XDG_STATE_HOME, AD-5: <state>/dotfiles/) — the rendered kitty.conf reads
