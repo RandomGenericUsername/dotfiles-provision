@@ -1,0 +1,1 @@
+{{ lookup('ansible.builtin.template', kitty_config_assets_template_path) | replace('include local.conf', 'include appearance.conf\ninclude local.conf') }}

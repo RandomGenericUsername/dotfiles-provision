@@ -82,13 +82,6 @@ def _local_conf_task() -> dict[str, object]:
     return matches[0]
 
 
-def _appearance_include_task() -> dict[str, object]:
-    matches = [
-        t for t in _load_tasks() if _module_key(t) == "ansible.builtin.lineinfile"
-    ]
-    assert len(matches) == 1, f"expected exactly one lineinfile task; found {len(matches)}"
-    return matches[0]
-
 
 def _vars() -> dict[str, Any]:
     data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
@@ -97,7 +90,11 @@ def _vars() -> dict[str, Any]:
 
 
 class TestKittyConfigRoleTree:
-    _REQUIRED_FILES = ("tasks/main.yml", "vars/main.yml")
+    _REQUIRED_FILES = (
+        "tasks/main.yml",
+        "vars/main.yml",
+        "templates/kitty.conf.j2",
+    )
 
     def test_role_tree_exists(self) -> None:
         for relative in self._REQUIRED_FILES:
@@ -125,21 +122,10 @@ class TestKittyConfigTasks:
         assert str(module.get("dest")) == "{{ kitty_config_spine_dir }}/kitty.conf", (
             "render dest must be {{ kitty_config_spine_dir }}/kitty.conf (final, not .j2)"
         )
-        assert str(module.get("src")) == (
-            "{{ kitty_config_assets_templates_dir }}/kitty/kitty.conf.j2"
-        ), (
-            "render src must be the kitty.conf.j2 template read from the pinned assets "
-            "templates class (S3: the role no longer carries a templates/ dir)"
+        assert str(module.get("src")) == "kitty.conf.j2", (
+            "render src must be the role-local wrapper; it renders the pinned "
+            "assets body and inserts the generated appearance hop"
         )
-
-    def test_appearance_include_is_inserted_before_local(self) -> None:
-        """The generated appearance hop sits between colors and local.conf."""
-        module = _module(_appearance_include_task())
-        assert module["path"] == "{{ kitty_config_spine_dir }}/kitty.conf"
-        assert module["line"] == "include appearance.conf"
-        assert module["regexp"] == "^include appearance\\.conf$"
-        assert module["insertbefore"] == "^include local\\.conf$"
-        assert module.get("firstmatch") is True
 
     def test_local_conf_copy_is_create_only(self) -> None:
         """local.conf must be created ONLY IF ABSENT (force: false) so a user's
@@ -210,6 +196,19 @@ class TestKittyConfigVars:
 
 
 class TestKittyConfigTemplate:
+    def test_wrapper_renders_the_corpus_body_and_inserts_appearance(self) -> None:
+        """The role owns only the one generated hop; the corpus owns structure."""
+        wrapper = (_ROLES_DIR / "templates" / "kitty.conf.j2").read_text()
+        assert "lookup('ansible.builtin.template', kitty_config_assets_template_path)" in wrapper
+        assert "replace('include local.conf'" in wrapper
+        assert "include appearance.conf" in wrapper
+        assert "include local.conf" in wrapper
+        data = _vars()
+        path = str(data["kitty_config_assets_template_path"])
+        assert path == (
+            "{{ kitty_config_assets_templates_dir }}/kitty/kitty.conf.j2"
+        )
+
     def test_template_contains_the_exact_managed_config(self) -> None:
         text = assets_templates.template_file(_KITTY_TEMPLATE, "kitty_config").read_text()
         assert "include {{ kitty_config_state_current_dir }}/colors.kitty" in text, (

@@ -46,21 +46,12 @@
 
 - name: Render kitty.conf
   ansible.builtin.template:
-    src: "{{ kitty_config_assets_templates_dir }}/kitty/kitty.conf.j2"
+    # The role-local wrapper renders the pinned corpus body and adds the one
+    # provisioning-owned hop before local.conf. The corpus keeps ownership of
+    # the app-owned structure; this wrapper prevents a second render+insert
+    # pass from looking changed on every run.
+    src: kitty.conf.j2
     dest: "{{ kitty_config_spine_dir }}/kitty.conf"
-
-# The static corpus body owns the app-owned structure (palette include first,
-# local include last, auto_reload_config -1). Provisioning owns only the single
-# generated appearance hop: insert it before local.conf so the user's
-# overrides still win. `regexp` + `insertbefore` makes the insertion
-# idempotent and keeps the line in place if it is already present.
-- name: Include the generated appearance projection before local overrides
-  ansible.builtin.lineinfile:
-    path: "{{ kitty_config_spine_dir }}/kitty.conf"
-    regexp: '^include appearance\.conf$'
-    line: 'include appearance.conf'
-    insertbefore: '^include local\.conf$'
-    firstmatch: true
 
 - name: Ensure local.conf exists (never clobber user overrides)
   ansible.builtin.copy:
