@@ -33,7 +33,7 @@
 - [REQ-034-host-defaults-mirrors/ticket.md](./REQ-034-host-defaults-mirrors/ticket.md) — Mirror contracts v0.9.0 and assets v0.15.0 for the host-defaults cutover | `done` | worktree: .worktrees/REQ-034/ | branch: ticket/REQ-034-host-defaults-mirrors | tag: v0.1.51
 - [REQ-035-assets-v0151/ticket.md](./REQ-035-assets-v0151/ticket.md) — Mirror dotfiles-assets v0.15.1 (wlogout static ownership fix) | `done` | worktree: .worktrees/REQ-035/ | branch: ticket/REQ-035-assets-v0151 | tag: v0.1.53
 - [REQ-036-assets-v0152-pin/ticket.md](./REQ-036-assets-v0152-pin/ticket.md) — Mirror dotfiles-assets v0.15.2 and add the local pin-only gate lane | `done` | worktree: .worktrees/REQ-036/ | branch: ticket/REQ-036-assets-v0152-pin | tag: v0.1.56
-- [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `in-progress` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0
+- [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `done` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0 | tag: v0.1.59
 
 ## Bugs
 
@@ -87,3 +87,4 @@
 - [REQ-008-ags-app-install-topology](./REQ-008-ags-app-install-topology/ticket.md) — Generic per-app AGS install topology and one-owner cutover | `done` | worktree .worktrees/REQ-008, branch ticket/REQ-008-ags-app-install-topology | tags: v0.1.18 (topology), v0.1.19 (adoption tuple)
 - [REQ-037-assets-v0153/ticket.md](./REQ-037-assets-v0153/ticket.md) — Mirror dotfiles-assets v0.15.3 (wlogout card-state correctness) | `done` | worktree: .worktrees/REQ-037/ | branch: ticket/REQ-037-assets-v0153 | tag: v0.1.57
 - [REQ-038-assets-v0160/ticket.md](./REQ-038-assets-v0160/ticket.md) — Mirror dotfiles-assets v0.16.0 (terminal-host skin) | `done` | worktree: .worktrees/REQ-038/ | branch: ticket/REQ-038-assets-v0160 | tag: v0.1.58
+- [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `done` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0 | tag: v0.1.59

@@ -2,7 +2,7 @@
 id: REQ-039
 title: "Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -42,15 +42,83 @@ Harden the consumer plane before any runtime/composition cutover:
 
 ## Acceptance
 
-- [ ] `pin-audit` fails on a missing/extra skin manifest name or target file,
+- [x] `pin-audit` fails on a missing/extra skin manifest name or target file,
       with regression tests covering the five names and `terminal-host`.
-- [ ] Fresh wlogout provisioning with no appearance link writes a regular
+- [x] Fresh wlogout provisioning with no appearance link writes a regular
       fallback `config/wlogout/appearance.css`; it parses as GTK3 CSS.
-- [ ] An existing stable `appearance.css` symlink is preserved by the fallback
+- [x] An existing stable `appearance.css` symlink is preserved by the fallback
       task (no clobber).
-- [ ] `state_links` replaces the regular fallback with the
+- [x] `state_links` replaces the regular fallback with the
       `current/appearance/wlogout.css` symlink after the seed; no stale
       fallback remains.
-- [ ] Full `make gates` and `make ci-gates-parity` pass; evidence recorded.
-- [ ] Engine `0.1.59` tagged/released with only its wheel/sdist; no apply and
+- [x] Full `make gates` and `make ci-gates-parity` pass; evidence recorded.
+- [x] Engine `0.1.59` tagged/released with only its wheel/sdist; no apply and
       no composition/runtime/app/contract edits.
+
+## Evidence
+
+Full gates on the REQ-039 worktree at `ff81d42` (clean tree; the following
+evidence-only commit changes no code):
+
+| Gate | Result |
+| --- | --- |
+| `make test` / test | `1031 passed, 3 skipped, 67 deselected` |
+| `make lint` / lint | `All checks passed` |
+| `make hermetic` / hermetic | `996 passed, 38 skipped, 67 deselected` |
+| `make lock-check` / lock-check | clean |
+| `make docs-check` / docs-check | clean |
+| `make ci-gates-parity` | `PASS` |
+
+Pin-audit portion (`make gates-pin` before the behavior merge):
+
+```text
+pin-audit: PASS (assets=v0.16.0, contracts=v0.9.0, platform=v1.0.1, apps=7, skins=5, targets=8)
+python3 scripts/ci-gates-parity.py
+PASS gates=['docs-check', 'hermetic', 'lint', 'lock-check', 'test'] jobs=[...]
+```
+
+Targeted behavior proof (assets corpus provided):
+
+```bash
+uv run pytest -q tests/unit/test_verify_role.py::TestVerifySkinPlane \
+  tests/unit/test_pin_audit.py tests/unit/test_wlogout_config_role.py \
+  tests/unit/test_v3_locality.py
+# 63 passed
+```
+
+Exact fallback behavior:
+
+- Fresh no-link run: the role's stat (`follow: false`) sees no path, then
+  `copy force: false` writes an empty regular
+  `<install>/config/wlogout/appearance.css`; the system GTK3 `CssProvider`
+  probe parses it with zero parsing errors.
+- Existing stable symlink: the stat sees the link itself and the
+  create-if-absent task is skipped; the symlink target and content are
+  unchanged.
+- Seeded run: `state_links` (`file state: link force: true`) replaces the
+  regular fallback with
+  `$XDG_STATE_HOME/dotfiles/current/appearance/wlogout.css`; a test asserts
+  the fallback content is gone and the raw link target is correct.
+- No runtime artifact or app-tag write; no live-reload lane.
+
+Exact pin-audit behavior:
+
+- `verify_skins_manifest_names` must be exactly
+  `glass, flat, paper, terminal, terminal-host`.
+- `verify_skins_template_files` must be exactly the eight released targets:
+  the seven AGS templates plus `wlogout.gtk.css.j2`.
+- Regression tests fail on a missing `terminal-host`, an extra manifest, a
+  missing wlogout target, and an extra target.
+
+Composition pin needed: `dotfiles-provision` installer **v0.1.59**. No
+composition/runtime/app/contract file is edited here and `apply` is not run.
+
+## Commits
+
+- `65d4fda` — plan
+- `c08d53f` — pin-audit skin manifest/target coverage
+- `02bd7b2` — wlogout bootstrap appearance fallback
+- `786384e` — fallback link replacement + terminal-host fixture tests
+- `82a3638` — expect all five released skin manifests
+- `ff81d42` — release 0.1.59 metadata
+- evidence close commit follows
