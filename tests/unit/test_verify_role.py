@@ -2240,10 +2240,10 @@ class TestVerifyVars:
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_skins_pin_is_v0180_with_the_v0110_contract_and_templates(self) -> None:
-        """REQ-041: assets v0.18.0 ships five manifests, ten CSS targets plus
+        """REQ-041: assets v0.18.1 ships five manifests, ten CSS targets plus
         the rofi artifact and the contracts v0.11.0 plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.18.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.18.1"
         assert str(data["verify_skins_expected_contract_tag"]) == "v0.11.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
@@ -3747,7 +3747,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_accepts_the_assets_v0180_v0110_envelope(
         self, tmp_path: Path
     ) -> None:
-        """REQ-041: the released assets v0.18.0 skins schema names contracts
+        """REQ-041: the released assets v0.18.1 skins schema names contracts
         v0.11.0 and vendors the fourth canonical (generation) schema."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
