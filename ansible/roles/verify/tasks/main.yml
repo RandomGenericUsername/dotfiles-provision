@@ -2365,6 +2365,9 @@
         verify_generation_manifest.host.version == 1 and
         verify_generation_manifest.host.fingerprint is match('^[0-9a-f]{64}$') and
         verify_generation_manifest.host.defaults | length > 0 and
+        verify_generation_manifest.host.defaults | dict2items
+        | map(attribute='key') | difference(verify_generation_host_default_paths)
+        | length == 0 and
         verify_generation_manifest.intent.host is defined and
         verify_generation_manifest.intent.host ==
         verify_generation_manifest.host.fingerprint)
@@ -2405,7 +2408,8 @@
       declare {{ verify_generation_tokens_path }} plus one
       appearance/<configDir>.css target per app, mode must agree across
       mode/skin/intent, and an optional host block must carry a hyprland v1
-      fingerprint with non-empty defaults plus a matching intent.host. Every
+      fingerprint with non-empty defaults drawn only from the v0.12.0
+      window/panel/rectangle allowlist plus a matching intent.host. Every
       optional non-CSS artifact must name appearance/<consumer>.<format> with
       format rasi/conf/theme (never .css), be unique across both families and
       resolve as a regular file. A v2 current directory, a torn manifest, a
@@ -2871,7 +2875,7 @@
       sheet last (W-2.6): {{ verify_wlogout_appearance_import.stderr | default('') }}.
       Expected the palette import first and `@import url("appearance.css");`
       last, with wallpaper/icons/layout/transitions kept app-owned. The
-      wlogout_config role renders the pinned assets v0.18.1 style.css.tpl; run
+      wlogout_config role renders the pinned assets v0.19.0 style.css.tpl; run
       the wlogout-config playbook (needs assets + runtime-seed first).
   when: not ansible_check_mode
 
@@ -2897,26 +2901,93 @@
       the file if a hand copy restored it.
   when: not ansible_check_mode
 
-- name: Check rendered kitty.conf includes the runtime palette
+- name: Check rendered kitty.conf import order and the generated appearance conf
   ansible.builtin.command:
     argv:
-      - grep
-      - -E
-      - 'current/colors\.kitty'
+      - "{{ ansible_python_interpreter | default('python3') }}"
+      - -c
+      - |
+        import sys
+        from pathlib import Path
+
+        kitty = Path(sys.argv[1])
+        generated = Path(sys.argv[2])
+        failures = []
+        if not kitty.is_file():
+            failures.append(f"{kitty}: missing rendered static kitty config")
+            lines = []
+        else:
+            lines = kitty.read_text().splitlines()
+
+        def index_of(predicate):
+            for index, line in enumerate(lines):
+                if predicate(line.strip()):
+                    return index
+            return None
+
+        def is_colors_include(line):
+            parts = line.split(maxsplit=1)
+            return (
+                len(parts) == 2
+                and parts[0] == "include"
+                and Path(parts[1]).name == "colors.kitty"
+                and Path(parts[1]).is_absolute()
+            )
+
+        colors = index_of(is_colors_include)
+        appearance = index_of(lambda line: line == "include appearance.conf")
+        local = index_of(lambda line: line == "include local.conf")
+        if colors is None:
+            failures.append(f"{kitty}: missing the absolute colors.kitty include")
+        if appearance is None:
+            failures.append(f"{kitty}: missing `include appearance.conf`")
+        if local is None:
+            failures.append(f"{kitty}: missing `include local.conf`")
+        if None not in (colors, appearance, local) and not (
+            colors < appearance < local
+        ):
+            failures.append(
+                f"{kitty}: import order is colors={colors}, "
+                f"appearance={appearance}, local={local}; expected colors first, "
+                "appearance second and local.conf last"
+            )
+        body = [
+            line.strip()
+            for line in lines
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        if not body or not is_colors_include(body[0]):
+            failures.append(
+                f"{kitty}: the first managed line is not the colors.kitty include"
+            )
+        if not generated.is_file():
+            failures.append(
+                f"{generated}: missing generated appearance/kitty.conf; the "
+                "runtime must commit the kitty conf artifact"
+            )
+        if failures:
+            print("\n".join(failures), file=sys.stderr)
+            raise SystemExit(1)
+        print("kitty import order ok: colors -> appearance -> local")
       - "{{ verify_xdg_config_home }}/kitty/kitty.conf"
+      - "{{ verify_state_appearance_dir }}/kitty.conf"
   register: verify_kitty_wiring
   changed_when: false
   failed_when: false
   when: not ansible_check_mode
 
-- name: Assert rendered kitty.conf includes the runtime palette
+- name: Assert rendered kitty.conf imports colors, appearance and local in order
   ansible.builtin.assert:
     that: verify_kitty_wiring.rc == 0
     fail_msg: >-
-      the rendered kitty.conf does not include the runtime palette (expected the
-      colors.kitty artifact to be included from the runtime state current dir —
-      kitty terminal config). The kitty_config role renders kitty.conf.j2 →
-      kitty.conf; run the kitty-config playbook first
+      the rendered kitty.conf does not import the runtime palette first, the
+      generated appearance.conf second and local.conf last, or the generated
+      {{ verify_state_appearance_dir }}/kitty.conf is absent:
+      {{ verify_kitty_wiring.stderr | default('') }}. The kitty_config role
+      renders the pinned static template and inserts the one appearance hop;
+      the runtime publishes current/appearance/kitty.conf through the
+      state_links appearance.conf link. Run runtime-seed and the kitty-config
+      playbook.
   when: not ansible_check_mode
 
 # ── btop integration (provision-btop-config) ────────────────────────────────

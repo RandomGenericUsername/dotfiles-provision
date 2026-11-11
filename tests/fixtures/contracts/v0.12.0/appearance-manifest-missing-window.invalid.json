@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "name": "glass",
+  "groups": {
+    "surface": {
+      "panel": {
+        "bg": "linear-gradient(180deg, alpha(@surface, 0.72), alpha(@surface_container, 0.82))",
+        "border": "color-mix(in srgb, @outline 60%, transparent)",
+        "border-width": 1.5,
+        "radius": 18,
+        "padding": 11,
+        "shadow": "0 8px 24px alpha(@shadow, 0.35)",
+        "blur": "blur(18px) saturate(1.2)"
+      },
+      "card": {
+        "bg": "alpha(@surface_container_high, 0.55)",
+        "border": "alpha(@on_surface, 0.1)",
+        "border-width": 1,
+        "radius": 14,
+        "padding": 10
+      },
+      "cell": {
+        "bg": "transparent",
+        "border": "transparent",
+        "border-width": 0,
+        "radius": 10,
+        "padding": 8,
+        "hover-bg": "alpha(@on_surface, 0.08)"
+      },
+      "control": {
+        "bg": "alpha(@surface_container, 0.45)",
+        "border": "alpha(@on_surface, 0.26)",
+        "border-width": 1,
+        "radius": 8,
+        "padding": 4,
+        "font-size": 12,
+        "font-weight": 600
+      },
+      "pill": {
+        "bg": "alpha(@on_surface, 0.12)",
+        "border": "alpha(@on_surface, 0.14)",
+        "border-width": 1,
+        "radius": 20,
+        "padding": 2,
+        "font-size": 9.5,
+        "letter-spacing": 0.05
+      }
+    },
+    "state": {
+      "hover": {
+        "fill": "alpha(@on_surface, 0.08)",
+        "ink": "@on_surface",
+        "ring": "@primary"
+      },
+      "selected": {
+        "fill": "@primary_container",
+        "ink": "@on_primary_container",
+        "ring": "@primary"
+      },
+      "focus": {
+        "fill": "transparent",
+        "ink": "@on_surface",
+        "ring": "@primary"
+      },
+      "disabled": {
+        "fill": "transparent",
+        "ink": "alpha(@on_surface, 0.45)",
+        "ring": "transparent"
+      }
+    },
+    "type": {
+      "font-family": "Inter, sans-serif",
+      "font-weight": 600,
+      "letter-spacing": 0.05,
+      "size-caption": 10.5,
+      "size-meta": 11,
+      "size-body": 12,
+      "size-title": 15,
+      "size-display": 20
+    },
+    "ink": {
+      "ink": "@on_surface",
+      "ink-dim": "alpha(@on_surface_variant, 0.8)",
+      "accent": "@primary",
+      "accent-muted": "alpha(@primary, 0.45)",
+      "ink-over": "auto"
+    },
+    "layout": {
+      "bar": {
+        "panel-width": 380,
+        "bt-list-spacing": 8,
+        "bar-row-height": 32,
+        "chip-min": 72
+      }
+    }
+  }
+}

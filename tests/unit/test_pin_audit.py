@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 _ENGINE_ROOT = Path(__file__).resolve().parents[2]
@@ -60,7 +61,7 @@ def test_repository_pin_audit_passes() -> None:
     assert "pin-audit: PASS" in result.stdout
     assert "skins=5" in result.stdout
     assert "targets=10" in result.stdout
-    assert "artifacts=1" in result.stdout
+    assert "artifacts=2" in result.stdout
 
 
 def test_missing_terminal_host_manifest_fails(tmp_path: Path) -> None:
@@ -114,17 +115,18 @@ def test_missing_gtk_consumer_target_fails(tmp_path: Path) -> None:
     assert "gtk3.gtk.css.j2" in result.stderr
 
 
-def test_missing_skin_artifact_fails(tmp_path: Path) -> None:
+@pytest.mark.parametrize("artifact", ["rofi.rasi.j2", "kitty.conf.j2"])
+def test_missing_skin_artifact_fails(tmp_path: Path, artifact: str) -> None:
     root = _minimal_root(tmp_path)
     _edit_verify_list(
         root,
         "verify_skins_artifact_files",
-        lambda files: files.remove("rofi.rasi.j2"),
+        lambda files: files.remove(artifact),
     )
     result = _run(root)
     assert result.returncode == 1
     assert "verify_skins_artifact_files" in result.stderr
-    assert "rofi.rasi.j2" in result.stderr
+    assert artifact in result.stderr
 
 
 def test_extra_skin_target_fails(tmp_path: Path) -> None:
@@ -144,7 +146,7 @@ def test_extra_skin_artifact_fails(tmp_path: Path) -> None:
     _edit_verify_list(
         root,
         "verify_skins_artifact_files",
-        lambda files: files.append("kitty.conf.j2"),
+        lambda files: files.append("btop.conf.j2"),
     )
     result = _run(root)
     assert result.returncode == 1

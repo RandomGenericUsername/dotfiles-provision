@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -299,6 +300,16 @@ def _skin_manifest_body(name: str) -> str:
         "schemaVersion = 2",
         f'name = "{name}"',
         "",
+        "[groups.surface.window]",
+        'bg = "alpha(@surface, 0.94)"',
+        'border = "@primary"',
+        "border-width = 1.5",
+        f"radius = {panel_radius}",
+        "padding = 11",
+        'shadow = "none"',
+        'blur = "none"',
+        "opacity = 0.94",
+        "",
         "[groups.surface.panel]",
         'bg = "alpha(@surface, 0.94)"',
         'border = "@primary"',
@@ -388,6 +399,16 @@ def _skin_manifest_body(name: str) -> str:
         # override replaces the whole group, not individual roles.
         lines.extend(
             [
+                "[mode.light.surface.window]",
+                'bg = "@surface_container_lowest"',
+                'border = "alpha(@on_surface, 0.16)"',
+                "border-width = 1",
+                "radius = 6",
+                "padding = 11",
+                'shadow = "none"',
+                'blur = "none"',
+                "opacity = 1.0",
+                "",
                 "[mode.light.surface.panel]",
                 'bg = "@surface_container_lowest"',
                 'border = "alpha(@on_surface, 0.22)"',
@@ -446,6 +467,7 @@ _SKIN_TEMPLATE_FILES = (
     "gtk4.gtk.css.j2",
     "wlogout.gtk.css.j2",
     "rofi.rasi.j2",
+    "kitty.conf.j2",
 )
 
 
@@ -469,7 +491,7 @@ def _write_deployed_skins(spine: Path) -> None:
             {
                 "schema_major": 2,
                 "canonical": {
-                    "tag": "v0.11.0",
+                    "tag": "v0.12.0",
                     "vendored": True,
                     "paths": [
                         "schemas/appearance-manifest.schema.json",
@@ -511,7 +533,7 @@ def _write_deployed_skins(spine: Path) -> None:
         )
         + "\n"
     )
-    pin_lines = ["contracts=v0.11.0\n"]
+    pin_lines = ["contracts=v0.12.0\n"]
     for name, body in _SKIN_CONTRACT_BODIES.items():
         (contracts / name).write_text(body)
         pin_lines.append(
@@ -1885,6 +1907,7 @@ class TestVerifyTasks:
             "verify_xdg_config_home",
             "verify_xdg_state_home",
             "verify_state_current_dir",
+            "verify_state_appearance_dir",
             "verify_xdg_cache_home",
             "verify_xdg_dirs",
             "verify_install_spine_dirs",
@@ -1950,6 +1973,7 @@ class TestVerifyConsumerLinks:
             ("config/gtk-3.0/appearance.css", "appearance", "gtk3.css"),
             ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
             ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
+            ("config/kitty/appearance.conf", "appearance", "kitty.conf"),
         ):
             assert any(expected in path for path in paths), f"missing {expected}"
             assert any(
@@ -2118,6 +2142,7 @@ class TestVerifyConsumerLinkRender:
             ("config/gtk-3.0/appearance.css", "appearance", "gtk3.css"),
             ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
             ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
+            ("config/kitty/appearance.conf", "appearance", "kitty.conf"),
         ],
     )
     @pytest.mark.parametrize(
@@ -2240,11 +2265,12 @@ class TestVerifyVars:
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_skins_pin_is_v0180_with_the_v0110_contract_and_templates(self) -> None:
-        """REQ-041: assets v0.18.1 ships five manifests, ten CSS targets plus
-        the rofi artifact and the contracts v0.11.0 plane."""
+        """REQ-043: assets v0.19.0 ships five manifests, twelve templates
+        (ten CSS targets plus kitty/rofi artifacts) and the contracts v0.12.0
+        window-role plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.18.1"
-        assert str(data["verify_skins_expected_contract_tag"]) == "v0.11.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.19.0"
+        assert str(data["verify_skins_expected_contract_tag"]) == "v0.12.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
             "flat",
@@ -2266,6 +2292,7 @@ class TestVerifyVars:
         ]
         assert [str(item) for item in data["verify_skins_artifact_files"]] == [
             "rofi.rasi.j2",
+            "kitty.conf.j2",
         ]
         assert "verify_skins_template_files + verify_skins_artifact_files" in str(
             data["verify_skins_template_paths"]
@@ -2273,7 +2300,9 @@ class TestVerifyVars:
         assert "verify_skins_templates_dir" in str(
             data["verify_skins_template_paths"]
         )
-        assert len(data["verify_skins_token_paths"]) == 57
+        assert len(data["verify_skins_token_paths"]) == 65
+        assert "surface.window.border-width" in data["verify_skins_token_paths"]
+        assert "surface.window.opacity" in data["verify_skins_token_paths"]
         assert "surface.panel.border-width" in data["verify_skins_token_paths"]
         assert "hairline-w" not in data["verify_skins_token_paths"]
         placeholders = yaml.safe_load(
@@ -2282,6 +2311,7 @@ class TestVerifyVars:
                 verify_skins_token_paths=data["verify_skins_token_paths"],
             )
         )
+        assert "SKIN_SURFACE_WINDOW_OPACITY" in placeholders
         assert "SKIN_SURFACE_PANEL_BG" in placeholders
         assert "SKIN_SURFACE_PANEL_BORDER_WIDTH" in placeholders
         assert "SKIN_HAIRLINE_W" not in placeholders
@@ -3168,6 +3198,7 @@ class TestVerifyVars:
             "verify_xdg_config_home",
             "verify_xdg_state_home",
             "verify_state_current_dir",
+            "verify_state_appearance_dir",
             "verify_xdg_cache_home",
             "verify_xdg_dirs",
             "verify_install_spine_dirs",
@@ -3364,7 +3395,7 @@ class TestVerifyAgsPinMirror:
         verify_vars = _vars()
         platform_vars = _sibling_vars("ags_platform")
         assert verify_vars["verify_ags_platform_version"] == platform_vars["ags_platform_version"]
-        assert platform_vars["ags_platform_version"] == "v1.0.1"
+        assert platform_vars["ags_platform_version"] == "v1.1.0"
 
 
 class TestVerifyRuntimePinMirror:
@@ -3747,12 +3778,12 @@ class TestVerifySkinPlane:
     def test_skin_plane_accepts_the_assets_v0180_v0110_envelope(
         self, tmp_path: Path
     ) -> None:
-        """REQ-041: the released assets v0.18.1 skins schema names contracts
-        v0.11.0 and vendors the fourth canonical (generation) schema."""
+        """REQ-041: the released assets v0.19.0 skins schema names contracts
+        v0.12.0 and vendors the fourth canonical (generation) schema."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         schema = json.loads((install / "skins" / "schema.json").read_text())
-        assert schema["canonical"]["tag"] == "v0.11.0"
+        assert schema["canonical"]["tag"] == "v0.12.0"
         assert "skins/contracts/generation-manifest.schema.json" in schema[
             "canonical"
         ]["vendored_paths"]
@@ -3779,10 +3810,10 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, (
-            f"canonical tag {tag} must fail the v0.11.0 envelope gate"
+            f"canonical tag {tag} must fail the v0.12.0 envelope gate"
         )
         assert "is not the pinned Appearance v2 envelope" in output, output
-        assert "v0.11.0" in output, output
+        assert "v0.12.0" in output, output
 
     def test_skin_plane_rejects_a_missing_canonical_tag(
         self, tmp_path: Path
@@ -3802,7 +3833,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_rejects_a_missing_generation_vendored_path(
         self, tmp_path: Path
     ) -> None:
-        """BUG-012: v0.11.0 vendors generation-manifest.schema.json; dropping it
+        """BUG-012: v0.12.0 vendors generation-manifest.schema.json; dropping it
         from the envelope must fail rather than silently pass the delegate set."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
@@ -3817,7 +3848,7 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, (
-            "a missing generation vendored path must fail the v0.11.0 envelope"
+            "a missing generation vendored path must fail the v0.12.0 envelope"
         )
         assert "is not the pinned Appearance v2 envelope" in output, output
 
@@ -3849,6 +3880,138 @@ class TestVerifySkinPlane:
         output = result.stdout + result.stderr
         assert result.returncode != 0, "a tampered contract must fail verify"
         assert "does not match its sha256 line" in output, output
+
+
+    def test_skin_plane_rejects_a_missing_window_role(self, tmp_path: Path) -> None:
+        """contracts v0.12.0: surface.window is required, never aliased."""
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        manifest = install / "skins" / "manifests" / "glass.toml"
+        text = manifest.read_text()
+        start = text.index("[groups.surface.window]")
+        end = text.index("[groups.surface.panel]")
+        manifest.write_text(text[:start] + text[end:])
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a manifest without window must fail verify"
+        assert "groups.surface.window" in output, output
+
+    def test_skin_plane_rejects_an_out_of_range_window_opacity(
+        self, tmp_path: Path
+    ) -> None:
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        manifest = install / "skins" / "manifests" / "glass.toml"
+        manifest.write_text(
+            manifest.read_text().replace("opacity = 0.94", "opacity = 1.5")
+        )
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "an out-of-range opacity must fail verify"
+        assert "surface.window.opacity" in output, output
+
+    def test_skin_plane_rejects_a_missing_kitty_template(
+        self, tmp_path: Path
+    ) -> None:
+        install = tmp_path / "spine"
+        _write_deployed_skins(install)
+        (install / "skins" / "templates" / "kitty.conf.j2").unlink()
+        result = _run_verify_skin_tasks(
+            tmp_path, _selected_verify_skin_tasks(), install
+        )
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, "a missing kitty artifact must fail verify"
+        assert "incomplete" in output, output
+
+
+class TestVerifyKittyImportOrder:
+    """The rendered static kitty config must import colors, appearance, local."""
+
+    def _task(self) -> dict[str, object]:
+        matches = [
+            task
+            for task in _load_tasks()
+            if task.get("name")
+            == "Check rendered kitty.conf import order and the generated appearance conf"
+        ]
+        assert len(matches) == 1
+        return matches[0]
+
+    def _run(
+        self, kitty: Path, generated: Path
+    ) -> subprocess.CompletedProcess[str]:
+        argv = [str(part) for part in _module(self._task())["argv"]]
+        script = argv[2]
+        return subprocess.run(
+            [sys.executable, "-c", script, str(kitty), str(generated)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    def test_import_order_and_generated_conf_pass(self, tmp_path: Path) -> None:
+        kitty = tmp_path / "kitty.conf"
+        generated = tmp_path / "state" / "appearance" / "kitty.conf"
+        generated.parent.mkdir(parents=True)
+        generated.write_text("font_family monospace\n")
+        kitty.write_text(
+            "# managed by provisioning\n"
+            "include /state/dotfiles/current/colors.kitty\n"
+            "include appearance.conf\n"
+            "include local.conf\n"
+            "auto_reload_config -1\n"
+        )
+        result = self._run(kitty, generated)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "colors -> appearance -> local" in result.stdout
+
+    @pytest.mark.parametrize(
+        "body, message",
+        [
+            (
+                "include /state/colors.kitty\ninclude local.conf\n",
+                "missing `include appearance.conf`",
+            ),
+            (
+                "include /state/colors.kitty\n"
+                "include local.conf\n"
+                "include appearance.conf\n",
+                "import order is",
+            ),
+            (
+                "include appearance.conf\n"
+                "include /state/colors.kitty\n"
+                "include local.conf\n",
+                "first managed line",
+            ),
+        ],
+    )
+    def test_bad_import_order_fails(
+        self, tmp_path: Path, body: str, message: str
+    ) -> None:
+        kitty = tmp_path / "kitty.conf"
+        generated = tmp_path / "appearance" / "kitty.conf"
+        generated.parent.mkdir(parents=True)
+        generated.write_text("font_family monospace\n")
+        kitty.write_text(body)
+        result = self._run(kitty, generated)
+        assert result.returncode != 0
+        assert message in result.stderr, result.stderr
+
+    def test_missing_generated_conf_fails(self, tmp_path: Path) -> None:
+        kitty = tmp_path / "kitty.conf"
+        kitty.write_text(
+            "include /state/colors.kitty\n"
+            "include appearance.conf\n"
+            "include local.conf\n"
+        )
+        result = self._run(kitty, tmp_path / "missing.conf")
+        assert result.returncode != 0
+        assert "missing generated appearance/kitty.conf" in result.stderr
 
 
 class TestVerifyDisplayManagerGreeter:
@@ -4288,6 +4451,8 @@ class TestVerifyRuntime:
             "version": 1,
             "fingerprint": fingerprint,
             "defaults": {
+                "surface.window.radius": 12,
+                "surface.window.border-width": 1.5,
                 "surface.panel.radius": 0,
                 "surface.panel.border-width": 1,
             },
@@ -4300,7 +4465,7 @@ class TestVerifyRuntime:
         manifest_path.write_text(json.dumps(manifest) + "\n")
 
     def test_verify_accepts_a_host_bearing_generation(self) -> None:
-        """contracts v0.11.0: the optional host block is valid runtime output."""
+        """contracts v0.12.0: the optional host block is valid runtime output."""
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")
@@ -5572,8 +5737,10 @@ def _build_provisioned_layout(
             {"configDir": config_dir, "path": f"appearance/{config_dir}.css"}
         )
     (appearance / "rofi.rasi").write_text("* { surface: transparent; }\n")
+    (appearance / "kitty.conf").write_text("font_family monospace\n")
     artifacts = [
-        {"consumer": "rofi", "path": "appearance/rofi.rasi", "format": "rasi"}
+        {"consumer": "rofi", "path": "appearance/rofi.rasi", "format": "rasi"},
+        {"consumer": "kitty", "path": "appearance/kitty.conf", "format": "conf"},
     ]
     manifest = {
         "version": 3,
@@ -5613,6 +5780,7 @@ def _build_provisioned_layout(
         ("config/gtk-3.0/appearance.css", "appearance", "gtk3.css"),
         ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
         ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
+        ("config/kitty/appearance.conf", "appearance", "kitty.conf"),
     ):
         pointer = install / rel
         pointer.parent.mkdir(parents=True, exist_ok=True)
@@ -5682,7 +5850,7 @@ def _build_provisioned_layout(
     # installed by the ags_platform role as ONE versioned unit, NOT mirrored
     # per file under config/ags. The fixture mirrors verify_ags_platform_unit_dir
     # / _pin_file / _shortcut so the criterion asserts have something to pass on.
-    unit = install / "ags-platform" / "v1.0.1"
+    unit = install / "ags-platform" / "v1.1.0"
     (unit / "ports").mkdir(parents=True, exist_ok=True)
     (unit / "adapters").mkdir(parents=True, exist_ok=True)
     (unit / "package.json").write_text("{}")
@@ -5694,7 +5862,7 @@ def _build_provisioned_layout(
     (unit / "adapters" / "event-bus.ts").write_text("")
     (unit / "adapters" / "icon-registry.ts").write_text("")
     (unit / "adapters" / "astal.ts").write_text("")
-    (install / "ags-platform" / "pinned").write_text("v1.0.1\n")
+    (install / "ags-platform" / "pinned").write_text("v1.1.0\n")
     # The final all-standalone AGS topology (AD-31/AD-37): every app is its
     # own immutable tag under <install>/apps/<installDir>/<tag>, resolving the
     # ONE shared apps/node_modules/ags-platform shortcut. ags_apps_units owns
@@ -5809,6 +5977,7 @@ def _build_provisioned_layout(
     (install / "config" / "kitty" / "kitty.conf").write_text(
         "# managed by provisioning\n"
         "include <STATE>/dotfiles/current/colors.kitty\n"
+        "include appearance.conf\n"
         "include local.conf\n"
         "auto_reload_config -1\n"
     )

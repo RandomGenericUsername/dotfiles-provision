@@ -7,10 +7,10 @@ expensive) full gates. It does not replace the full gates for behavior changes.
 
 Skin consumer coverage is structural, not a schema validator: the deployed
 skin plane must name exactly the released five manifests, the ten
-`<configDir>.gtk.css.j2` CSS targets and the rofi `rasi` artifact (eleven
-templates in total). In particular, `terminal-host`, `gtk3`, `gtk4` and the
-rofi artifact are part of the v0.18.1 release and must not silently drop out
-of `verify` again.
+`<configDir>.gtk.css.j2` CSS targets and the rofi `rasi` / kitty `conf`
+artifacts (twelve templates in total). In particular, `terminal-host`, `gtk3`,
+`gtk4`, the rofi artifact and the kitty artifact are part of the v0.19.0
+release and must not silently drop out of `verify` again.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Released dotfiles-assets v0.18.1 skin plane. Keep these ordered sets explicit:
+# Released dotfiles-assets v0.19.0 skin plane. Keep these ordered sets explicit:
 # the audit is a pin/structural check, so a missing or extra name is a drift.
 EXPECTED_SKIN_MANIFEST_NAMES = (
     "glass",
@@ -45,7 +45,7 @@ EXPECTED_SKIN_TARGET_FILES = (
     "gtk4.gtk.css.j2",
     "wlogout.gtk.css.j2",
 )
-EXPECTED_SKIN_ARTIFACT_FILES = ("rofi.rasi.j2",)
+EXPECTED_SKIN_ARTIFACT_FILES = ("rofi.rasi.j2", "kitty.conf.j2")
 
 
 def _fixture(root: Path) -> Path:
@@ -156,7 +156,7 @@ def audit(root: Path = ROOT) -> tuple[list[str], dict[str, str | int]]:
 
     # The all-standalone fixture is the canonical final app inventory.
     expected_app_tags = {
-        "bar": "v0.6.1",
+        "bar": "v0.6.2",
         "notifications": "v0.5.1",
         "capture": "v0.7.1",
         "clipboard": "v0.6.1",

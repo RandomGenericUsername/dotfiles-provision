@@ -17,7 +17,7 @@ kind: assets
 
 assets:
   repo: https://github.com/RandomGenericUsername/dotfiles-assets
-  tag: v0.18.1
+  tag: v0.19.0
   classes:
     icons:     { dest: icons,     schema: icons/schema.json }
     templates: { dest: templates, schema: "**/*.vars.schema.json" }
@@ -29,20 +29,20 @@ assets:
 entries:
   - name: wallpapers
     kind: wallpaper
-    source: "{{ install_dir | trim }}/assets/v0.18.1/content/wallpapers/wallpapers.tar.gz"
+    source: "{{ install_dir | trim }}/assets/v0.19.0/content/wallpapers/wallpapers.tar.gz"
   - name: icon-templates
     kind: icon-template
-    source: "{{ install_dir | trim }}/assets/v0.18.1/icons/templates/"
+    source: "{{ install_dir | trim }}/assets/v0.19.0/icons/templates/"
   - name: icon-mappings
     kind: icon-mapping
-    source: "{{ install_dir | trim }}/assets/v0.18.1/icons/mappings/"
+    source: "{{ install_dir | trim }}/assets/v0.19.0/icons/mappings/"
   - name: skins
     kind: skins
     # REQ-020: the skin plane is root-level DATA deployed to <install>/skins,
     # the runtime's first skin root. Manifests + templates + the vendored
     # contracts/PIN and local schema envelope all ride the class mirror; no
     # render, no validate script, no runtime reconcile.
-    source: "{{ install_dir | trim }}/assets/v0.18.1/skins/"
+    source: "{{ install_dir | trim }}/assets/v0.19.0/skins/"
   - name: tpr-templates
     kind: tpr-template
     # REQ-010: the sole palette producer's projection catalog, copied FROM

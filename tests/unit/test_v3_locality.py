@@ -1,7 +1,7 @@
 """Generations v3 deployment/locality contracts for the provisioning engine.
 
 These tests pin the wave-4 boundary from `dotfiles-v3/docs/107-generations-v3.md`
-§2.7 and contracts `generations.md` v0.11.0 §6:
+§2.7 and contracts `generations.md` v0.12.0 §6:
 
 - provisioning owns stable links for non-runtime palette consumers and points
   them at `state/current/palette/...`;
@@ -102,6 +102,7 @@ class TestStableConsumerLinks:
             ("appearance", "gtk-3.0/appearance.css", "gtk3.css"),
             ("appearance", "gtk-4.0/appearance.css", "gtk4.css"),
             ("appearance", "rofi/appearance.rasi", "rofi.rasi"),
+            ("appearance", "kitty/appearance.conf", "kitty.conf"),
         ]
         joined = str(data)
         assert "config/ags" not in joined
@@ -163,8 +164,14 @@ class TestStableConsumerLinks:
             "spine": "rofi/appearance.rasi",
             "target": "rofi.rasi",
         }
-        # The rofi artifact is never linked through a `.css` target.
+        assert by_spine["kitty/appearance.conf"] == {
+            "base": "appearance",
+            "spine": "kitty/appearance.conf",
+            "target": "kitty.conf",
+        }
+        # The rofi/kitty artifacts are never linked through a `.css` target.
         assert not by_spine["rofi/appearance.rasi"]["target"].endswith(".css")
+        assert not by_spine["kitty/appearance.conf"]["target"].endswith(".css")
 
     def test_post_seed_playbook_runs_config_links_then_state_links(self) -> None:
         playbook = yaml.safe_load(
@@ -196,7 +203,7 @@ class TestStableConsumerLinks:
 class TestVerifyGenerationLayout:
     def test_verify_expects_contracts_v0110_generation(self) -> None:
         data = _vars("verify")
-        assert data["verify_generation_contract_tag"] == "v0.11.0"
+        assert data["verify_generation_contract_tag"] == "v0.12.0"
         assert data["verify_generation_manifest_version"] == 3
         assert data["verify_state_generation_manifest"] == (
             "{{ verify_state_current_dir }}/manifest.json"
@@ -342,6 +349,9 @@ def _stage_palette(state: Path, *, manifest: bool) -> None:
     (appearance / "rofi.rasi").write_text(
         "* { surface: transparent; }\n", encoding="utf-8"
     )
+    (appearance / "kitty.conf").write_text(
+        "font_family monospace\n", encoding="utf-8"
+    )
     if manifest:
         (state / "dotfiles" / "current" / "manifest.json").write_text(
             '{"version": 3}\n', encoding="utf-8"
@@ -356,7 +366,14 @@ class TestStableLinksExecution:
         state = tmp_path / "state"
         for path in (home, config, state):
             path.mkdir()
-        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes", "wlogout"):
+        for spine in (
+            "gtk-3.0",
+            "gtk-4.0",
+            "rofi",
+            "btop/themes",
+            "wlogout",
+            "kitty",
+        ):
             (install / "config" / spine).mkdir(parents=True)
         _stage_palette(state, manifest=True)
 
@@ -371,6 +388,7 @@ class TestStableLinksExecution:
             "gtk-3.0/appearance.css": ("appearance", "gtk3.css"),
             "gtk-4.0/appearance.css": ("appearance", "gtk4.css"),
             "rofi/appearance.rasi": ("appearance", "rofi.rasi"),
+            "kitty/appearance.conf": ("appearance", "kitty.conf"),
         }
         for spine, (base, target) in expected.items():
             link = install / "config" / spine
@@ -391,7 +409,14 @@ class TestStableLinksExecution:
         state = tmp_path / "state"
         for path in (home, config, state):
             path.mkdir()
-        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes", "wlogout"):
+        for spine in (
+            "gtk-3.0",
+            "gtk-4.0",
+            "rofi",
+            "btop/themes",
+            "wlogout",
+            "kitty",
+        ):
             (install / "config" / spine).mkdir(parents=True)
         fallback = install / "config" / "wlogout" / "appearance.css"
         fallback.write_text("/* provisioning fallback, must not survive a seed */\n")
@@ -414,7 +439,14 @@ class TestStableLinksExecution:
         state = tmp_path / "state"
         for path in (home, config, state):
             path.mkdir()
-        for spine in ("gtk-3.0", "gtk-4.0", "rofi", "btop/themes", "wlogout"):
+        for spine in (
+            "gtk-3.0",
+            "gtk-4.0",
+            "rofi",
+            "btop/themes",
+            "wlogout",
+            "kitty",
+        ):
             (install / "config" / spine).mkdir(parents=True)
 
         result = _run_post_seed(install, home, config, state)
@@ -430,21 +462,22 @@ class TestStableLinksExecution:
             "gtk-3.0/appearance.css",
             "gtk-4.0/appearance.css",
             "rofi/appearance.rasi",
+            "kitty/appearance.conf",
         ):
             assert (install / "config" / spine).is_symlink(), spine
 
 
 _CONTRACTS_FIXTURE = (
-    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.11.0"
+    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.12.0"
 )
 
 
-class TestVendoredContractsV0110:
-    """The engine vendors the v0.11.0 generation/refresh schemas it validates."""
+class TestVendoredContractsV0120:
+    """The engine vendors the v0.12.0 generation/appearance schemas it validates."""
 
-    def test_pin_names_contracts_v0110_and_matches_every_schema_digest(self) -> None:
+    def test_pin_names_contracts_v0120_and_matches_every_schema_digest(self) -> None:
         pin = (_CONTRACTS_FIXTURE / "PIN").read_text()
-        assert "contracts=v0.11.0" in pin
+        assert "contracts=v0.12.0" in pin
         import hashlib
 
         for schema in _CONTRACTS_FIXTURE.glob("*.schema.json"):
@@ -548,7 +581,7 @@ class TestVendoredContractsV0110:
         assert manifest["intent"]["host"] == manifest["host"]["fingerprint"]
 
     def test_generation_manifest_schema_accepts_rectangle_host_radii(self) -> None:
-        """contracts v0.11.0 delegates panel geometry plus card/control/cell radii."""
+        """contracts v0.12.0 delegates window/panel geometry plus card/control/cell radii."""
         import json
 
         schema = json.loads(
@@ -556,6 +589,8 @@ class TestVendoredContractsV0110:
         )
         defaults = schema["definitions"]["host"]["properties"]["defaults"]
         assert set(defaults["properties"]) == {
+            "surface.window.radius",
+            "surface.window.border-width",
             "surface.panel.radius",
             "surface.panel.border-width",
             "surface.card.radius",
@@ -563,14 +598,18 @@ class TestVendoredContractsV0110:
             "surface.cell.radius",
         }
         for path in (
+            "surface.window.radius",
             "surface.panel.radius",
             "surface.card.radius",
             "surface.control.radius",
             "surface.cell.radius",
         ):
             assert defaults["properties"][path]["maximum"] == 64
-        assert defaults["properties"]["surface.panel.border-width"]["maximum"] == 16
+        for path in ("surface.window.border-width", "surface.panel.border-width"):
+            assert defaults["properties"][path]["maximum"] == 16
         assert "surface.pill.radius" not in defaults["properties"]
+        assert "surface.window.padding" not in defaults["properties"]
+        assert "surface.window.opacity" not in defaults["properties"]
 
     def test_host_rectangle_manifest_fixture_records_all_five_paths(self) -> None:
         import json
@@ -590,6 +629,24 @@ class TestVendoredContractsV0110:
         assert "surface.pill.radius" not in manifest["host"]["defaults"]
         assert manifest["intent"]["host"] == manifest["host"]["fingerprint"]
 
+    def test_host_window_manifest_records_the_window_defaults(self) -> None:
+        """contracts v0.12.0 adds the required window role and its host paths."""
+        import json
+
+        manifest = json.loads(
+            (
+                _CONTRACTS_FIXTURE / "generation-manifest-host-window.valid.json"
+            ).read_text()
+        )
+        assert manifest["host"]["defaults"] == {
+            "surface.window.radius": 12,
+            "surface.window.border-width": 1.5,
+            "surface.panel.radius": 0,
+            "surface.panel.border-width": 1,
+        }
+        assert "surface.window.opacity" not in manifest["host"]["defaults"]
+        assert "surface.window.padding" not in manifest["host"]["defaults"]
+
     def test_pill_radius_host_default_fixture_is_not_delegable(self) -> None:
         import json
 
@@ -604,6 +661,82 @@ class TestVendoredContractsV0110:
         allowed = schema["definitions"]["host"]["properties"]["defaults"]["properties"]
         assert "surface.pill.radius" in manifest["host"]["defaults"]
         assert "surface.pill.radius" not in allowed
+
+    def test_appearance_manifest_schema_requires_window_and_opacity(self) -> None:
+        """contracts v0.12.0: six required surface roles with a unitless
+        [0,1] window opacity; window is never an alias of panel."""
+        import json
+
+        schema = json.loads(
+            (_CONTRACTS_FIXTURE / "appearance-manifest.schema.json").read_text()
+        )
+        assert schema["definitions"]["surfaceGroup"]["required"] == [
+            "window",
+            "panel",
+            "card",
+            "cell",
+            "control",
+            "pill",
+        ]
+        window = schema["definitions"]["windowRole"]
+        assert set(window["required"]) == {
+            "bg",
+            "border",
+            "border-width",
+            "radius",
+            "padding",
+            "shadow",
+            "blur",
+            "opacity",
+        }
+        opacity = schema["definitions"]["opacityValue"]
+        assert opacity["type"] == "number"
+        assert opacity["minimum"] == 0
+        assert opacity["maximum"] == 1
+        inherit = schema["definitions"]["hostPolicy"]["properties"]["inherit"]
+        assert inherit["items"]["enum"] == [
+            "surface.window.radius",
+            "surface.window.border-width",
+            "surface.panel.radius",
+            "surface.panel.border-width",
+            "surface.card.radius",
+            "surface.control.radius",
+            "surface.cell.radius",
+        ]
+
+    def test_appearance_window_fixtures_cover_the_required_role(self) -> None:
+        """The vendored window fixtures pin acceptance and rejection."""
+        import json
+
+        glass = json.loads(
+            (_CONTRACTS_FIXTURE / "appearance-manifest-glass.valid.json").read_text()
+        )
+        window = glass["groups"]["surface"]["window"]
+        assert set(window) == {
+            "bg",
+            "border",
+            "border-width",
+            "radius",
+            "padding",
+            "shadow",
+            "blur",
+            "opacity",
+        }
+        assert 0 <= window["opacity"] <= 1
+        missing = json.loads(
+            (
+                _CONTRACTS_FIXTURE
+                / "appearance-manifest-missing-window.invalid.json"
+            ).read_text()
+        )
+        assert "window" not in missing["groups"]["surface"]
+        too_large = json.loads(
+            (
+                _CONTRACTS_FIXTURE
+                / "appearance-manifest-opacity-too-large.invalid.json"
+            ).read_text()
+        )
+        assert too_large["groups"]["surface"]["window"]["opacity"] > 1
 
     def test_v2_boolean_ack_is_not_a_contract_shape(self) -> None:
         import json

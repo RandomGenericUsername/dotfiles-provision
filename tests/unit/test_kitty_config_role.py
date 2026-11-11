@@ -82,6 +82,14 @@ def _local_conf_task() -> dict[str, object]:
     return matches[0]
 
 
+def _appearance_include_task() -> dict[str, object]:
+    matches = [
+        t for t in _load_tasks() if _module_key(t) == "ansible.builtin.lineinfile"
+    ]
+    assert len(matches) == 1, f"expected exactly one lineinfile task; found {len(matches)}"
+    return matches[0]
+
+
 def _vars() -> dict[str, Any]:
     data = yaml.safe_load((_ROLES_DIR / "vars" / "main.yml").read_text())
     assert isinstance(data, dict)
@@ -123,6 +131,15 @@ class TestKittyConfigTasks:
             "render src must be the kitty.conf.j2 template read from the pinned assets "
             "templates class (S3: the role no longer carries a templates/ dir)"
         )
+
+    def test_appearance_include_is_inserted_before_local(self) -> None:
+        """The generated appearance hop sits between colors and local.conf."""
+        module = _module(_appearance_include_task())
+        assert module["path"] == "{{ kitty_config_spine_dir }}/kitty.conf"
+        assert module["line"] == "include appearance.conf"
+        assert module["regexp"] == "^include appearance\\.conf$"
+        assert module["insertbefore"] == "^include local\\.conf$"
+        assert module.get("firstmatch") is True
 
     def test_local_conf_copy_is_create_only(self) -> None:
         """local.conf must be created ONLY IF ABSENT (force: false) so a user's
@@ -199,6 +216,9 @@ class TestKittyConfigTemplate:
             "the template must include the runtime palette at the absolute state path"
         )
         assert "include local.conf" in text, "the template must include the user local.conf"
+        assert text.index("include {{ kitty_config_state_current_dir }}/colors.kitty") < (
+            text.index("include local.conf")
+        ), "the static corpus body keeps colors first and local.conf after it"
         assert "auto_reload_config -1" in text, (
             "auto_reload_config must be -1 (kitty 0.48 types it as a float in "
             "seconds; a negative value disables it; the runtime reloader "
@@ -287,7 +307,20 @@ class TestKittyConfigPlaybook:
                 "rendered kitty.conf must include the absolute runtime palette path; "
                 f"got: {text}"
             )
-            assert "include local.conf" in text
+            lines = [
+                line.strip()
+                for line in text.splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            ]
+            expected_order = [
+                "include " + str(state / "dotfiles" / "current" / "colors.kitty"),
+                "include appearance.conf",
+                "include local.conf",
+            ]
+            assert lines[:3] == expected_order, (
+                "rendered kitty.conf must import colors, then the generated "
+                f"appearance.conf, then local.conf; got {lines[:3]!r}"
+            )
             assert "auto_reload_config -1" in text
             local_conf = kitty_dir / "local.conf"
             assert local_conf.is_file(), "local.conf must be created on first provision"
