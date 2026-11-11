@@ -1,3 +1,33 @@
+## 0.1.63
+
+Window-role release: mirror `contracts v0.12.0` (required `surface.window`
+role and unitless opacity), `dotfiles-assets v0.19.0` (window groups in every
+skin, kitty `conf` artifact), `ags-platform v1.1.0` and `ags-bar v0.6.2`.
+Runtime stays composition-owned: this engine has no runtime pin to move, and
+the other six app tags are unchanged.
+
+- Move every engine `*_assets_pinned_tag` mirror, the composition fixture
+  (`assets.yaml`, `program-tuple.yaml`) and the app-list fixture to assets
+  `v0.19.0`; move `verify_generation_contract_tag` /
+  `verify_skins_expected_contract_tag` to contracts `v0.12.0` and the platform
+  mirror to `v1.1.0`. Only the bar app tag moves (`v0.6.1` → `v0.6.2`).
+- Vendor the contracts `v0.12.0` generation/appearance schemas and window host
+  fixtures with refreshed PIN digests.
+- Verify accepts the required eight-token `surface.window` group (including a
+  unitless `[0,1]` opacity) and generation `host.defaults` window
+  radius/border-width alongside the panel/card/control/cell paths. The deployed
+  skin envelope is five manifests, twelve templates (ten CSS targets plus
+  `kitty.conf.j2` and `rofi.rasi.j2`) and artifacts `kitty:conf` + `rofi:rasi`.
+- Provision the kitty generated-appearance consumer: the static rendered
+  `kitty.conf` imports `colors.kitty` first, `appearance.conf` second and
+  `local.conf` last (keeping `auto_reload_config -1`), and the stable link
+  `config/kitty/appearance.conf -> state/current/appearance/kitty.conf` is
+  created post-seed and asserted with the other stable consumer links. Verify
+  also parses the import order and requires the generated conf to exist.
+- `scripts/pin-audit.py` keeps the released skin plane fail-closed over the
+  expanded artifact set. Full gates plus assets parity were run; no apply,
+  runtime/assets/composition/app edits or live state writes.
+
 ## 0.1.62
 
 Pin-only release: mirror `dotfiles-assets v0.18.1` (the rofi generated
