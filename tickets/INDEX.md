@@ -34,6 +34,7 @@
 - [REQ-035-assets-v0151/ticket.md](./REQ-035-assets-v0151/ticket.md) — Mirror dotfiles-assets v0.15.1 (wlogout static ownership fix) | `done` | worktree: .worktrees/REQ-035/ | branch: ticket/REQ-035-assets-v0151 | tag: v0.1.53
 - [REQ-036-assets-v0152-pin/ticket.md](./REQ-036-assets-v0152-pin/ticket.md) — Mirror dotfiles-assets v0.15.2 and add the local pin-only gate lane | `done` | worktree: .worktrees/REQ-036/ | branch: ticket/REQ-036-assets-v0152-pin | tag: v0.1.56
 - [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `done` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0 | tag: v0.1.59
+- [REQ-040-skin-consumer-phase3a4/ticket.md](./REQ-040-skin-consumer-phase3a4/ticket.md) — Phase 3A-4 format-aware skin consumers (GTK3/GTK4/rofi links + imports) | `in-progress` | worktree: .worktrees/REQ-040/ | branch: ticket/REQ-040-skin-consumer-phase3a4
 
 ## Bugs
 
