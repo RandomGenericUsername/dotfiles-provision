@@ -35,10 +35,68 @@ targets, one rofi `rasi` artifact).
 
 No runtime/assets/composition/app edits, no live state writes, no apply.
 
+## Evidence
+
+Gate choice: **`make gates-pin`** (pin-only lane: pin-audit + lint +
+docs-check + ci-gates-parity). No behavior/schema change landed, so the full
+`make gates` suite was not required.
+
+| Gate | Result |
+| --- | --- |
+| pin-audit (`make gates-pin`) | `PASS (assets=v0.18.0, contracts=v0.11.0, platform=v1.0.1, apps=7, skins=5, targets=10, artifacts=1)` |
+| lint | `All checks passed!` |
+| docs-check | clean |
+| ci-gates-parity | `PASS gates=['docs-check', 'hermetic', 'lint', 'lock-check', 'test']` |
+| lock-check | `uv lock --check` clean |
+| build | `dotfiles_provision-0.1.61.tar.gz` + `dotfiles_provision-0.1.61-py3-none-any.whl`; `check-wheel-contents.py` PASS |
+
+Targeted tests:
+
+```text
+pytest tests/unit/test_v3_locality.py tests/unit/test_pin_audit.py
+       tests/unit/test_verify_role.py::TestVerifyVars
+       tests/unit/test_verify_role.py::TestVerifyAssetsSchemaWindow
+# 85 passed
+
+pytest tests/unit/test_verify_role.py::TestVerifySkinPlane
+# 14 passed in 192.97s (the ansible-backed skin execution probes)
+
+pytest tests/unit/test_display_manager_role.py
+       tests/unit/test_ags_apps_units_role.py
+       tests/unit/test_runtime_seed_playbook.py
+       tests/unit/adapters/test_yaml_manifest_reader.py
+       -k "pin or assets or generation or tuple or manifest or mirror"
+# 74 passed, 1 skipped
+```
+
+Exact pins:
+
+- installer **v0.1.61**, contracts **v0.11.0**, assets **v0.18.0**,
+  runtime **v1.3.0**, platform **v1.0.1**
+- vendored generation schema sha256
+  `e3fe10bd27cd102056af2249a9631c6289a0a41cb35aca2a79bff63c7e97fd53`
+- skin envelope unchanged: 5 manifests (`glass`, `flat`, `paper`, `terminal`,
+  `terminal-host`), 11 templates (10 `<configDir>.gtk.css.j2` CSS targets +
+  `rofi.rasi.j2` artifact), 10 targets, 1 artifact.
+
+Host delegation recorded by contracts v0.11.0: `surface.panel.radius`,
+`surface.panel.border-width`, `surface.card.radius`,
+`surface.control.radius`, `surface.cell.radius`; `surface.pill.radius` is
+explicit and rejected as a host default.
+
+No apply, no runtime/assets/composition/app edits and no live state writes.
+
+## Commits
+
+- `3f49c1f` — plan
+- `e0e153a` — mirror assets v0.18.0 and contracts v0.11.0
+- `1050d70` — release 0.1.61 metadata
+- evidence close commit follows; tag `v0.1.61`
+
 ## Acceptance
 
-- [ ] Engine pins and fixtures mirror assets `v0.18.0` / contracts `v0.11.0`.
-- [ ] Contracts `v0.11.0` generation schema and rectangle fixtures are vendored.
-- [ ] Pin audit stays fail-closed with the unchanged skin envelope.
-- [ ] `make gates-pin` and targeted tests pass; gate choice recorded.
-- [ ] Engine `0.1.61` tagged/released with only wheel/sdist; no apply.
+- [x] Engine pins and fixtures mirror assets `v0.18.0` / contracts `v0.11.0`.
+- [x] Contracts `v0.11.0` generation schema and rectangle fixtures are vendored.
+- [x] Pin audit stays fail-closed with the unchanged skin envelope.
+- [x] `make gates-pin` and targeted tests pass; gate choice recorded.
+- [x] Engine `0.1.61` tagged/released with only wheel/sdist; no apply.
