@@ -36,7 +36,7 @@
 - [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `done` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0 | tag: v0.1.59
 - [REQ-040-skin-consumer-phase3a4/ticket.md](./REQ-040-skin-consumer-phase3a4/ticket.md) — Phase 3A-4 format-aware skin consumers (GTK3/GTK4/rofi links + imports) | `done` | worktree: .worktrees/REQ-040/ | branch: ticket/REQ-040-skin-consumer-phase3a4 | tag: v0.1.60
 - [REQ-041-host-rectangle-radii-pin/ticket.md](./REQ-041-host-rectangle-radii-pin/ticket.md) — Mirror contracts v0.11.0 and assets v0.18.0 (host rectangle radii) | `done` | worktree: .worktrees/REQ-041/ | branch: ticket/REQ-041-host-rectangle-radii-pin | tag: v0.1.61
-- [REQ-042-assets-v0181-pin/ticket.md](./REQ-042-assets-v0181-pin/ticket.md) — Mirror dotfiles-assets v0.18.1 (rofi generated appearance last) | `in-progress` | worktree: .worktrees/REQ-042/ | branch: ticket/REQ-042-assets-v0181-pin
+- [REQ-042-assets-v0181-pin/ticket.md](./REQ-042-assets-v0181-pin/ticket.md) — Mirror dotfiles-assets v0.18.1 (rofi generated appearance last) | `done` | worktree: .worktrees/REQ-042/ | branch: ticket/REQ-042-assets-v0181-pin | tag: v0.1.62
 
 ## Bugs
 
