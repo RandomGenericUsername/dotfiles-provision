@@ -1,3 +1,24 @@
+## 0.1.61
+
+Pin-only release: mirror `dotfiles-assets v0.18.0` (host rectangle radii) and
+contracts `v0.11.0`. Uses `gates-pin`; no behavior or schema change.
+
+- Move every engine `*_assets_pinned_tag` mirror plus the composition fixture
+  (`assets.yaml`, `program-tuple.yaml`) to assets `v0.18.0`, and move
+  `verify_generation_contract_tag` / `verify_skins_expected_contract_tag` to
+  contracts `v0.11.0`.
+- Vendor the contracts `v0.11.0` generation-manifest schema, which records the
+  five delegated host paths (`surface.panel.radius`,
+  `surface.panel.border-width`, `surface.card.radius`,
+  `surface.control.radius`, `surface.cell.radius`) and keeps
+  `surface.pill.radius` explicit. Add the host-rectangle positive fixture and
+  the pill-radius negative fixture; keep the existing host fixture.
+- The assets `v0.18.0` skin envelope is unchanged structurally: five manifests,
+  eleven templates (ten CSS targets plus the rofi `rasi` artifact), ten CSS
+  targets and one artifact. `scripts/pin-audit.py` audits the same fail-closed
+  sets and now names `v0.18.0`. No apply, runtime/assets/composition/app edits
+  or live state writes.
+
 ## 0.1.60
 
 Phase 3A-4 format-aware skin consumers. Behavior/schema change release; full
