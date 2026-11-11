@@ -1,0 +1,75 @@
+{
+  "version": 3,
+  "generationHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created": {
+    "at": "2026-11-06T12:00:00Z",
+    "by": "dotfiles-runtime 0.8.0"
+  },
+  "committed": {
+    "at": "2026-11-06T12:00:01Z",
+    "jobId": "converge-01J8Z3"
+  },
+  "layers": {
+    "wallpaper": {
+      "entryHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "path": "wallpaper"
+    },
+    "palette": {
+      "entryHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "path": "palette"
+    },
+    "effects": {
+      "entryHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "path": "effects"
+    },
+    "icons": {
+      "entryHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "path": "icons"
+    }
+  },
+  "skin": {
+    "name": "glass",
+    "entryHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "mode": "dark"
+  },
+  "appearance": {
+    "tokensPath": "appearance/tokens.json",
+    "targets": [
+      {
+        "configDir": "ags",
+        "path": "appearance/ags.css"
+      },
+      {
+        "configDir": "ags-notifications",
+        "path": "appearance/ags-notifications.css"
+      }
+    ]
+  },
+  "mode": "dark",
+  "intent": {
+    "wallpaper": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "palette": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "skin": "glass",
+    "mode": "dark",
+    "effects": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "icons": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "host": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "source": {
+    "kind": "daemon",
+    "intentHash": "9999999999999999999999999999999999999999999999999999999999999999",
+    "jobId": "converge-01J8Z3"
+  },
+  "host": {
+    "source": "hyprland",
+    "version": 1,
+    "fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+    "defaults": {
+      "surface.panel.radius": 0,
+      "surface.panel.border-width": 1,
+      "surface.card.radius": 0,
+      "surface.control.radius": 0,
+      "surface.cell.radius": 0
+    }
+  }
+}

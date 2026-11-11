@@ -1,7 +1,7 @@
 """Generations v3 deployment/locality contracts for the provisioning engine.
 
 These tests pin the wave-4 boundary from `dotfiles-v3/docs/107-generations-v3.md`
-§2.7 and contracts `generations.md` v0.10.0 §6:
+§2.7 and contracts `generations.md` v0.11.0 §6:
 
 - provisioning owns stable links for non-runtime palette consumers and points
   them at `state/current/palette/...`;
@@ -194,9 +194,9 @@ class TestStableConsumerLinks:
 
 
 class TestVerifyGenerationLayout:
-    def test_verify_expects_contracts_v0100_generation(self) -> None:
+    def test_verify_expects_contracts_v0110_generation(self) -> None:
         data = _vars("verify")
-        assert data["verify_generation_contract_tag"] == "v0.10.0"
+        assert data["verify_generation_contract_tag"] == "v0.11.0"
         assert data["verify_generation_manifest_version"] == 3
         assert data["verify_state_generation_manifest"] == (
             "{{ verify_state_current_dir }}/manifest.json"
@@ -435,16 +435,16 @@ class TestStableLinksExecution:
 
 
 _CONTRACTS_FIXTURE = (
-    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.10.0"
+    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.11.0"
 )
 
 
-class TestVendoredContractsV0100:
-    """The engine vendors the v0.10.0 generation/refresh schemas it validates."""
+class TestVendoredContractsV0110:
+    """The engine vendors the v0.11.0 generation/refresh schemas it validates."""
 
-    def test_pin_names_contracts_v0100_and_matches_every_schema_digest(self) -> None:
+    def test_pin_names_contracts_v0110_and_matches_every_schema_digest(self) -> None:
         pin = (_CONTRACTS_FIXTURE / "PIN").read_text()
-        assert "contracts=v0.10.0" in pin
+        assert "contracts=v0.11.0" in pin
         import hashlib
 
         for schema in _CONTRACTS_FIXTURE.glob("*.schema.json"):
@@ -546,6 +546,64 @@ class TestVendoredContractsV0100:
         assert manifest["host"]["version"] == 1
         assert manifest["host"]["defaults"]
         assert manifest["intent"]["host"] == manifest["host"]["fingerprint"]
+
+    def test_generation_manifest_schema_accepts_rectangle_host_radii(self) -> None:
+        """contracts v0.11.0 delegates panel geometry plus card/control/cell radii."""
+        import json
+
+        schema = json.loads(
+            (_CONTRACTS_FIXTURE / "generation-manifest.schema.json").read_text()
+        )
+        defaults = schema["definitions"]["host"]["properties"]["defaults"]
+        assert set(defaults["properties"]) == {
+            "surface.panel.radius",
+            "surface.panel.border-width",
+            "surface.card.radius",
+            "surface.control.radius",
+            "surface.cell.radius",
+        }
+        for path in (
+            "surface.panel.radius",
+            "surface.card.radius",
+            "surface.control.radius",
+            "surface.cell.radius",
+        ):
+            assert defaults["properties"][path]["maximum"] == 64
+        assert defaults["properties"]["surface.panel.border-width"]["maximum"] == 16
+        assert "surface.pill.radius" not in defaults["properties"]
+
+    def test_host_rectangle_manifest_fixture_records_all_five_paths(self) -> None:
+        import json
+
+        manifest = json.loads(
+            (
+                _CONTRACTS_FIXTURE / "generation-manifest-host-rectangles.valid.json"
+            ).read_text()
+        )
+        assert manifest["host"]["defaults"] == {
+            "surface.panel.radius": 0,
+            "surface.panel.border-width": 1,
+            "surface.card.radius": 0,
+            "surface.control.radius": 0,
+            "surface.cell.radius": 0,
+        }
+        assert "surface.pill.radius" not in manifest["host"]["defaults"]
+        assert manifest["intent"]["host"] == manifest["host"]["fingerprint"]
+
+    def test_pill_radius_host_default_fixture_is_not_delegable(self) -> None:
+        import json
+
+        manifest = json.loads(
+            (
+                _CONTRACTS_FIXTURE / "generation-manifest-host-pill-default.invalid.json"
+            ).read_text()
+        )
+        schema = json.loads(
+            (_CONTRACTS_FIXTURE / "generation-manifest.schema.json").read_text()
+        )
+        allowed = schema["definitions"]["host"]["properties"]["defaults"]["properties"]
+        assert "surface.pill.radius" in manifest["host"]["defaults"]
+        assert "surface.pill.radius" not in allowed
 
     def test_v2_boolean_ack_is_not_a_contract_shape(self) -> None:
         import json

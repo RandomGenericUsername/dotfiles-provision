@@ -469,7 +469,7 @@ def _write_deployed_skins(spine: Path) -> None:
             {
                 "schema_major": 2,
                 "canonical": {
-                    "tag": "v0.10.0",
+                    "tag": "v0.11.0",
                     "vendored": True,
                     "paths": [
                         "schemas/appearance-manifest.schema.json",
@@ -511,7 +511,7 @@ def _write_deployed_skins(spine: Path) -> None:
         )
         + "\n"
     )
-    pin_lines = ["contracts=v0.10.0\n"]
+    pin_lines = ["contracts=v0.11.0\n"]
     for name, body in _SKIN_CONTRACT_BODIES.items():
         (contracts / name).write_text(body)
         pin_lines.append(
@@ -2239,12 +2239,12 @@ class TestVerifyVars:
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
-    def test_skins_pin_is_v0170_with_the_v0100_contract_and_templates(self) -> None:
-        """REQ-040: assets v0.17.0 ships five manifests, ten CSS targets plus
-        the rofi artifact and the contracts v0.10.0 plane."""
+    def test_skins_pin_is_v0180_with_the_v0110_contract_and_templates(self) -> None:
+        """REQ-041: assets v0.18.0 ships five manifests, ten CSS targets plus
+        the rofi artifact and the contracts v0.11.0 plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.17.0"
-        assert str(data["verify_skins_expected_contract_tag"]) == "v0.10.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.18.0"
+        assert str(data["verify_skins_expected_contract_tag"]) == "v0.11.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
             "flat",
@@ -3744,15 +3744,15 @@ class TestVerifySkinPlane:
         assert result.returncode != 0, "an unknown placeholder must fail verify"
         assert "placeholder" in output, output
 
-    def test_skin_plane_accepts_the_assets_v0170_v0100_envelope(
+    def test_skin_plane_accepts_the_assets_v0180_v0110_envelope(
         self, tmp_path: Path
     ) -> None:
-        """REQ-040: the released assets v0.17.0 skins schema names contracts
-        v0.10.0 and vendors the fourth canonical (generation) schema."""
+        """REQ-041: the released assets v0.18.0 skins schema names contracts
+        v0.11.0 and vendors the fourth canonical (generation) schema."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         schema = json.loads((install / "skins" / "schema.json").read_text())
-        assert schema["canonical"]["tag"] == "v0.10.0"
+        assert schema["canonical"]["tag"] == "v0.11.0"
         assert "skins/contracts/generation-manifest.schema.json" in schema[
             "canonical"
         ]["vendored_paths"]
@@ -3779,10 +3779,10 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, (
-            f"canonical tag {tag} must fail the v0.10.0 envelope gate"
+            f"canonical tag {tag} must fail the v0.11.0 envelope gate"
         )
         assert "is not the pinned Appearance v2 envelope" in output, output
-        assert "v0.10.0" in output, output
+        assert "v0.11.0" in output, output
 
     def test_skin_plane_rejects_a_missing_canonical_tag(
         self, tmp_path: Path
@@ -3802,7 +3802,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_rejects_a_missing_generation_vendored_path(
         self, tmp_path: Path
     ) -> None:
-        """BUG-012: v0.10.0 vendors generation-manifest.schema.json; dropping it
+        """BUG-012: v0.11.0 vendors generation-manifest.schema.json; dropping it
         from the envelope must fail rather than silently pass the delegate set."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
@@ -3817,7 +3817,7 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, (
-            "a missing generation vendored path must fail the v0.10.0 envelope"
+            "a missing generation vendored path must fail the v0.11.0 envelope"
         )
         assert "is not the pinned Appearance v2 envelope" in output, output
 
@@ -4300,7 +4300,7 @@ class TestVerifyRuntime:
         manifest_path.write_text(json.dumps(manifest) + "\n")
 
     def test_verify_accepts_a_host_bearing_generation(self) -> None:
-        """contracts v0.10.0: the optional host block is valid runtime output."""
+        """contracts v0.11.0: the optional host block is valid runtime output."""
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")

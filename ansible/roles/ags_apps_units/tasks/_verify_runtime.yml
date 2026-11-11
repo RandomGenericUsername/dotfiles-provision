@@ -68,7 +68,7 @@
     fail_msg: >-
       {{ app.app }} is live but its appearance-refresh handler did not return
       {"applied":"<genHash>"} or a deferred response naming the requested
-      generation (contracts v0.10.0). A boolean {"ok":true} ack is not
+      generation (contracts v0.11.0). A boolean {"ok":true} ack is not
       generation-bound and is rejected. rc={{
       ags_apps_units_handler.rc | default('?') }}, stdout={{
       ags_apps_units_handler.stdout | default('') | trim }}, stderr={{
