@@ -27,13 +27,17 @@ state_links_spine_config_dir: "{{ install_dir | trim }}/config"
 #   `target` is the artifact inside it. The runtime never repoints these links;
 #   a new generation is visible through `current`.
 #
-#   wlogout is the first generated-appearance consumer: the assets v0.17.0
-#   static style imports its sibling `appearance.css` last, and that link
-#   resolves to the runtime's `current/appearance/wlogout.css`. It never points
-#   through a generation directory or an `<install>/apps/<tag>` path.
+#   wlogout was the first generated-appearance consumer. Phase 3A-4 adds the
+#   format-aware GTK3, GTK4 and rofi consumers: gtk/rofi import their sibling
+#   appearance sheet/artifact last, and each link resolves to the runtime's
+#   `current/appearance/<consumer>.<ext>`. None points through a generation
+#   directory or an `<install>/apps/<tag>` path.
 state_links_consumers:
   - { base: palette, spine: gtk-3.0/colors.css, target: colors.gtk.css }
   - { base: palette, spine: gtk-4.0/colors.css, target: colors.adw.css }
   - { base: palette, spine: rofi/colors.rasi, target: colors.rasi }
   - { base: palette, spine: btop/themes/colors.btop.theme, target: colors.btop.theme }
   - { base: appearance, spine: wlogout/appearance.css, target: wlogout.css }
+  - { base: appearance, spine: gtk-3.0/appearance.css, target: gtk3.css }
+  - { base: appearance, spine: gtk-4.0/appearance.css, target: gtk4.css }
+  - { base: appearance, spine: rofi/appearance.rasi, target: rofi.rasi }

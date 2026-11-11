@@ -234,6 +234,12 @@ def _seed_assets_configs(install: Path) -> None:
         'local cfg = "{{ compositor_configs_xdg_config_home }}/hypr"\n'
         'dofile(cfg .. "/keybindings.lua")\n'
     )
+    (root / "rofi" / "launcher" / "config.rasi").write_text(
+        '@import "../colors.rasi"\n'
+        "\n"
+        "configuration { modes: \"drun\"; }\n"
+        "window { background-color: @surface; }\n"
+    )
 
 
 #: The seeded `desktop/` corpus: file -> (Exec line, TryExec, requires, optional).
@@ -586,6 +592,28 @@ class TestCompositorConfigsTasks:
         assert str(task.get("when")) == (
             "not ansible_check_mode or compositor_configs_assets_configs_check.stat.isdir | default(false)"
         ), task.get("when")
+
+    def test_rofi_appearance_import_is_after_palette(self) -> None:
+        """F-4.2: the rofi launcher imports ../appearance.rasi after its one
+        ../colors.rasi import; lineinfile is exact-line idempotent and names the
+        stable provisioning link, not a generation/app-tag path."""
+        matches = [
+            task
+            for task in _tasks_with_module("ansible.builtin.lineinfile")
+            if "compositor_configs_rofi_appearance_import_line"
+            in str(_module(task).get("line", ""))
+        ]
+        assert len(matches) == 1
+        task = matches[0]
+        module = _module(task)
+        assert module.get("path") == "{{ compositor_configs_rofi_config_path }}"
+        assert module.get("insertafter") == '@import "../colors.rasi"'
+        assert "regexp" not in module
+        assert str(_vars()["compositor_configs_rofi_appearance_import_line"]) == (
+            '@import "../appearance.rasi"'
+        )
+        assert "generations" not in str(module)
+        assert "/apps/" not in str(module)
 
     def test_skeleton_placements_carry_no_creates(self) -> None:
         """AC 5/6 idempotency: `force: false` already guarantees no re-transfer
@@ -977,6 +1005,8 @@ class TestCompositorConfigsVars:
         "compositor_configs_spine_config_dir",
         "compositor_configs_config_dirs",
         "compositor_configs_skeleton_files",
+        "compositor_configs_rofi_config_path",
+        "compositor_configs_rofi_appearance_import_line",
     }
 
     def test_vars_parse_with_required_keys(self) -> None:
@@ -1228,6 +1258,26 @@ class TestCompositorConfigsPlaybook:
             )
             assert 'dofile(cfg .. "/keybindings.lua")' in hypr_content, (
                 "hyprland.lua must include keybindings.lua via dofile"
+            )
+
+            rofi = (install / "config" / "rofi" / "launcher" / "config.rasi").read_text()
+            assert rofi.count('@import "../colors.rasi"') == 1, (
+                "the static rofi config keeps exactly one palette import"
+            )
+            assert rofi.count('@import "../appearance.rasi"') == 1, (
+                "the rofi config must import the generated rasi artifact once"
+            )
+            assert rofi.index('@import "../colors.rasi"') < rofi.index(
+                '@import "../appearance.rasi"'
+            ), "appearance.rasi must follow the palette import"
+            imports = [
+                line for line in rofi.splitlines() if line.startswith("@import")
+            ]
+            assert imports[-1].endswith('"../appearance.rasi"'), (
+                "appearance.rasi must be the last import"
+            )
+            assert not any(line.endswith('.css"') for line in imports), (
+                "the rofi artifact is .rasi, never fake CSS"
             )
 
     def test_playbook_fails_when_a_required_desktop_binary_is_missing(self) -> None:

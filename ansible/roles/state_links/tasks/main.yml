@@ -15,6 +15,9 @@
 #   <install>/config/btop/themes/colors.btop.theme
 #                                             -> state/current/palette/colors.btop.theme
 #   <install>/config/wlogout/appearance.css   -> state/current/appearance/wlogout.css
+#   <install>/config/gtk-3.0/appearance.css   -> state/current/appearance/gtk3.css
+#   <install>/config/gtk-4.0/appearance.css   -> state/current/appearance/gtk4.css
+#   <install>/config/rofi/appearance.rasi     -> state/current/appearance/rofi.rasi
 #
 # The links are stable: they name the `current` pointer, never a
 # generation-specific path, so a new commit is visible without repointing them.

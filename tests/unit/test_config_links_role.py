@@ -154,6 +154,21 @@ def _lineinfile_task() -> dict[str, object]:
     return import_tasks[0]
 
 
+def _appearance_lineinfile_task() -> dict[str, object]:
+    matches = _link_one_tasks_with_module("ansible.builtin.lineinfile")
+    import_tasks = [
+        t
+        for t in matches
+        if "config_links_gtk_appearance_import_line"
+        in str(_module(t).get("line", ""))
+    ]
+    assert len(import_tasks) == 1, (
+        "expected exactly one appearance-import lineinfile task; "
+        f"found {len(import_tasks)}"
+    )
+    return import_tasks[0]
+
+
 def _symlink_task() -> dict[str, object]:
     matches = [
         task
@@ -349,6 +364,36 @@ class TestConfigLinksTasks:
             "the lineinfile must be ordered BEFORE the symlink task"
         )
 
+    def test_appearance_import_is_after_palette_and_before_symlink(self) -> None:
+        """F-4.2: `@import "appearance.css";` is inserted after the palette
+        import (explicit insertafter, no duplicate on re-run), and still before
+        the symlink so the spine gtk.css is complete when GTK first reads it."""
+        task = _appearance_lineinfile_task()
+        module = _module(task)
+        assert module.get("line") == "{{ config_links_gtk_appearance_import_line }}"
+        assert module.get("insertafter") == "{{ config_links_gtk_import_line }}", (
+            "appearance must be pinned AFTER the palette import"
+        )
+        assert module.get("create") is True
+        assert "regexp" not in module
+        tasks = _load_tasks(_TASKS_LINK_ONE)
+        names = [str(t.get("name", "")) for t in tasks]
+        palette_index = names.index(
+            "config_links : Ensure palette import in spine gtk.css for "
+            "{{ config_link_name }}"
+        )
+        appearance_index = names.index(
+            "config_links : Ensure appearance import in spine gtk.css for "
+            "{{ config_link_name }}"
+        )
+        symlink_index = next(
+            i
+            for i, t in enumerate(tasks)
+            if _module_key(t) == "ansible.builtin.file"
+            and str(_module(t).get("state")) == "link"
+        )
+        assert palette_index < appearance_index < symlink_index
+
     def test_ensure_spine_dir_gated_on_gtk_dirs(self) -> None:
         """gt-3-1: the spine-dir ensure (seed dirs only) is gated on gtk-dirs
         membership and NOT --check-gated (file state: directory is natively
@@ -426,6 +471,7 @@ class TestConfigLinksVars:
         "config_links_dirs_for_phase",
         "config_links_gtk_dirs",
         "config_links_gtk_import_line",
+        "config_links_gtk_appearance_import_line",
     }
 
     def test_vars_parse_with_required_keys(self) -> None:
@@ -502,6 +548,13 @@ class TestConfigLinksVars:
         """The import line is pinned EXACTLY — verify's grep gate asserts the
         same literal, so a drifted import path must fail both sides."""
         assert str(_vars()["config_links_gtk_import_line"]) == '@import "colors.css";'
+
+    def test_gtk_appearance_import_line_is_the_exact_generated_import(self) -> None:
+        """F-4.2: the relative appearance import names the stable link beside
+        gtk.css — never a generation or app-tag path."""
+        assert str(_vars()["config_links_gtk_appearance_import_line"]) == (
+            '@import "appearance.css";'
+        )
 
     def test_xdg_config_home_honors_xdg_and_defaults_to_home(self) -> None:
         """The link targets must resolve to the SAME location the filesystem
@@ -587,8 +640,18 @@ def _base_env(tmp: Path) -> tuple[dict[str, str], Path, Path, Path]:
     return env, home, xdg, install
 
 
-def _import_counts(path: Path) -> int:
-    return path.read_text().count('@import "colors.css";')
+def _import_counts(path: Path, line: str = '@import "colors.css";') -> int:
+    return path.read_text().count(line)
+
+
+def _assert_gtk_import_order(path: Path) -> None:
+    text = path.read_text()
+    palette = text.index('@import "colors.css";')
+    appearance = text.index('@import "appearance.css";')
+    assert palette < appearance, f"{path}: appearance import must follow palette"
+    assert text.count('@import "appearance.css";') == 1, (
+        f"{path}: appearance import must not be duplicated"
+    )
 
 
 @pytest.mark.integration
@@ -616,6 +679,10 @@ class TestConfigLinksExecution:
                 assert _import_counts(gtk_css) == 1, (
                     f"{gtk_css} must hold exactly one import line; got {_import_counts(gtk_css)}"
                 )
+                assert _import_counts(gtk_css, '@import "appearance.css";') == 1, (
+                    f"{gtk_css} must import the generated appearance sheet once"
+                )
+                _assert_gtk_import_order(gtk_css)
                 xdg_link = xdg / name
                 assert xdg_link.is_symlink(), f"{xdg_link} must be a symlink"
                 assert os.readlink(xdg_link) == str(spine_dir), (
@@ -628,9 +695,14 @@ class TestConfigLinksExecution:
                 "re-running the playbook must be a no-op (idempotency); recap:\n" + second.stdout
             )
             for name in ("gtk-3.0", "gtk-4.0"):
-                assert _import_counts(install / "config" / name / "gtk.css") == 1, (
-                    "re-runs must never duplicate the import line"
+                gtk_css = install / "config" / name / "gtk.css"
+                assert _import_counts(gtk_css) == 1, (
+                    "re-runs must never duplicate the palette import line"
                 )
+                assert _import_counts(gtk_css, '@import "appearance.css";') == 1, (
+                    "re-runs must never duplicate the appearance import line"
+                )
+                _assert_gtk_import_order(gtk_css)
 
     def test_playbook_migrates_existing_user_dirs_into_the_spine(self) -> None:
         """AC (migration machine, gt-3-1): pre-existing real dirs at
@@ -677,9 +749,11 @@ class TestConfigLinksExecution:
                 '@import "colors.css";'
             ), "the import must be APPENDED at EOF, below the user's snippet"
             assert _import_counts(migrated_css) == 1
+            _assert_gtk_import_order(migrated_css)
             assert _import_counts(spine4 / "gtk.css") == 1, (
                 "gtk-4.0/gtk.css must be the new import file"
             )
+            _assert_gtk_import_order(spine4 / "gtk.css")
             assert (spine4 / "settings.ini").is_file(), "gtk-4.0's settings.ini must be seeded too"
 
             for name in (xdg / "gtk-3.0", xdg / "gtk-4.0"):
@@ -702,8 +776,12 @@ class TestConfigLinksExecution:
                 "re-running after migration must be a no-op; recap:\n" + second.stdout
             )
             assert _import_counts(migrated_css) == 1, (
-                "re-runs must never duplicate the import line after migration"
+                "re-runs must never duplicate the palette import line after migration"
             )
+            assert _import_counts(migrated_css, '@import "appearance.css";') == 1, (
+                "re-runs must never duplicate the appearance import line"
+            )
+            _assert_gtk_import_order(migrated_css)
 
     def test_gtk3_theme_migration_task_shape(self) -> None:
         """Option A (2026-09-09): the gtk-3.0-only task flips settings.ini

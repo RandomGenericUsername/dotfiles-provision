@@ -134,6 +134,20 @@
     create: true
   when: config_link_name in config_links_gtk_dirs
 
+# F-4.2: the generated appearance sheet is imported AFTER the palette so its
+# same-specificity paint wins the GTK cascade. insertafter pins the order even
+# when the palette import was already present; lineinfile's exact-line match
+# makes re-runs a no-op (never a duplicate import). The relative
+# `appearance.css` names the stable provisioning link beside gtk.css, never a
+# generation or app-tag path.
+- name: "config_links : Ensure appearance import in spine gtk.css for {{ config_link_name }}"
+  ansible.builtin.lineinfile:
+    path: "{{ install_dir | trim }}/config/{{ config_link_name }}/gtk.css"
+    line: "{{ config_links_gtk_appearance_import_line }}"
+    insertafter: "{{ config_links_gtk_import_line }}"
+    create: true
+  when: config_link_name in config_links_gtk_dirs
+
 - name: "config_links : Symlink ~/.config/{{ config_link_name }} -> spine"
   ansible.builtin.file:
     path: "{{ config_links_xdg_config_home }}/{{ config_link_name }}"

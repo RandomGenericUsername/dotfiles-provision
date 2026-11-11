@@ -99,6 +99,9 @@ class TestStableConsumerLinks:
             ("palette", "rofi/colors.rasi", "colors.rasi"),
             ("palette", "btop/themes/colors.btop.theme", "colors.btop.theme"),
             ("appearance", "wlogout/appearance.css", "wlogout.css"),
+            ("appearance", "gtk-3.0/appearance.css", "gtk3.css"),
+            ("appearance", "gtk-4.0/appearance.css", "gtk4.css"),
+            ("appearance", "rofi/appearance.rasi", "rofi.rasi"),
         ]
         joined = str(data)
         assert "config/ags" not in joined
@@ -138,6 +141,30 @@ class TestStableConsumerLinks:
             "spine": "wlogout/appearance.css",
             "target": "wlogout.css",
         }
+
+    def test_format_aware_appearance_links_name_their_current_targets(self) -> None:
+        """F-4.1: GTK3/GTK4/rofi use consumer aliases but real config dirs."""
+        data = _vars("state_links")
+        by_spine = {
+            item["spine"]: item for item in data["state_links_consumers"]
+        }
+        assert by_spine["gtk-3.0/appearance.css"] == {
+            "base": "appearance",
+            "spine": "gtk-3.0/appearance.css",
+            "target": "gtk3.css",
+        }
+        assert by_spine["gtk-4.0/appearance.css"] == {
+            "base": "appearance",
+            "spine": "gtk-4.0/appearance.css",
+            "target": "gtk4.css",
+        }
+        assert by_spine["rofi/appearance.rasi"] == {
+            "base": "appearance",
+            "spine": "rofi/appearance.rasi",
+            "target": "rofi.rasi",
+        }
+        # The rofi artifact is never linked through a `.css` target.
+        assert not by_spine["rofi/appearance.rasi"]["target"].endswith(".css")
 
     def test_post_seed_playbook_runs_config_links_then_state_links(self) -> None:
         playbook = yaml.safe_load(
@@ -195,6 +222,11 @@ class TestVerifyGenerationLayout:
             "verify_generation_manifest.host.version == 1",
             "verify_generation_manifest.host.defaults | length > 0",
             "intent.host is defined",
+            "verify_generation_artifacts",
+            "verify_generation_artifact_expected_paths",
+            "selectattr('format', 'in', ['rasi', 'conf', 'theme'])",
+            "select('match', '.*[.]css$')",
+            "verify_generation_artifact_checks.results | selectattr('stat.isreg')",
         ):
             assert expected in that, expected
         assert (
@@ -205,7 +237,9 @@ class TestVerifyGenerationLayout:
         for name in (
             "Read the committed generation manifest",
             "Parse the committed generation manifest",
+            "Build the expected non-CSS artifact paths",
             "Check the generation appearance targets exist when a generation is present",
+            "Check the generation appearance artifacts exist when a generation is present",
             "Check the generation token document exists when a generation is present",
             "Assert the generation manifest is one complete v3 generation",
         ):
@@ -303,7 +337,11 @@ def _stage_palette(state: Path, *, manifest: bool) -> None:
         (palette / name).write_text("/* palette */\n", encoding="utf-8")
     appearance = state / "dotfiles" / "current" / "appearance"
     appearance.mkdir(parents=True, exist_ok=True)
-    (appearance / "wlogout.css").write_text("/* appearance */\n", encoding="utf-8")
+    for name in ("wlogout.css", "gtk3.css", "gtk4.css"):
+        (appearance / name).write_text("/* appearance */\n", encoding="utf-8")
+    (appearance / "rofi.rasi").write_text(
+        "* { surface: transparent; }\n", encoding="utf-8"
+    )
     if manifest:
         (state / "dotfiles" / "current" / "manifest.json").write_text(
             '{"version": 3}\n', encoding="utf-8"
@@ -330,6 +368,9 @@ class TestStableLinksExecution:
             "rofi/colors.rasi": ("palette", "colors.rasi"),
             "btop/themes/colors.btop.theme": ("palette", "colors.btop.theme"),
             "wlogout/appearance.css": ("appearance", "wlogout.css"),
+            "gtk-3.0/appearance.css": ("appearance", "gtk3.css"),
+            "gtk-4.0/appearance.css": ("appearance", "gtk4.css"),
+            "rofi/appearance.rasi": ("appearance", "rofi.rasi"),
         }
         for spine, (base, target) in expected.items():
             link = install / "config" / spine
@@ -386,6 +427,9 @@ class TestStableLinksExecution:
             "rofi/colors.rasi",
             "btop/themes/colors.btop.theme",
             "wlogout/appearance.css",
+            "gtk-3.0/appearance.css",
+            "gtk-4.0/appearance.css",
+            "rofi/appearance.rasi",
         ):
             assert (install / "config" / spine).is_symlink(), spine
 

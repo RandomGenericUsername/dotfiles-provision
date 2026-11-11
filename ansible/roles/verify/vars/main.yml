@@ -1062,14 +1062,19 @@ verify_gui_tools_app_files: []
 #   generation-specific path and never an AGS app tag. `config/ags/colors.css`
 #   is deliberately absent: AGS apps read
 #   state/current/appearance/<configDir>.css directly, and config/ags is a
-#   symlink into an immutable tag. wlogout is a real config directory, so its
-#   generated sheet is exposed as a stable provisioning-owned link.
+#   symlink into an immutable tag. wlogout/gtk3/gtk4/rofi are real config
+#   directories, so their generated sheet/artifact is exposed as a stable
+#   provisioning-owned link. GTK uses the gtk3/gtk4 consumer aliases because a
+#   contract configDir cannot contain the dot in gtk-3.0/gtk-4.0.
 verify_consumer_symlinks:
   - { path: "{{ install_dir | trim }}/config/gtk-3.0/colors.css", base: palette, target: colors.gtk.css }
   - { path: "{{ install_dir | trim }}/config/gtk-4.0/colors.css", base: palette, target: colors.adw.css }
   - { path: "{{ install_dir | trim }}/config/rofi/colors.rasi", base: palette, target: colors.rasi }
   - { path: "{{ install_dir | trim }}/config/btop/themes/colors.btop.theme", base: palette, target: colors.btop.theme }
   - { path: "{{ install_dir | trim }}/config/wlogout/appearance.css", base: appearance, target: wlogout.css }
+  - { path: "{{ install_dir | trim }}/config/gtk-3.0/appearance.css", base: appearance, target: gtk3.css }
+  - { path: "{{ install_dir | trim }}/config/gtk-4.0/appearance.css", base: appearance, target: gtk4.css }
+  - { path: "{{ install_dir | trim }}/config/rofi/appearance.rasi", base: appearance, target: rofi.rasi }
 
 # verify_app_tag_forbidden_runtime_artifacts: runtime-owned names that must
 #   never exist inside an immutable app tag (contracts generations.md §6).
@@ -1210,6 +1215,12 @@ verify_btop_save_config_on_exit: "false"
 verify_gtk_skeleton_files:
   - "{{ verify_xdg_config_home }}/gtk-3.0/gtk.css"
   - "{{ verify_xdg_config_home }}/gtk-4.0/gtk.css"
+
+# verify_rofi_config_path: the static rofi launcher read through the
+#   ~/.config/rofi link. F-4.2 requires one palette import (`../colors.rasi`)
+#   followed by the generated artifact import (`../appearance.rasi`) as the last
+#   import; the .rasi artifact is never a CSS sheet.
+verify_rofi_config_path: "{{ verify_xdg_config_home }}/rofi/launcher/config.rasi"
 
 # verify_managed_link_spine_prefix: the regex prefix each managed symlink target
 #   must match (criterion 9, layer 2 — exact-target). Derived from the same

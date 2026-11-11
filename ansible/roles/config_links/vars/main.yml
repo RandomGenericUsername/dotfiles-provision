@@ -153,3 +153,11 @@ config_links_gtk_dirs:
 #   spine dirs on the first seed (gt-2-2); provisioning never writes the
 #   pointer file itself (a missing import file is harmless to GTK).
 config_links_gtk_import_line: '@import "colors.css";'
+
+# config_links_gtk_appearance_import_line: Phase 3A-4 / F-4.2 — the generated
+#   skin sheet is imported AFTER the palette so same-specificity skin paint
+#   wins the GTK cascade. It points at the provisioning-owned stable link
+#   beside gtk.css (`appearance.css` -> current/appearance/gtk{3,4}.css), never
+#   a generation or app-tag path. App-owned rules stay untouched; lineinfile
+#   without regexp is idempotent and only appends when absent.
+config_links_gtk_appearance_import_line: '@import "appearance.css";'

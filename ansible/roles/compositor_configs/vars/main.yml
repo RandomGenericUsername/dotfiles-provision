@@ -134,6 +134,17 @@ compositor_configs_config_dirs:
 #   <install>/config/<spineLink>. A stale per-file AGS entry here would template
 #   INTO a tag through that link — silently diverging the live app from its
 #   pinned version — so deploy-coverage FAILS on any AGS source in this list.
+# compositor_configs_rofi_config_path / _rofi_appearance_import_line: Phase
+#   3A-4 / F-4.2. The pinned rofi launcher config imports the palette once
+#   (`../colors.rasi`) and must import the generated rofi rasi artifact after
+#   it. `../appearance.rasi` is the provisioning-owned stable link beside the
+#   launcher dir (config/rofi/appearance.rasi -> current/appearance/rofi.rasi),
+#   never a generation or app-tag path. The generated fragment carries skin
+#   geometry/paint but does NOT import the palette itself, so the static config
+#   keeps exactly one palette import.
+compositor_configs_rofi_config_path: "{{ compositor_configs_spine_config_dir }}/rofi/launcher/config.rasi"
+compositor_configs_rofi_appearance_import_line: '@import "../appearance.rasi"'
+
 compositor_configs_skeleton_files:
   - { name: hyprland-lua, source: "{{ compositor_configs_assets_configs_dir }}/hypr/hyprland.lua", dest: "{{ compositor_configs_spine_config_dir }}/hypr/hyprland.lua" }
   - { name: keybindings-lua, source: "{{ compositor_configs_assets_configs_dir }}/hypr/keybindings.lua", dest: "{{ compositor_configs_spine_config_dir }}/hypr/keybindings.lua" }

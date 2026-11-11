@@ -104,6 +104,19 @@
   # loud on a bad pin. A provisioned machine still predicts every change.
   when: not ansible_check_mode or compositor_configs_assets_configs_check.stat.isdir | default(false)
 
+# F-4.2: the static rofi launcher imports its palette once (the pinned
+# config.rasi's first line) and imports the generated appearance.rasi after it.
+# The fragment references palette roles but does not import the palette, so no
+# second palette import is added here. insertafter pins the order; lineinfile's
+# exact-line match keeps re-runs idempotent. The import names the stable
+# provisioning link, never a generation/app-tag path.
+- name: Ensure the rofi launcher imports the generated appearance artifact
+  ansible.builtin.lineinfile:
+    path: "{{ compositor_configs_rofi_config_path }}"
+    line: "{{ compositor_configs_rofi_appearance_import_line }}"
+    insertafter: '@import "../colors.rasi"'
+  when: not ansible_check_mode or compositor_configs_assets_configs_check.stat.isdir | default(false)
+
 # Desktop entries (spine AD-10 layers 1-3). The corpus ships the entries plus
 # `desktop.yaml`; layer 2 is HERE and it runs BEFORE the copy:
 #   * a missing `requires` binary FAILS the run, naming the entry and the binary

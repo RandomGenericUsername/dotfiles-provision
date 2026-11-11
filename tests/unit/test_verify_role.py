@@ -1646,6 +1646,57 @@ class TestVerifyTasks:
         assert "verify_gtk_skeleton_files | length" in that
         assert assert_task.get("when") == "not ansible_check_mode"
 
+    def test_gtk_appearance_import_gate_requires_last_after_palette(self) -> None:
+        """F-4.2: verify proves the generated sheet is the LAST import and
+        follows exactly one palette import, through the ~/.config links."""
+        matches = [
+            task
+            for task in _command_tasks()
+            if "verify_gtk_appearance_import_checks" == str(task.get("register"))
+        ]
+        assert len(matches) == 1
+        gate = matches[0]
+        text = _module_text(gate)
+        assert "appearance.css" in text and "colors.css" in text
+        assert "appearance[0] != len(imports) - 1" in text
+        assert "colors[0] > appearance[0]" in text
+        assert "{{ verify_gtk_skeleton_files }}" in str(gate.get("loop", ""))
+        assert gate.get("changed_when") is False
+        assert gate.get("failed_when") is False
+        assert gate.get("when") == "not ansible_check_mode"
+        asserts = [
+            task
+            for task in _assert_tasks()
+            if "verify_gtk_appearance_import_checks" in str(_module(task).get("that", ""))
+        ]
+        assert len(asserts) == 1
+        assert "verify_gtk_skeleton_files | length" in str(
+            _module(asserts[0]).get("that", "")
+        )
+
+    def test_rofi_appearance_import_gate_requires_rasi_last_after_palette(self) -> None:
+        """F-4.2: the rofi launcher imports the palette once, then the .rasi
+        artifact last; a CSS import is never accepted."""
+        matches = [
+            task
+            for task in _command_tasks()
+            if "verify_rofi_appearance_import" == str(task.get("register"))
+        ]
+        assert len(matches) == 1
+        gate = matches[0]
+        text = _module_text(gate)
+        assert "appearance.rasi" in text and "colors.rasi" in text
+        assert "appearance[0] != len(imports) - 1" in text
+        assert 'value.endswith(".css")' in text
+        assert str(gate.get("when")) == "not ansible_check_mode"
+        asserts = [
+            task
+            for task in _assert_tasks()
+            if "verify_rofi_appearance_import.rc" in str(_module(task).get("that", ""))
+        ]
+        assert len(asserts) == 1
+        assert "appearance.rasi" in str(_module(asserts[0]).get("fail_msg", ""))
+
     def test_gtk_skeleton_files_var_pins_both_dirs_through_xdg(self) -> None:
         """The skeleton list pins exactly ~/.config/gtk-{3,4}.0/gtk.css
         (read through the links). settings.ini is deliberately absent
@@ -1896,6 +1947,9 @@ class TestVerifyConsumerLinks:
             ("config/rofi/colors.rasi", "palette", "colors.rasi"),
             ("config/btop/themes/colors.btop.theme", "palette", "colors.btop.theme"),
             ("config/wlogout/appearance.css", "appearance", "wlogout.css"),
+            ("config/gtk-3.0/appearance.css", "appearance", "gtk3.css"),
+            ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
+            ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
         ):
             assert any(expected in path for path in paths), f"missing {expected}"
             assert any(
@@ -2058,6 +2112,49 @@ class TestVerifyConsumerLinkRender:
             )
             self._assert_clean_render(combined)
 
+    @pytest.mark.parametrize(
+        ("relative", "base", "target"),
+        [
+            ("config/gtk-3.0/appearance.css", "appearance", "gtk3.css"),
+            ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
+            ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "mutation", ["missing", "dangling", "wrong-target", "generation-path"]
+    )
+    def test_bad_format_aware_appearance_link_fails_cleanly(
+        self, relative: str, base: str, target: str, mutation: str
+    ) -> None:
+        """F-4.3: every GTK/rofi appearance link must be present, resolve and
+        name current/appearance/<target> — never a generation or app-tag path.
+        The rofi target is .rasi, not fake CSS."""
+        with tempfile.TemporaryDirectory() as tmp:
+            install, _home, _bin_dir, env = _synthetic_verify_machine(Path(tmp))
+            link = install / relative
+            link.unlink()
+            state_home = Path(env["XDG_STATE_HOME"])
+            current = state_home / "dotfiles" / "current"
+            if mutation == "dangling":
+                link.symlink_to(current / base / "missing-target")
+            elif mutation == "wrong-target":
+                link.symlink_to(current / "palette" / "colors.gtk.css")
+            elif mutation == "generation-path":
+                link.symlink_to(current.resolve() / base / target)
+            result = self._run(install, env)
+            combined = result.stdout + result.stderr
+            assert result.returncode != 0, (
+                f"verify must FAIL for a {mutation} {relative} link; recap:\n"
+                + combined[-5000:]
+            )
+            assert self._ASSERT in combined, combined[-5000:]
+            assert relative in combined, combined[-5000:]
+            assert "is not the provisioning-owned stable link" in combined, (
+                "the failure must be the clean assert message; recap:\n"
+                + combined[-5000:]
+            )
+            self._assert_clean_render(combined)
+
 
 class TestVerifyVars:
     _REQUIRED_KEYS = {
@@ -2102,6 +2199,7 @@ class TestVerifyVars:
         "verify_config_copy_content",
         "verify_managed_link_dirs",
         "verify_gtk_skeleton_files",
+        "verify_rofi_config_path",
         "verify_btop_spine_dir",
         "verify_btop_config_path",
         "verify_btop_themes_dir",
@@ -4214,6 +4312,47 @@ class TestVerifyRuntime:
             assert result.returncode == 0, result.stdout + result.stderr
             assert "failed=0" in result.stdout, result.stdout
 
+    def _rewrite_manifest_artifacts(self, state_home: Path, mutate: str) -> None:
+        manifest_path = state_home / "dotfiles" / "current" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        if mutate == "missing-file":
+            (state_home / "dotfiles" / "current" / "appearance" / "rofi.rasi").unlink()
+        elif mutate == "fake-css":
+            artifact = manifest["appearance"]["artifacts"][0]
+            artifact["path"] = "appearance/rofi.css"
+            (state_home / "dotfiles" / "current" / "appearance" / "rofi.css").write_text(
+                "/* fake */\n"
+            )
+        elif mutate == "target-consumer-collision":
+            manifest["appearance"]["artifacts"][0]["consumer"] = "gtk3"
+            manifest["appearance"]["artifacts"][0]["path"] = "appearance/gtk3.rasi"
+            (state_home / "dotfiles" / "current" / "appearance" / "gtk3.rasi").write_text(
+                "* { surface: transparent; }\n"
+            )
+        manifest_path.write_text(json.dumps(manifest) + "\n")
+
+    @pytest.mark.parametrize(
+        "mutation", ["missing-file", "fake-css", "target-consumer-collision"]
+    )
+    def test_verify_rejects_a_broken_generation_artifact(
+        self, mutation: str
+    ) -> None:
+        """F-4.3/no-fake-CSS: a missing, `.css`-named or target-colliding
+        artifact must fail the committed-generation gate."""
+        ansible_playbook = shutil.which("ansible-playbook")
+        if ansible_playbook is None:
+            pytest.skip("ansible-playbook not installed; skipping execution test")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            install, _home, _bin_dir, env = _synthetic_verify_machine(root)
+            self._rewrite_manifest_artifacts(
+                Path(env["XDG_STATE_HOME"]), mutation
+            )
+            result = self._run_verify(root, install, env)
+            combined = result.stdout + result.stderr
+            assert result.returncode != 0, combined
+            assert "complete v3 generation" in combined, combined
+
     @pytest.mark.parametrize("mutation", ["fingerprint-mismatch", "host-without-intent"])
     def test_verify_rejects_a_malformed_host_block(self, mutation: str) -> None:
         ansible_playbook = shutil.which("ansible-playbook")
@@ -5416,8 +5555,11 @@ def _build_provisioned_layout(
         "ags-wallpaper-selector",
         "ags-icme",
         "ags-btop-studio",
-        # W-2.5: the non-AGS wlogout consumer also gets a generated sheet.
+        # W-2.5 / F-4: the non-AGS wlogout/gtk3/gtk4 consumers also get
+        # generated CSS sheets.
         "wlogout",
+        "gtk3",
+        "gtk4",
     )
     appearance = state_generation / "appearance"
     appearance.mkdir()
@@ -5429,6 +5571,10 @@ def _build_provisioned_layout(
         targets.append(
             {"configDir": config_dir, "path": f"appearance/{config_dir}.css"}
         )
+    (appearance / "rofi.rasi").write_text("* { surface: transparent; }\n")
+    artifacts = [
+        {"consumer": "rofi", "path": "appearance/rofi.rasi", "format": "rasi"}
+    ]
     manifest = {
         "version": 3,
         "generationHash": gen_hash,
@@ -5442,6 +5588,7 @@ def _build_provisioned_layout(
         "appearance": {
             "tokensPath": "appearance/tokens.json",
             "targets": targets,
+            "artifacts": artifacts,
         },
         "mode": "dark",
         "intent": {
@@ -5463,6 +5610,9 @@ def _build_provisioned_layout(
         ("config/rofi/colors.rasi", "palette", "colors.rasi"),
         ("config/btop/themes/colors.btop.theme", "palette", "colors.btop.theme"),
         ("config/wlogout/appearance.css", "appearance", "wlogout.css"),
+        ("config/gtk-3.0/appearance.css", "appearance", "gtk3.css"),
+        ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
+        ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
     ):
         pointer = install / rel
         pointer.parent.mkdir(parents=True, exist_ok=True)
@@ -5515,7 +5665,14 @@ def _build_provisioned_layout(
         (install / "config" / "hypr" / lua).write_text("")
     (install / "config" / "hyprpaper" / "hyprpaper.conf").write_text("")
     # rofi launcher skeleton (compositor_configs role, add-rofi-app-launcher).
-    (install / "config" / "rofi" / "launcher" / "config.rasi").write_text("")
+    # F-4.2: one palette import, then the generated rasi artifact LAST.
+    (install / "config" / "rofi" / "launcher" / "config.rasi").write_text(
+        '@import "../colors.rasi"\n'
+        '@import "../appearance.rasi"\n'
+        "\n"
+        "configuration { modes: \"drun\"; }\n"
+        "window { background-color: @surface; }\n"
+    )
     # The capture instance's generated icons.json lands THROUGH the live-capture
     # symlink (into the unit's capture-tool/); it is written in the ags-apps unit
     # block below, after that link exists.
@@ -5694,8 +5851,11 @@ def _build_provisioned_layout(
     ):
         (xdg / name).symlink_to(install / "config" / name, target_is_directory=True)
 
-    # GTK skeleton files (gt-3-1): both spine gtk.css files carry the exact
-    # palette-import line the config-links role ensures (the fixture IS the
-    # provisioned machine and must satisfy the skeleton + grep criteria).
+    # GTK skeleton files (gt-3-1 / F-4.2): both spine gtk.css files carry the
+    # palette import then the generated appearance import LAST (the fixture IS
+    # the provisioned machine and must satisfy the skeleton + ordering gates).
     for name in ("gtk-3.0", "gtk-4.0"):
-        (install / "config" / name / "gtk.css").write_text('@import "colors.css";\n')
+        (install / "config" / name / "gtk.css").write_text(
+            '@import "colors.css";\n'
+            '@import "appearance.css";\n'
+        )

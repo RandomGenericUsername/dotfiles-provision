@@ -2292,6 +2292,19 @@
   ansible.builtin.set_fact:
     verify_generation_manifest: "{{ verify_generation_manifest_raw.content | b64decode | from_json }}"
     verify_generation_targets: "{{ (verify_generation_manifest_raw.content | b64decode | from_json).appearance.targets | default([]) }}"
+    verify_generation_artifacts: "{{ (verify_generation_manifest_raw.content | b64decode | from_json).appearance.artifacts | default([]) }}"
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
+
+- name: Build the expected non-CSS artifact paths
+  ansible.builtin.set_fact:
+    verify_generation_artifact_expected_paths: >-
+      {%- set paths = [] -%}
+      {%- for artifact in verify_generation_artifacts | default([]) -%}
+      {%- set _ = paths.append('appearance/' ~ artifact.consumer ~ '.' ~ artifact.format) -%}
+      {%- endfor -%}
+      {{ paths }}
   when:
     - not ansible_check_mode
     - verify_generation_layout_checks.results[0].stat.exists | default(false)
@@ -2304,6 +2317,18 @@
   loop_control:
     label: "{{ item.path | default('') }}"
   register: verify_generation_target_checks
+  when:
+    - not ansible_check_mode
+    - verify_generation_layout_checks.results[0].stat.exists | default(false)
+
+- name: Check the generation appearance artifacts exist when a generation is present
+  ansible.builtin.stat:
+    path: "{{ verify_state_current_dir }}/{{ item.path }}"
+    follow: true
+  loop: "{{ verify_generation_artifacts | default([]) }}"
+  loop_control:
+    label: "{{ item.path | default('') }}"
+  register: verify_generation_artifact_checks
   when:
     - not ansible_check_mode
     - verify_generation_layout_checks.results[0].stat.exists | default(false)
@@ -2352,6 +2377,25 @@
       - >-
         verify_generation_target_checks.results | selectattr('stat.isreg') | list
         | length == verify_generation_targets | length
+      - >-
+        (verify_generation_artifacts | default([]) | length) == 0
+        or
+        (verify_generation_artifacts
+         | selectattr('format', 'in', ['rasi', 'conf', 'theme']) | list | length
+         == verify_generation_artifacts | length)
+      - >-
+        (verify_generation_artifacts | map(attribute='path') | list)
+        == verify_generation_artifact_expected_paths
+      - >-
+        verify_generation_artifacts | map(attribute='path') | list
+        | select('match', '.*[.]css$') | list | length == 0
+      - >-
+        (verify_generation_targets | map(attribute='configDir') | list
+         | intersect(verify_generation_artifacts
+                     | map(attribute='consumer') | list) | length) == 0
+      - >-
+        verify_generation_artifact_checks.results | selectattr('stat.isreg') | list
+        | length == verify_generation_artifacts | length
       - verify_generation_tokens_check.stat.isreg | default(false)
     fail_msg: >-
       current/manifest.json is not the committed v3 generation required by
@@ -2361,9 +2405,11 @@
       declare {{ verify_generation_tokens_path }} plus one
       appearance/<configDir>.css target per app, mode must agree across
       mode/skin/intent, and an optional host block must carry a hyprland v1
-      fingerprint with non-empty defaults plus a matching intent.host. A v2
-      current directory, a torn manifest or a malformed host block fails
-      closed.
+      fingerprint with non-empty defaults plus a matching intent.host. Every
+      optional non-CSS artifact must name appearance/<consumer>.<format> with
+      format rasi/conf/theme (never .css), be unique across both families and
+      resolve as a regular file. A v2 current directory, a torn manifest, a
+      fake CSS artifact or a malformed host block fails closed.
   when:
     - not ansible_check_mode
     - verify_generation_layout_checks.results[0].stat.exists | default(false)
@@ -2528,6 +2574,131 @@
       {{ verify_gtk_skeleton_files | join(' and ') }} — gt-3-1, read through
       the spine symlinks). The config-links role ensures the import;
       re-run the config-links playbook
+  when: not ansible_check_mode
+
+# F-4.2: the generated GTK sheet is imported AFTER the palette and is the LAST
+# import, so same-specificity skin paint wins while app-owned rules stay
+# untouched. A relative `appearance.css` names the stable link beside gtk.css,
+# never a generation or app-tag path. The `.rasi` rofi check below applies the
+# same ordering but keeps the artifact format (never CSS).
+- name: Check gtk skeleton files import the generated appearance sheet last
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter | default('python3') }}"
+      - -c
+      - |
+        import re
+        import sys
+
+        text = open(sys.argv[1], encoding="utf-8").read()
+        imports = re.findall(
+            r'@import\s+(?:url\(\s*)?["\']([^"\']+)["\']', text
+        )
+        colors = [i for i, value in enumerate(imports) if value.endswith("colors.css")]
+        appearance = [
+            i for i, value in enumerate(imports) if value.endswith("appearance.css")
+        ]
+        if len(colors) != 1:
+            print(
+                f"expected exactly one palette import, found {colors}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if len(appearance) != 1:
+            print(
+                f"expected exactly one appearance.css import, found {appearance}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if appearance[0] != len(imports) - 1:
+            print(
+                f"last @import is {imports[-1]!r}, expected appearance.css last",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if colors[0] > appearance[0]:
+            print("appearance.css must be imported after colors.css", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"gtk imports palette then appearance: {imports}")
+      - "{{ item }}"
+  loop: "{{ verify_gtk_skeleton_files }}"
+  register: verify_gtk_appearance_import_checks
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert gtk skeleton files import the generated appearance sheet last
+  ansible.builtin.assert:
+    that: >-
+      verify_gtk_appearance_import_checks.results
+      | selectattr('rc', 'equalto', 0) | list | length
+      == verify_gtk_skeleton_files | length
+    fail_msg: >-
+      a gtk skeleton gtk.css does not import the generated appearance sheet
+      last (F-4.2): expected exactly one `@import "colors.css";` followed by
+      `@import "appearance.css";` as the final import in
+      {{ verify_gtk_skeleton_files | join(' and ') }}. The config-links role
+      ensures both imports; re-run config-links.
+  when: not ansible_check_mode
+
+- name: Check the rofi launcher imports palette then the generated rasi artifact
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter | default('python3') }}"
+      - -c
+      - |
+        import re
+        import sys
+
+        text = open(sys.argv[1], encoding="utf-8").read()
+        imports = re.findall(
+            r'@import\s+(?:url\(\s*)?["\']([^"\']+)["\']', text
+        )
+        colors = [i for i, value in enumerate(imports) if value.endswith("colors.rasi")]
+        appearance = [
+            i for i, value in enumerate(imports) if value.endswith("appearance.rasi")
+        ]
+        if len(colors) != 1:
+            print(
+                f"expected exactly one palette import, found {colors}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if len(appearance) != 1:
+            print(
+                f"expected exactly one appearance.rasi import, found {appearance}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if appearance[0] != len(imports) - 1:
+            print(
+                f"last @import is {imports[-1]!r}, expected appearance.rasi last",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        if colors[0] > appearance[0]:
+            print("appearance.rasi must be imported after colors.rasi", file=sys.stderr)
+            raise SystemExit(1)
+        if any(value.endswith(".css") for value in imports):
+            print("rofi imports a CSS sheet; its artifact is .rasi", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"rofi imports palette then rasi artifact: {imports}")
+      - "{{ verify_rofi_config_path }}"
+  register: verify_rofi_appearance_import
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Assert the rofi launcher imports the generated rasi artifact last
+  ansible.builtin.assert:
+    that: verify_rofi_appearance_import.rc == 0
+    fail_msg: >-
+      the rofi launcher does not import the generated appearance artifact last
+      (F-4.2): {{ verify_rofi_appearance_import.stderr | default('') }}.
+      Expected exactly one `@import "../colors.rasi"` followed by
+      `@import "../appearance.rasi"` as the final import. The generated
+      artifact owns skin geometry/paint (not palette colours), so the palette
+      stays imported exactly once. Run compositor-configs.
   when: not ansible_check_mode
 
 - name: Check rendered zshrc wires starship and the color scheme
