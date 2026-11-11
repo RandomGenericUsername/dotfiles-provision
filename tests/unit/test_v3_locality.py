@@ -1,7 +1,7 @@
 """Generations v3 deployment/locality contracts for the provisioning engine.
 
 These tests pin the wave-4 boundary from `dotfiles-v3/docs/107-generations-v3.md`
-§2.7 and contracts `generations.md` v0.9.0 §6:
+§2.7 and contracts `generations.md` v0.10.0 §6:
 
 - provisioning owns stable links for non-runtime palette consumers and points
   them at `state/current/palette/...`;
@@ -167,9 +167,9 @@ class TestStableConsumerLinks:
 
 
 class TestVerifyGenerationLayout:
-    def test_verify_expects_contracts_v090_generation(self) -> None:
+    def test_verify_expects_contracts_v0100_generation(self) -> None:
         data = _vars("verify")
-        assert data["verify_generation_contract_tag"] == "v0.9.0"
+        assert data["verify_generation_contract_tag"] == "v0.10.0"
         assert data["verify_generation_manifest_version"] == 3
         assert data["verify_state_generation_manifest"] == (
             "{{ verify_state_current_dir }}/manifest.json"
@@ -391,16 +391,16 @@ class TestStableLinksExecution:
 
 
 _CONTRACTS_FIXTURE = (
-    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.9.0"
+    Path(__file__).resolve().parent.parent / "fixtures" / "contracts" / "v0.10.0"
 )
 
 
-class TestVendoredContractsV090:
-    """The engine vendors the v0.9.0 generation/refresh schemas it validates."""
+class TestVendoredContractsV0100:
+    """The engine vendors the v0.10.0 generation/refresh schemas it validates."""
 
-    def test_pin_names_contracts_v090_and_matches_every_schema_digest(self) -> None:
+    def test_pin_names_contracts_v0100_and_matches_every_schema_digest(self) -> None:
         pin = (_CONTRACTS_FIXTURE / "PIN").read_text()
-        assert "contracts=v0.9.0" in pin
+        assert "contracts=v0.10.0" in pin
         import hashlib
 
         for schema in _CONTRACTS_FIXTURE.glob("*.schema.json"):
@@ -432,6 +432,42 @@ class TestVendoredContractsV090:
         appearance = schema["definitions"]["appearance"]
         assert "appearance/tokens.json" in str(appearance)
         assert "appearance/[a-z0-9]" in str(schema["definitions"]["target"])
+
+    def test_generation_manifest_schema_adds_optional_css_free_artifacts(self) -> None:
+        import json
+
+        schema = json.loads(
+            (_CONTRACTS_FIXTURE / "generation-manifest.schema.json").read_text()
+        )
+        artifact = schema["definitions"]["artifact"]
+        assert set(artifact["required"]) == {"consumer", "path", "format"}
+        assert artifact["properties"]["format"]["enum"] == ["rasi", "conf", "theme"]
+        assert "css" not in artifact["properties"]["format"]["enum"]
+        appearance = schema["definitions"]["appearance"]
+        assert "artifacts" not in appearance["required"]
+        artifacts = appearance["properties"]["artifacts"]
+        assert artifacts["items"]["$ref"] == "#/definitions/artifact"
+        assert artifacts["minItems"] == 1
+        assert artifacts["uniqueItems"] is True
+
+    def test_artifacts_rasi_manifest_fixture_is_non_css(self) -> None:
+        import json
+
+        manifest = json.loads(
+            (
+                _CONTRACTS_FIXTURE
+                / "generation-manifest-artifacts.rasi.valid.json"
+            ).read_text()
+        )
+        artifacts = manifest["appearance"]["artifacts"]
+        assert artifacts == [
+            {
+                "consumer": "rofi",
+                "path": "appearance/rofi.rasi",
+                "format": "rasi",
+            }
+        ]
+        assert not any(item["path"].endswith(".css") for item in artifacts)
 
     def test_generation_manifest_schema_accepts_an_optional_host_block(self) -> None:
         import json

@@ -27,7 +27,7 @@ state_links_spine_config_dir: "{{ install_dir | trim }}/config"
 #   `target` is the artifact inside it. The runtime never repoints these links;
 #   a new generation is visible through `current`.
 #
-#   wlogout is the first generated-appearance consumer: the assets v0.16.0
+#   wlogout is the first generated-appearance consumer: the assets v0.17.0
 #   static style imports its sibling `appearance.css` last, and that link
 #   resolves to the runtime's `current/appearance/wlogout.css`. It never points
 #   through a generation directory or an `<install>/apps/<tag>` path.

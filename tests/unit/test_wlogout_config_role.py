@@ -137,7 +137,7 @@ class TestWlogoutConfigTasks:
         assert not missing, f"render task does not define template vars: {sorted(missing)}"
 
     def test_render_context_matches_v0151_static_template(self) -> None:
-        """v0.16.0 static style owns no typography; only structure vars remain."""
+        """v0.17.0 static style owns no typography; only structure vars remain."""
         task = _render_task()
         vars_block = task.get("vars")
         assert isinstance(vars_block, dict)
@@ -243,7 +243,7 @@ class TestWlogoutConfigTemplate:
         )
 
     def test_static_template_owns_no_generated_paint(self) -> None:
-        """v0.16.0: the static sheet is structure only; the generated appearance
+        """v0.17.0: the static sheet is structure only; the generated appearance
         sheet owns palette roles. The retired CSG carrier tokens stay absent."""
         text = _template().read_text()
         for bad in ("@color_", "@color16", "@color10", "@color7;"):

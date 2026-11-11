@@ -1,0 +1,69 @@
+{
+  "version": 3,
+  "generationHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created": {
+    "at": "2026-11-06T12:00:00Z",
+    "by": "dotfiles-runtime 0.8.0"
+  },
+  "committed": {
+    "at": "2026-11-06T12:00:01Z",
+    "jobId": "converge-01J8Z3"
+  },
+  "layers": {
+    "wallpaper": {
+      "entryHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "path": "wallpaper"
+    },
+    "palette": {
+      "entryHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "path": "palette"
+    },
+    "effects": {
+      "entryHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "path": "effects"
+    },
+    "icons": {
+      "entryHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "path": "icons"
+    }
+  },
+  "skin": {
+    "name": "glass",
+    "entryHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "mode": "dark"
+  },
+  "appearance": {
+    "tokensPath": "appearance/tokens.json",
+    "targets": [
+      {
+        "configDir": "ags",
+        "path": "appearance/ags.css"
+      },
+      {
+        "configDir": "ags-notifications",
+        "path": "appearance/ags-notifications.css"
+      }
+    ],
+    "artifacts": [
+      {
+        "consumer": "rofi",
+        "path": "appearance/rofi.rasi",
+        "format": "rasi"
+      }
+    ]
+  },
+  "mode": "dark",
+  "intent": {
+    "wallpaper": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "palette": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "skin": "glass",
+    "mode": "dark",
+    "effects": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "icons": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "source": {
+    "kind": "daemon",
+    "intentHash": "9999999999999999999999999999999999999999999999999999999999999999",
+    "jobId": "converge-01J8Z3"
+  }
+}

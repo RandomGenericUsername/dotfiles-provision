@@ -442,7 +442,10 @@ _SKIN_TEMPLATE_FILES = (
     "ags-capture.gtk.css.j2",
     "ags-icme.gtk.css.j2",
     "ags-btop-studio.gtk.css.j2",
+    "gtk3.gtk.css.j2",
+    "gtk4.gtk.css.j2",
     "wlogout.gtk.css.j2",
+    "rofi.rasi.j2",
 )
 
 
@@ -466,7 +469,7 @@ def _write_deployed_skins(spine: Path) -> None:
             {
                 "schema_major": 2,
                 "canonical": {
-                    "tag": "v0.9.0",
+                    "tag": "v0.10.0",
                     "vendored": True,
                     "paths": [
                         "schemas/appearance-manifest.schema.json",
@@ -508,7 +511,7 @@ def _write_deployed_skins(spine: Path) -> None:
         )
         + "\n"
     )
-    pin_lines = ["contracts=v0.9.0\n"]
+    pin_lines = ["contracts=v0.10.0\n"]
     for name, body in _SKIN_CONTRACT_BODIES.items():
         (contracts / name).write_text(body)
         pin_lines.append(
@@ -2138,12 +2141,12 @@ class TestVerifyVars:
         for name in ("icons", "templates", "configs", "content", "desktop", "skins"):
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
-    def test_skins_pin_is_v0150_with_the_v09_contract_and_templates(self) -> None:
-        """BUG-012: assets v0.16.0 ships five manifests, eight templates and the
-        contracts v0.9.0 plane, including the vendored generation schema."""
+    def test_skins_pin_is_v0170_with_the_v0100_contract_and_templates(self) -> None:
+        """REQ-040: assets v0.17.0 ships five manifests, ten CSS targets plus
+        the rofi artifact and the contracts v0.10.0 plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.16.0"
-        assert str(data["verify_skins_expected_contract_tag"]) == "v0.9.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.17.0"
+        assert str(data["verify_skins_expected_contract_tag"]) == "v0.10.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
             "flat",
@@ -2159,8 +2162,16 @@ class TestVerifyVars:
             "ags-capture.gtk.css.j2",
             "ags-icme.gtk.css.j2",
             "ags-btop-studio.gtk.css.j2",
+            "gtk3.gtk.css.j2",
+            "gtk4.gtk.css.j2",
             "wlogout.gtk.css.j2",
         ]
+        assert [str(item) for item in data["verify_skins_artifact_files"]] == [
+            "rofi.rasi.j2",
+        ]
+        assert "verify_skins_template_files + verify_skins_artifact_files" in str(
+            data["verify_skins_template_paths"]
+        )
         assert "verify_skins_templates_dir" in str(
             data["verify_skins_template_paths"]
         )
@@ -3530,7 +3541,8 @@ class TestVerifySkinPlane:
     def test_deployed_skin_plane_accepts_the_fifth_terminal_host_manifest(
         self, tmp_path: Path
     ) -> None:
-        """REQ-033/REQ-038: all five manifests expand through eight templates."""
+        """REQ-039/REQ-040: all five manifests expand through ten CSS targets
+        and the rofi rasi artifact."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         manifests = sorted(
@@ -3634,15 +3646,15 @@ class TestVerifySkinPlane:
         assert result.returncode != 0, "an unknown placeholder must fail verify"
         assert "placeholder" in output, output
 
-    def test_skin_plane_accepts_the_assets_v0150_v09_envelope(
+    def test_skin_plane_accepts_the_assets_v0170_v0100_envelope(
         self, tmp_path: Path
     ) -> None:
-        """BUG-012: the released assets v0.16.0 skins schema names v0.9.0 and
-        vendors the fourth canonical (generation) schema."""
+        """REQ-040: the released assets v0.17.0 skins schema names contracts
+        v0.10.0 and vendors the fourth canonical (generation) schema."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
         schema = json.loads((install / "skins" / "schema.json").read_text())
-        assert schema["canonical"]["tag"] == "v0.9.0"
+        assert schema["canonical"]["tag"] == "v0.10.0"
         assert "skins/contracts/generation-manifest.schema.json" in schema[
             "canonical"
         ]["vendored_paths"]
@@ -3669,10 +3681,10 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, (
-            f"canonical tag {tag} must fail the v0.9.0 envelope gate"
+            f"canonical tag {tag} must fail the v0.10.0 envelope gate"
         )
         assert "is not the pinned Appearance v2 envelope" in output, output
-        assert "v0.9.0" in output, output
+        assert "v0.10.0" in output, output
 
     def test_skin_plane_rejects_a_missing_canonical_tag(
         self, tmp_path: Path
@@ -3692,7 +3704,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_rejects_a_missing_generation_vendored_path(
         self, tmp_path: Path
     ) -> None:
-        """BUG-012: v0.9.0 vendors generation-manifest.schema.json; dropping it
+        """BUG-012: v0.10.0 vendors generation-manifest.schema.json; dropping it
         from the envelope must fail rather than silently pass the delegate set."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
@@ -3707,7 +3719,7 @@ class TestVerifySkinPlane:
         )
         output = result.stdout + result.stderr
         assert result.returncode != 0, (
-            "a missing generation vendored path must fail the v0.9.0 envelope"
+            "a missing generation vendored path must fail the v0.10.0 envelope"
         )
         assert "is not the pinned Appearance v2 envelope" in output, output
 
@@ -4190,7 +4202,7 @@ class TestVerifyRuntime:
         manifest_path.write_text(json.dumps(manifest) + "\n")
 
     def test_verify_accepts_a_host_bearing_generation(self) -> None:
-        """contracts v0.9.0: the optional host block is valid runtime output."""
+        """contracts v0.10.0: the optional host block is valid runtime output."""
         ansible_playbook = shutil.which("ansible-playbook")
         if ansible_playbook is None:
             pytest.skip("ansible-playbook not installed; skipping execution test")

@@ -249,7 +249,7 @@ class TestYamlManifestReaderPerKindSchemas:
             "kind: assets\n"
             "assets:\n"
             "  repo: https://github.com/RandomGenericUsername/dotfiles-assets\n"
-            "  tag: v0.16.0\n"
+            "  tag: v0.17.0\n"
             "  classes:\n"
             "    icons: { dest: icons, schema: icons/schema.json }\n"
             "    templates: { dest: templates, schema: '**/*.vars.schema.json' }\n"

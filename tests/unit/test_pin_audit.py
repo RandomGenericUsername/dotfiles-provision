@@ -59,7 +59,8 @@ def test_repository_pin_audit_passes() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "pin-audit: PASS" in result.stdout
     assert "skins=5" in result.stdout
-    assert "targets=8" in result.stdout
+    assert "targets=10" in result.stdout
+    assert "artifacts=1" in result.stdout
 
 
 def test_missing_terminal_host_manifest_fails(tmp_path: Path) -> None:
@@ -100,6 +101,32 @@ def test_missing_wlogout_consumer_target_fails(tmp_path: Path) -> None:
     assert "wlogout.gtk.css.j2" in result.stderr
 
 
+def test_missing_gtk_consumer_target_fails(tmp_path: Path) -> None:
+    root = _minimal_root(tmp_path)
+    _edit_verify_list(
+        root,
+        "verify_skins_template_files",
+        lambda files: files.remove("gtk3.gtk.css.j2"),
+    )
+    result = _run(root)
+    assert result.returncode == 1
+    assert "verify_skins_template_files" in result.stderr
+    assert "gtk3.gtk.css.j2" in result.stderr
+
+
+def test_missing_skin_artifact_fails(tmp_path: Path) -> None:
+    root = _minimal_root(tmp_path)
+    _edit_verify_list(
+        root,
+        "verify_skins_artifact_files",
+        lambda files: files.remove("rofi.rasi.j2"),
+    )
+    result = _run(root)
+    assert result.returncode == 1
+    assert "verify_skins_artifact_files" in result.stderr
+    assert "rofi.rasi.j2" in result.stderr
+
+
 def test_extra_skin_target_fails(tmp_path: Path) -> None:
     root = _minimal_root(tmp_path)
     _edit_verify_list(
@@ -110,3 +137,15 @@ def test_extra_skin_target_fails(tmp_path: Path) -> None:
     result = _run(root)
     assert result.returncode == 1
     assert "verify_skins_template_files" in result.stderr
+
+
+def test_extra_skin_artifact_fails(tmp_path: Path) -> None:
+    root = _minimal_root(tmp_path)
+    _edit_verify_list(
+        root,
+        "verify_skins_artifact_files",
+        lambda files: files.append("kitty.conf.j2"),
+    )
+    result = _run(root)
+    assert result.returncode == 1
+    assert "verify_skins_artifact_files" in result.stderr

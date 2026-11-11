@@ -1706,9 +1706,9 @@
          | difference(verify_skins_token_placeholders) | length) == 0
     fail_msg: >-
       {{ item.item }} is empty, has no {{ '{{SKIN_' }} placeholders, or names a
-      placeholder outside the v2 CSS token paths. The eight
-      <configDir>.gtk.css.j2 templates (seven AGS + wlogout) must all be real
-      expander inputs whose
+      placeholder outside the v2 CSS token paths. The ten
+      <configDir>.gtk.css.j2 CSS targets (seven AGS + gtk3 + gtk4 + wlogout)
+      and the rofi.rasi.j2 artifact must all be real expander inputs whose
       placeholders resolve against every v2 manifest
       ({{ verify_skins_manifest_names | join('/') }}); layout tokens are
       TSX-owned and must never be expanded into CSS. Re-run the assets playbook
@@ -1724,7 +1724,7 @@
                verify_skins_expand_check_script,
                verify_skins_manifests_dir, verify_skins_templates_dir,
                verify_skins_manifest_names | to_json,
-               verify_skins_template_files | to_json] }}"
+               (verify_skins_template_files + verify_skins_artifact_files) | to_json] }}"
   register: verify_skins_expansion
   changed_when: false
   failed_when: false
@@ -2700,7 +2700,7 @@
       sheet last (W-2.6): {{ verify_wlogout_appearance_import.stderr | default('') }}.
       Expected the palette import first and `@import url("appearance.css");`
       last, with wallpaper/icons/layout/transitions kept app-owned. The
-      wlogout_config role renders the pinned assets v0.16.0 style.css.tpl; run
+      wlogout_config role renders the pinned assets v0.17.0 style.css.tpl; run
       the wlogout-config playbook (needs assets + runtime-seed first).
   when: not ansible_check_mode
 

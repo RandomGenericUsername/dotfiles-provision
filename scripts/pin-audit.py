@@ -6,9 +6,10 @@ role vars and the fixture tuple before a pin-only release enters the (much more
 expensive) full gates. It does not replace the full gates for behavior changes.
 
 Skin consumer coverage is structural, not a schema validator: the deployed
-skin plane must name exactly the released five manifests and the released eight
-`<configDir>.gtk.css.j2` targets. In particular, `terminal-host` is part of the
-v0.16.0 release and must not silently drop out of `verify` again.
+skin plane must name exactly the released five manifests, the ten
+`<configDir>.gtk.css.j2` CSS targets and the rofi `rasi` artifact. In
+particular, `terminal-host`, `gtk3`, `gtk4` and the rofi artifact are part of
+the v0.17.0 release and must not silently drop out of `verify` again.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Released dotfiles-assets v0.16.0 skin plane. Keep these ordered sets explicit:
+# Released dotfiles-assets v0.17.0 skin plane. Keep these ordered sets explicit:
 # the audit is a pin/structural check, so a missing or extra name is a drift.
 EXPECTED_SKIN_MANIFEST_NAMES = (
     "glass",
@@ -39,8 +40,11 @@ EXPECTED_SKIN_TARGET_FILES = (
     "ags-capture.gtk.css.j2",
     "ags-icme.gtk.css.j2",
     "ags-btop-studio.gtk.css.j2",
+    "gtk3.gtk.css.j2",
+    "gtk4.gtk.css.j2",
     "wlogout.gtk.css.j2",
 )
+EXPECTED_SKIN_ARTIFACT_FILES = ("rofi.rasi.j2",)
 
 
 def _fixture(root: Path) -> Path:
@@ -99,8 +103,21 @@ def _skin_plane_errors(root: Path) -> list[str]:
     ):
         errors.append(
             "verify_skins_template_files="
-            f"{target_files!r}, expected exactly the eight released skin targets "
+            f"{target_files!r}, expected exactly the ten released CSS targets "
             f"{expected_targets!r}"
+        )
+
+    artifact_files = [
+        str(name) for name in verify_vars.get("verify_skins_artifact_files", [])
+    ]
+    expected_artifacts = list(EXPECTED_SKIN_ARTIFACT_FILES)
+    if len(artifact_files) != len(expected_artifacts) or set(artifact_files) != set(
+        expected_artifacts
+    ):
+        errors.append(
+            "verify_skins_artifact_files="
+            f"{artifact_files!r}, expected exactly the released non-CSS artifacts "
+            f"{expected_artifacts!r}"
         )
 
     return errors
@@ -167,6 +184,7 @@ def audit(root: Path = ROOT) -> tuple[list[str], dict[str, str | int]]:
         "apps": len(expected_app_tags),
         "skins": len(EXPECTED_SKIN_MANIFEST_NAMES),
         "targets": len(EXPECTED_SKIN_TARGET_FILES),
+        "artifacts": len(EXPECTED_SKIN_ARTIFACT_FILES),
     }
     return errors, summary
 
@@ -191,7 +209,8 @@ def main(argv: list[str] | None = None) -> int:
         "pin-audit: PASS "
         f"(assets={summary['assets']}, contracts={summary['contracts']}, "
         f"platform={summary['platform']}, apps={summary['apps']}, "
-        f"skins={summary['skins']}, targets={summary['targets']})"
+        f"skins={summary['skins']}, targets={summary['targets']}, "
+        f"artifacts={summary['artifacts']})"
     )
     return 0
 

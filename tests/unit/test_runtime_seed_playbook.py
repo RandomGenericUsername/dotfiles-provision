@@ -141,7 +141,7 @@ def test_seed_captures_the_generation_and_asserts_v3_postconditions() -> None:
     assert "runtime_seed_current_link.stdout | trim | basename" in that
     assert "appearance.tokensPath == 'appearance/tokens.json'" in that
     assert "appearance.targets | length > 0" in that
-    assert "generations.md v0.9.0" in str(
+    assert "generations.md v0.10.0" in str(
         generation["ansible.builtin.assert"]["fail_msg"]
     )
 
