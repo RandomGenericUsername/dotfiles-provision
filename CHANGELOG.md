@@ -1,3 +1,30 @@
+## 0.1.60
+
+Phase 3A-4 format-aware skin consumers. Behavior/schema change release; full
+`make gates` + `make ci-gates-parity` (not only `gates-pin`).
+
+- Mirror `dotfiles-assets v0.17.0` and contracts `v0.10.0` in every engine pin,
+  composition fixture and test. Vendor the contracts `v0.10.0`
+  generation-manifest schema (optional `appearance.artifacts`; format is
+  `rasi|conf|theme`, CSS stays exclusively in `targets`) and move
+  `verify_generation_contract_tag` / `verify_skins_expected_contract_tag` plus
+  the schema envelopes to `v0.10.0`.
+- `state_links` adds provisioning-owned appearance links for GTK3, GTK4 and
+  rofi: `config/gtk-3.0/appearance.css -> current/appearance/gtk3.css`,
+  `config/gtk-4.0/appearance.css -> current/appearance/gtk4.css`, and
+  `config/rofi/appearance.rasi -> current/appearance/rofi.rasi`. The same
+  create-then-assert flow owns them; no generation-specific or app-tag route.
+- GTK3/GTK4 `gtk.css` import `appearance.css` after `colors.css`; the rofi
+  launcher imports `../appearance.rasi` after its one `../colors.rasi` import.
+  App-owned rules, selectors and structure stay intact; re-runs do not
+  duplicate imports.
+- `verify` accepts the assets v0.17.0 skin envelope (five manifests, ten CSS
+  targets plus the rofi `rasi` artifact), asserts the committed generation
+  CSS targets and non-CSS artifacts, resolves the new stable links, and
+  rejects `.css`-named artifacts. Pin audit now covers the ten CSS targets and
+  the rofi artifact. No apply, runtime/assets/composition/contract edits or
+  live state writes.
+
 ## 0.1.59
 
 Phase 0 hardening for the skin consumer plane. Behavior change release; full
