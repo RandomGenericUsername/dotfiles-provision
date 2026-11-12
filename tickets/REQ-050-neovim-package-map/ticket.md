@@ -104,3 +104,10 @@ Originally filed as `REQ-045`; renumbered to `REQ-050` because
 `.worktrees/REQ-045/` already exists on the unrelated
 `ticket/REQ-045-assets-v0200-pin` branch. The existing worktree was not
 touched.
+
+## Release-time note (not now)
+
+At implementation time the engine `main` is at `v0.1.64`; an unrelated branch
+already targets `v0.1.65` for the assets `v0.20.0` mirror. This branch was
+developed from `d8ec793` (`v0.1.64`); the release slice must rebase on the then
+current `main`, rerun the gates, and pick the next available engine tag.
