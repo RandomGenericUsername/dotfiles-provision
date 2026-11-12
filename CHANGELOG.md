@@ -1,3 +1,9 @@
+## 0.1.74
+
+Follow-up pin release for bar **`v0.6.13`** (Input body conditionally mounted;
+collapse no longer retains the expanded height). Assets `v0.21.0`, platform
+`v1.2.0`, contracts `v0.12.0` and runtime ownership are unchanged.
+
 ## 0.1.73
 
 Follow-up pin release for bar **`v0.6.12`** (Input collapse fit on visibility

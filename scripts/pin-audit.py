@@ -156,7 +156,7 @@ def audit(root: Path = ROOT) -> tuple[list[str], dict[str, str | int]]:
 
     # The all-standalone fixture is the canonical final app inventory.
     expected_app_tags = {
-        "bar": "v0.6.12",
+        "bar": "v0.6.13",
         "notifications": "v0.5.2",
         "capture": "v0.7.2",
         "clipboard": "v0.6.2",
