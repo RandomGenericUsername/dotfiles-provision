@@ -1,3 +1,9 @@
+## 0.1.76
+
+Follow-up pin release for bar **`v0.6.15`** (strip centering, shuffle-off
+opacity) and assets **`v0.21.1`** (50% shuffle-off art). Platform `v1.2.0`,
+contracts `v0.12.0` and runtime ownership are unchanged.
+
 ## 0.1.75
 
 Follow-up pin release for bar **`v0.6.14`** (layer-shell window natural-height
