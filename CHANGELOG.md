@@ -1,3 +1,10 @@
+## 0.1.70
+
+Follow-up pin release: bar **`v0.6.9`** adds the debug-only `tray-open`
+request used to measure the tray radius. Assets `v0.20.2`, contracts
+`v0.12.0`, platform `v1.1.0` and runtime ownership are unchanged. Uses
+`gates-pin`; no behavior or schema change.
+
 ## 0.1.69
 
 Follow-up pin release: assets **`v0.20.2`** (removes the dead
