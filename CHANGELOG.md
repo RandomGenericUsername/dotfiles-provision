@@ -1,3 +1,18 @@
+## 0.1.66
+
+QA release: mirror `dotfiles-assets v0.20.1` (bare icon-only sound controls,
+thumbnail styles) and bar **`v0.6.5`** (sound panel QA). Contracts `v0.12.0`,
+platform `v1.1.0` and runtime ownership are unchanged. Uses `gates-pin`; no
+behavior or schema change.
+
+- Move every engine `*_assets_pinned_tag` mirror, `verify_assets_pinned_tag`,
+  the composition fixtures and the hardcoded pin assertions to assets
+  `v0.20.1`; the skin envelope is unchanged (five manifests, twelve
+  templates, rofi/rasi + kitty/conf).
+- Move the app inventory mirror to bar `v0.6.5`; the other six app tags are
+  unchanged.
+- No apply, runtime/assets/composition/app edits or live state writes.
+
 ## 0.1.65
 
 Assets paint release: mirror `dotfiles-assets v0.20.0` (REQ-028 sound-panel
