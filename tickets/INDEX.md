@@ -93,3 +93,4 @@
 - [REQ-037-assets-v0153/ticket.md](./REQ-037-assets-v0153/ticket.md) — Mirror dotfiles-assets v0.15.3 (wlogout card-state correctness) | `done` | worktree: .worktrees/REQ-037/ | branch: ticket/REQ-037-assets-v0153 | tag: v0.1.57
 - [REQ-038-assets-v0160/ticket.md](./REQ-038-assets-v0160/ticket.md) — Mirror dotfiles-assets v0.16.0 (terminal-host skin) | `done` | worktree: .worktrees/REQ-038/ | branch: ticket/REQ-038-assets-v0160 | tag: v0.1.58
 - [REQ-039-skin-consumer-phase0/ticket.md](./REQ-039-skin-consumer-phase0/ticket.md) — Phase 0 hardening for the skin consumer plane (pin-audit + wlogout fallback) | `done` | worktree: .worktrees/REQ-039/ | branch: ticket/REQ-039-skin-consumer-phase0 | tag: v0.1.59
+- [REQ-045-assets-v0200-pin/ticket.md](./REQ-045-assets-v0200-pin/ticket.md) — Mirror dotfiles-assets v0.20.0 (sound panel paint) | `done` | tag: v0.1.65 | worktree: .worktrees/REQ-045/ | branch: ticket/REQ-045-assets-v0200-pin
