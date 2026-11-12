@@ -1,3 +1,20 @@
+## 0.1.64
+
+Pin-only release: move the engine's final app inventory to the parity app
+releases. Contracts `v0.12.0`, assets `v0.19.0`, platform `v1.1.0` and runtime
+ownership are unchanged. Uses `gates-pin`; no behavior or schema change.
+
+- Move every app-tag mirror to bar **`v0.6.4`**, notifications **`v0.5.2`**,
+  capture **`v0.7.2`**, clipboard **`v0.6.2`** and
+  wallpaper-selector/icme/btop-theme-studio **`v0.5.2`** in the all-standalone
+  fixture, the composition fixture `apps.yaml`, the hardcoded app-tag test
+  assertions and `scripts/pin-audit.py`. Bar `v0.6.3` is the sound-panel
+  release; the final inventory pins its successor `v0.6.4`.
+- Add `SUPERSEDED.md`: engine tags `v0.1.54` and `v0.1.55` are immutable
+  mistakes and must not be used; `v0.1.56+`/`v0.1.64` are authoritative. This
+  is documentation only. No apply, runtime/assets/composition/app edits or
+  live state writes.
+
 ## 0.1.63
 
 Window-role release: mirror `contracts v0.12.0` (required `surface.window`
