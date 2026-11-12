@@ -192,7 +192,7 @@ verify_install_spine_dirs:
 #   class contracts against `verify_assets_schema_support`.
 verify_assets_dir: "{{ install_dir | trim }}/assets"
 verify_assets_pinned_file: "{{ verify_assets_dir }}/pinned"
-verify_assets_pinned_tag: v0.19.0
+verify_assets_pinned_tag: v0.20.0
 verify_assets_tag_dir: "{{ verify_assets_dir }}/{{ verify_assets_pinned_tag }}"
 verify_assets_class_dirs:
   - "{{ verify_assets_tag_dir }}/icons"
@@ -237,7 +237,7 @@ verify_skins_manifest_names:
 verify_skins_manifest_paths: >-
   {{ verify_skins_manifest_names | map('regex_replace', '^',
      verify_skins_manifests_dir ~ '/') | map('regex_replace', '$', '.toml') | list }}
-#: v0.19.0 ships one `<configDir>.gtk.css.j2` per CSS target: the seven AGS
+#: v0.20.0 ships one `<configDir>.gtk.css.j2` per CSS target: the seven AGS
 #: app templates plus the non-AGS wlogout, gtk3 and gtk4 consumers. The
 #: expander renders `<configDir>.css`; a missing template would leave that
 #: consumer's generated sheet unbacked (W-2.1/W-2.9, F-2.1/F-4.2).
@@ -252,7 +252,7 @@ verify_skins_template_files:
   - gtk3.gtk.css.j2
   - gtk4.gtk.css.j2
   - wlogout.gtk.css.j2
-#: v0.19.0 ships two non-CSS artifact templates: rofi/rasi and kitty/conf.
+#: v0.20.0 ships two non-CSS artifact templates: rofi/rasi and kitty/conf.
 #: They are NOT CSS targets and must never be validated as one (contracts
 #: v0.12.0 keeps CSS exclusively in appearance.targets).
 verify_skins_artifact_files:
@@ -542,7 +542,7 @@ verify_skins_contract_files:
 verify_skins_contract_paths: >-
   {{ verify_skins_contract_files | map('regex_replace', '^',
      verify_skins_contracts_dir ~ '/') | list }}
-#: Assets v0.19.0 re-vendored the skins contracts at v0.12.0 (the
+#: Assets v0.20.0 re-vendored the skins contracts at v0.12.0 (the
 #: rectangle-radii release). The PIN, the four canonical vendored schemas
 #: (appearance manifest/json/artifact + generation) and the local schema
 #: envelope must all name the same tag.

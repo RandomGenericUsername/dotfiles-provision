@@ -1,3 +1,20 @@
+## 0.1.65
+
+Assets paint release: mirror `dotfiles-assets v0.20.0` (REQ-028 sound-panel
+paint in the `ags.gtk.css.j2` target). Contracts `v0.12.0`, platform `v1.1.0`,
+runtime ownership and the app inventory (bar `v0.6.4`) are unchanged. Uses
+`gates-pin`; no behavior or schema change.
+
+- Move every engine `*_assets_pinned_tag` mirror, `verify_assets_pinned_tag`,
+  the composition fixture (`assets.yaml`, `program-tuple.yaml`) and the
+  hardcoded pin assertions to assets **`v0.20.0`**. The schema/template
+  envelope is unchanged: five manifests, twelve templates (ten CSS targets
+  plus the rofi/rasi and kitty/conf artifacts).
+- `v0.20.0` adds the sound surface classes (panel/card/cell/control/pill,
+  state and ink/type) to the existing `ags` target; the engine only re-pins
+  the corpus. No apply, runtime/assets/composition/app edits or live state
+  writes.
+
 ## 0.1.64
 
 Pin-only release: move the engine's final app inventory to the parity app

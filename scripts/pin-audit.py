@@ -9,7 +9,7 @@ Skin consumer coverage is structural, not a schema validator: the deployed
 skin plane must name exactly the released five manifests, the ten
 `<configDir>.gtk.css.j2` CSS targets and the rofi `rasi` / kitty `conf`
 artifacts (twelve templates in total). In particular, `terminal-host`, `gtk3`,
-`gtk4`, the rofi artifact and the kitty artifact are part of the v0.19.0
+`gtk4`, the rofi artifact and the kitty artifact are part of the v0.20.0
 release and must not silently drop out of `verify` again.
 """
 
@@ -24,7 +24,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Released dotfiles-assets v0.19.0 skin plane. Keep these ordered sets explicit:
+# Released dotfiles-assets v0.20.0 skin plane. Keep these ordered sets explicit:
 # the audit is a pin/structural check, so a missing or extra name is a drift.
 EXPECTED_SKIN_MANIFEST_NAMES = (
     "glass",
