@@ -82,6 +82,10 @@ _LOGICAL_PACKAGE_KEYS = (
     "wf-recorder",
     "btop",
     "thunderbird",
+    # REQ-046: Evolution is a first-class mail client and gnome-keyring owns
+    # org.freedesktop.secrets (libsecret activates it on first use).
+    "evolution",
+    "gnome-keyring",
     "brightnessctl",
     "playerctl",
     # AGS settings panel (add-ags-settings-panel): the AstalWp binding and the
@@ -259,6 +263,22 @@ class TestGroupVars:
     def test_debian_family_packages_cover_exactly_logical_set(self) -> None:
         packages = self._packages_map("debian-family.yml")
         assert set(packages.keys()) == set(_LOGICAL_PACKAGE_KEYS)
+
+    def test_evolution_and_gnome_keyring_are_mapped_and_mirrored(self) -> None:
+        """REQ-046: both logical keys resolve in each distro map and the
+        fixture composition declares them, so a fresh provision installs the
+        client and the org.freedesktop.secrets provider."""
+        arch = self._packages_map("arch.yml")
+        debian = self._packages_map("debian-family.yml")
+        assert arch["evolution"] == "evolution"
+        assert arch["gnome-keyring"] == "gnome-keyring"
+        assert debian["evolution"] == "evolution"
+        assert debian["gnome-keyring"] == "gnome-keyring"
+
+        manifest = yaml.safe_load((_MANIFEST_DIR / "packages.yaml").read_text())
+        declared = {entry["name"].split("#")[0].strip() for entry in manifest["entries"]}
+        assert {"evolution", "gnome-keyring"}.issubset(declared)
+        assert "thunderbird" in declared, "REQ-046 keeps the existing mail client"
 
     def test_arch_package_names_are_non_empty(self) -> None:
         packages = self._packages_map("arch.yml")

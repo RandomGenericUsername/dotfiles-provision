@@ -55,8 +55,11 @@ entries:
   # System monitor (AGS bar icon launcher)
   - name: btop
 
-  # Mail client (AGS bar icon launcher)
+  # Mail clients (AGS bar icon launcher). Evolution's OAuth tokens live in
+  # libsecret, so gnome-keyring (org.freedesktop.secrets) is provisioned too.
   - name: thunderbird
+  - name: evolution
+  - name: gnome-keyring
 
   # Music streaming client (rofi launcher; AUR-only on Arch — see
   # `aur_packages` in roles/packages/vars/arch.yml)

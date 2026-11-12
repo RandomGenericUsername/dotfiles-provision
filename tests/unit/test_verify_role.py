@@ -1943,6 +1943,9 @@ class TestVerifyTasks:
             "verify_pixie_themedir",
             "verify_pixie_main_qml",
             "verify_pixie_repo_ref",
+            # Fixed system path: gnome-keyring owns the D-Bus activation file
+            # for org.freedesktop.secrets (REQ-046).
+            "verify_secret_service_dbus_file",
             "<install>",
             "install_dir",
             "ansible_facts.env",
@@ -2242,6 +2245,7 @@ class TestVerifyVars:
         "verify_pixie_themedir",
         "verify_pixie_main_qml",
         "verify_pixie_repo_ref",
+        "verify_secret_service_dbus_file",
     }
 
     def test_vars_parse_with_required_keys(self) -> None:
@@ -3061,7 +3065,43 @@ class TestVerifyVars:
             "devin-desktop",
             "copilot",
             "codex",
+            # REQ-046: Evolution + the gnome-keyring daemon are packages-role
+            # PATH binaries; the secret-service D-Bus file is gated below.
+            "evolution",
+            "gnome-keyring-daemon",
         ]
+
+    def test_secret_service_dbus_activation_file_is_gated(self) -> None:
+        """REQ-046: gnome-keyring ships the D-Bus activation file libsecret
+        uses for org.freedesktop.secrets. verify stats it read-only and fails
+        with a packages-role pointer, so a host without the provider cannot
+        pass with "The name is not activatable" waiting at first OAuth use."""
+        data = _vars()
+        path = str(data["verify_secret_service_dbus_file"])
+        assert path == "/usr/share/dbus-1/services/org.freedesktop.secrets.service"
+
+        stats = [
+            task
+            for task in _stat_tasks()
+            if "verify_secret_service_dbus_file_stat" == str(task.get("register"))
+        ]
+        assert len(stats) == 1, "expected exactly one secret-service stat probe"
+        assert "verify_secret_service_dbus_file" in str(_module(stats[0]).get("path"))
+        assert stats[0].get("when") == "not ansible_check_mode"
+
+        asserts = [
+            task
+            for task in _assert_tasks()
+            if "verify_secret_service_dbus_file_stat" in str(_module(task).get("that", ""))
+        ]
+        assert len(asserts) == 1, "expected exactly one secret-service assert"
+        that = str(_module(asserts[0]).get("that", ""))
+        assert "stat.exists" in that
+        assert "stat.isreg" in that
+        fail_msg = str(_module(asserts[0]).get("fail_msg", ""))
+        assert "org.freedesktop.secrets" in fail_msg
+        assert "packages role" in fail_msg or "packages-role" in fail_msg
+        assert asserts[0].get("when") == "not ansible_check_mode"
 
     def test_icons_samples_include_the_settings_panel_glyphs(self) -> None:
         """add-ags-settings-panel: the icons gate asserts one known render per
@@ -3292,6 +3332,9 @@ class TestVerifyVars:
             "verify_pixie_themedir",
             "verify_pixie_main_qml",
             "verify_pixie_repo_ref",
+            # Fixed system path: gnome-keyring owns the D-Bus activation file
+            # for org.freedesktop.secrets (REQ-046).
+            "verify_secret_service_dbus_file",
             "install_dir",
             "ansible_facts.env",
         )
@@ -4269,7 +4312,7 @@ class TestVerifyAutostartLaunchPolicy:
                 "-e",
                 f"manifests_dir={manifests_dir()}",
                 *_cli_tags_extra_vars(),
-                *_display_manager_extra_vars(tmp),
+                *_system_fixture_extra_vars(tmp),
             ],
             capture_output=True,
             text=True,
@@ -4395,7 +4438,7 @@ class TestVerifyRuntime:
                         "-e",
                         f"manifests_dir={manifests_dir()}",
                         *_cli_tags_extra_vars(),
-                        *_display_manager_extra_vars(Path(tmp)),
+                        *_system_fixture_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
                     text=True,
@@ -4432,7 +4475,7 @@ class TestVerifyRuntime:
                 "-e",
                 f"manifests_dir={manifests_dir()}",
                 *_cli_tags_extra_vars(),
-                *_display_manager_extra_vars(tmp),
+                *_system_fixture_extra_vars(tmp),
             ],
             capture_output=True,
             text=True,
@@ -4745,7 +4788,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -4827,7 +4870,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -4898,7 +4941,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -4964,7 +5007,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -5027,7 +5070,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -5081,7 +5124,7 @@ class TestVerifyRuntime:
                         "-e",
                         f"manifests_dir={manifests_dir()}",
                         *_cli_tags_extra_vars(),
-                        *_display_manager_extra_vars(Path(tmp)),
+                        *_system_fixture_extra_vars(Path(tmp)),
                     ],
                     capture_output=True,
                     text=True,
@@ -5141,7 +5184,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -5184,7 +5227,7 @@ class TestVerifyRuntime:
                     "-e",
                     f"manifests_dir={manifests_dir()}",
                     *_cli_tags_extra_vars(),
-                    *_display_manager_extra_vars(Path(tmp)),
+                    *_system_fixture_extra_vars(Path(tmp)),
                 ],
                 capture_output=True,
                 text=True,
@@ -5225,13 +5268,15 @@ def _synthetic_verify_machine(tmp: Path) -> tuple[Path, Path, Path, dict[str, st
     return install, home, bin_dir, env
 
 
-def _display_manager_extra_vars(tmp: Path) -> list[str]:
-    """Seed a rootless display-manager fixture and return its `-e` overrides.
+def _system_fixture_extra_vars(tmp: Path) -> list[str]:
+    """Seed rootless fixtures for fixed system paths and return `-e` overrides.
 
     Production reads /etc/sddm.conf.d/10-dotfiles.conf and the root-owned Pixie
-    checkout under /usr/share/sddm; the synthetic machine substitutes temp
-    paths so the REAL verify task bodies run the same assertions without root.
-    `weston` itself is a stub on PATH (see `_write_stub_binaries`).
+    checkout under /usr/share/sddm, plus the gnome-keyring D-Bus activation
+    file under /usr/share/dbus-1/services (REQ-046). The synthetic machine
+    substitutes temp paths so the REAL verify task bodies run the same
+    assertions without root. `weston` itself is a stub on PATH (see
+    `_write_stub_binaries`).
     """
     root = tmp / "display-manager"
     conf = root / "10-dotfiles.conf"
@@ -5246,6 +5291,12 @@ def _display_manager_extra_vars(tmp: Path) -> list[str]:
         "\n"
         "[Theme]\n"
         "Current=pixie\n"
+    )
+    secret_service = root / "org.freedesktop.secrets.service"
+    secret_service.write_text(
+        "[D-BUS Service]\n"
+        "Name=org.freedesktop.secrets\n"
+        "Exec=/usr/bin/gnome-keyring-daemon --start --components=secrets\n"
     )
     pixie = root / "pixie"
     pixie.mkdir(parents=True, exist_ok=True)
@@ -5281,6 +5332,8 @@ def _display_manager_extra_vars(tmp: Path) -> list[str]:
         f"verify_pixie_main_qml={qml}",
         "-e",
         f"verify_pixie_repo_ref={sha}",
+        "-e",
+        f"verify_secret_service_dbus_file={secret_service}",
     ]
 
 
@@ -5316,7 +5369,7 @@ def _write_stub_binaries(home: Path) -> Path:
     machine: report `NetworkManager` as active."""
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    for name in ("hyprland", "hyprpaper", "power-options-gtk", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston"):
+    for name in ("hyprland", "hyprpaper", "power-options-gtk", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston", "evolution", "gnome-keyring-daemon"):
         stub = bin_dir / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)

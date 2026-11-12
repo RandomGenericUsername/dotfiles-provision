@@ -590,6 +590,10 @@ class TestReadRealManifests:
             "thunar",
             "btop",
             "thunderbird",
+            # REQ-046: Evolution + gnome-keyring (org.freedesktop.secrets)
+            # mirror the composition package list.
+            "evolution",
+            "gnome-keyring",
             "tidal-hifi",
             "brightnessctl",
             "playerctl",

@@ -102,6 +102,12 @@ packages:
     - kitty
   btop: btop # System monitor (AGS bar icon launcher)
   thunderbird: thunderbird # Mail client (AGS bar icon launcher)
+  # Evolution: a second first-class mail client. Its OAuth tokens are stored
+  # through libsecret, so it needs the secret service below (REQ-046).
+  evolution: evolution
+  # gnome-keyring provides org.freedesktop.secrets and ships the D-Bus
+  # activation file libsecret starts on first use — no autostart/PAM edits.
+  gnome-keyring: gnome-keyring
   # adw-gtk-theme intentionally ABSENT on Debian-family (Option A 2026-09-09):
   # no official package (adw-gtk3 README points at a 3rd-party repo). Debian
   # keeps its distro GTK theme; the config-links gtk-3.0 theme migration is

@@ -122,6 +122,12 @@ packages:
     - kitty
   btop: btop # System monitor (AGS bar icon launcher)
   thunderbird: thunderbird # Mail client (AGS bar icon launcher)
+  # Evolution: a second first-class mail client. Its OAuth tokens are stored
+  # through libsecret, so it needs the secret service below (REQ-046).
+  evolution: evolution
+  # gnome-keyring provides org.freedesktop.secrets and ships the D-Bus
+  # activation file libsecret starts on first use — no autostart/PAM edits.
+  gnome-keyring: gnome-keyring
   # GTK3 theme (extra repo — Option A 2026-09-09): adw-gtk3 unifies GTK3 apps
   # (thunar, wlogout, native menus/dialogs, thunderbird's native bits) with the
   # libadwaita design language the GTK4 apps already wear. Installed here so the

@@ -299,6 +299,30 @@
       not PATH binaries
   when: not ansible_check_mode
 
+# REQ-046: gnome-keyring ships the D-Bus activation file libsecret uses to
+# start org.freedesktop.secrets on first use. A missing file is the exact
+# "The name is not activatable" failure, and it can disappear if the package
+# is removed even while the daemon binary stays around. Read-only presence
+# check (no secret is written here).
+- name: Check the secret-service D-Bus activation file
+  ansible.builtin.stat:
+    path: "{{ verify_secret_service_dbus_file }}"
+  register: verify_secret_service_dbus_file_stat
+  when: not ansible_check_mode
+
+- name: Assert the secret-service D-Bus activation file exists
+  ansible.builtin.assert:
+    that:
+      - verify_secret_service_dbus_file_stat.stat.exists | default(false)
+      - verify_secret_service_dbus_file_stat.stat.isreg | default(false)
+    fail_msg: >-
+      {{ verify_secret_service_dbus_file }} is missing — libsecret cannot
+      activate org.freedesktop.secrets, so Evolution's OAuth token storage
+      fails with "The name is not activatable". The packages role installs
+      gnome-keyring (logical key `gnome-keyring`) from the group_vars package
+      list; run the packages playbook first (direct-run prerequisite).
+  when: not ansible_check_mode
+
 # NetworkManager is the DBus backend astal-network (the AGS bar) reads. A bare
 # package install leaves no daemon running, which makes the bar report
 # "no network" and the network-click TUI exit instantly. Gate on the service

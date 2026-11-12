@@ -667,6 +667,10 @@ verify_system_binaries:
   - devin-desktop
   - copilot
   - codex
+  # Mail + secret service (REQ-046): both are packages-role PATH binaries.
+  # gnome-keyring's D-Bus activation file is asserted separately below.
+  - evolution
+  - gnome-keyring-daemon
 
 # verify_cli_tools: the uv-tool-installed CLIs on PATH (criterion 3). `itr` IS
 #   the icon-renderer console script (no separate binary); `dotfiles-runtime`
@@ -908,6 +912,13 @@ verify_audio_user_units:
 #   terminal (reported live). gui_tools pins thunar (the provisioned file
 #   manager); this gate catches a machine where that never took effect.
 verify_directory_handler: thunar.desktop
+
+# verify_secret_service_dbus_file: the D-Bus activation file shipped by
+#   gnome-keyring. libsecret activates org.freedesktop.secrets through it on
+#   first use, so its absence is the exact "The name is not activatable" failure
+#   REQ-046 fixes. Presence only — verify never writes a secret; the live
+#   store/lookup smoke check belongs to post-apply acceptance.
+verify_secret_service_dbus_file: /usr/share/dbus-1/services/org.freedesktop.secrets.service
 
 # verify_cli_bin_dir: the uv bin dir to prepend to PATH — mirror of
 #   cli_tools_bin_dir exactly. The CLIs land here via `uv tool install`
