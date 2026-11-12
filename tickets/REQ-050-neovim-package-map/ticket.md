@@ -20,7 +20,7 @@ the install authority. Neovim is absent from both, so a provisioned host has no
 `nvim` binary even though `~/.config/nvim` is deployed.
 
 This ticket makes the engine able to install Neovim. The composition manifest
-entry is tracked separately in `dotfiles-v3` `REQ-115`; the assets config is
+entry is tracked separately in `dotfiles-v3` `REQ-118`; the assets config is
 `dotfiles-assets` `req-029`.
 
 ## Requirement
@@ -57,7 +57,7 @@ entry is tracked separately in `dotfiles-v3` `REQ-115`; the assets config is
 
 ## Dependency / sequencing
 
-`dotfiles-v3` `REQ-115` adds the logical `neovim` entry to the composition
+`dotfiles-v3` `REQ-118` adds the logical `neovim` entry to the composition
 manifest. Until this engine change is **released and pinned**, that composition
 entry is inert: the `packages` role flattens only mapped group_vars values, so
 an unmapped logical key silently does not install. That is acceptable for the
