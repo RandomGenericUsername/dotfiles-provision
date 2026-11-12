@@ -1,3 +1,10 @@
+## 0.1.67
+
+Follow-up pin release: bar **`v0.6.6`** fixes the live sound-panel QA leftovers
+(Gio artwork-cache directory creation and Output header alignment). Assets
+`v0.20.1`, contracts `v0.12.0`, platform `v1.1.0` and runtime ownership are
+unchanged. Uses `gates-pin`; no behavior or schema change.
+
 ## 0.1.66
 
 QA release: mirror `dotfiles-assets v0.20.1` (bare icon-only sound controls,
