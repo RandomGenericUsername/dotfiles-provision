@@ -1,3 +1,10 @@
+## 0.1.72
+
+Follow-up pin release for bar **`v0.6.11`**, which restores the content-sized
+Input collapse after the revealer regression. Assets `v0.21.0`, platform
+`v1.2.0`, contracts `v0.12.0` and runtime ownership are unchanged. Uses
+`gates-pin`; no apply.
+
 ## 0.1.71
 
 Sound-panel round two: bar **`v0.6.10`**, assets **`v0.21.0`** and platform
