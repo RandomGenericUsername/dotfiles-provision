@@ -156,13 +156,13 @@ def audit(root: Path = ROOT) -> tuple[list[str], dict[str, str | int]]:
 
     # The all-standalone fixture is the canonical final app inventory.
     expected_app_tags = {
-        "bar": "v0.6.2",
-        "notifications": "v0.5.1",
-        "capture": "v0.7.1",
-        "clipboard": "v0.6.1",
-        "wallpaper-selector": "v0.5.1",
-        "icme": "v0.5.1",
-        "btop-theme-studio": "v0.5.1",
+        "bar": "v0.6.4",
+        "notifications": "v0.5.2",
+        "capture": "v0.7.2",
+        "clipboard": "v0.6.2",
+        "wallpaper-selector": "v0.5.2",
+        "icme": "v0.5.2",
+        "btop-theme-studio": "v0.5.2",
     }
     fixture_apps = _load(
         root / "tests/fixtures/ags-apps/app-list/all-standalone.apps.yaml"
