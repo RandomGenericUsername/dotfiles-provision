@@ -4,7 +4,7 @@
 # from its own immutable tag at <install>/apps/<installDir>/<tag>/ and resolves
 # the one shared <install>/apps/node_modules/ags-platform shortcut. The retired
 # `ags_apps` monorepo role/pin no longer exists, so a `legacy` entry would have
-# no installer. `tag` pins the final v3 released generation: bar v0.6.11,
+# no installer. `tag` pins the final v3 released generation: bar v0.6.12,
 # notifications v0.5.2, capture v0.7.2, clipboard v0.6.2 and
 # wallpaper-selector/icme/btop-theme-studio v0.5.2. Repos stay fixture
 # placeholders.
@@ -33,7 +33,7 @@ apps:
     installDir: bar
     owner: standalone
     repo: https://example.invalid/ags-bar.git
-    tag: v0.6.11
+    tag: v0.6.12
     instance: ags
     configDir: ags
     configLink: ags

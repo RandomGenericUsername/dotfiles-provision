@@ -1,3 +1,9 @@
+## 0.1.73
+
+Follow-up pin release for bar **`v0.6.12`** (Input collapse fit on visibility
+and a 250 ms post-layout pass). Assets `v0.21.0`, platform `v1.2.0`,
+contracts `v0.12.0` and runtime ownership are unchanged.
+
 ## 0.1.72
 
 Follow-up pin release for bar **`v0.6.11`**, which restores the content-sized
