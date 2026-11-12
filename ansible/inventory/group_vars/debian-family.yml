@@ -100,6 +100,8 @@ packages:
     - starship
   terminal:
     - kitty
+  # Neovim — same rationale as Arch; the assets `configs/nvim` tree is LazyVim.
+  neovim: neovim
   btop: btop # System monitor (AGS bar icon launcher)
   thunderbird: thunderbird # Mail client (AGS bar icon launcher)
   # Evolution: a second first-class mail client. Its OAuth tokens are stored

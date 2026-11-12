@@ -657,6 +657,9 @@ verify_system_binaries:
   #   Packages-role installed (lock key + portals key).
   - hyprlock
   - hypridle
+  # Editor: the assets `configs/nvim` tree is LazyVim; the binary must exist
+  # for the first launch to install plugins. Installed by the packages role.
+  - nvim
   # AI development tools (provision-ai-ides-and-clis): the three IDE binaries
   # and the two CLIs. Installed by the packages role via the AUR channel, so a
   # missing install fails the criterion-2 PATH gate instead of silently leaving

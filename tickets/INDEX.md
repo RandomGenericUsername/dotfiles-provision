@@ -45,6 +45,8 @@
 - [REQ-055-gate-latency-phase2/ticket.md](./REQ-055-gate-latency-phase2/ticket.md) — Add release preflight + CI sharding/slow-test support | `done` | worktree: .worktrees/REQ-055/ | branch: ticket/REQ-055-gate-latency-phase2
 - [REQ-056-hermetic-sharding/ticket.md](./REQ-056-hermetic-sharding/ticket.md) — Shard the hermetic CI gate | `done` | worktree: .worktrees/REQ-056/ | branch: ticket/REQ-056-hermetic-sharding
 - [REQ-050-neovim-package-map/ticket.md](./REQ-050-neovim-package-map/ticket.md) — Provision the Neovim binary: map `neovim` in both group_vars and add `nvim` to the PATH verify gate | `proposed` | lane 2 | implementation-only; no tag/release/merge/installer.pin/apply/UI worktree
+- [REQ-050-neovim-package-map/ticket.md](./REQ-050-neovim-package-map/ticket.md) — Provision the Neovim binary: map `neovim` in both group_vars and add `nvim` to the PATH verify gate | `in-progress` | lane 2 | worktree: .worktrees/REQ-050/ | branch: ticket/REQ-050-neovim-package-map | implementation-only; no tag/release/merge/installer.pin/apply/UI worktree
+>>>>>>> 58a6b1f (feat(REQ-050): provision the Neovim binary)
 
 ## Bugs
 

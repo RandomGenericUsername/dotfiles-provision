@@ -70,6 +70,7 @@ _LOGICAL_PACKAGE_KEYS = (
     "fonts",
     "zsh",
     "terminal",
+    "neovim",
     "display_manager",
     "container_engine",
     "ffmpeg",

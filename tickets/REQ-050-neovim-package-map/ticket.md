@@ -2,13 +2,13 @@
 id: REQ-050
 title: "Provision the Neovim binary: engine package maps + verify"
 kind: requirement
-status: proposed
+status: in-progress
 lane: 2
 links:
   openspec: none
   bmad: none
-worktree: none
-branch: none
+worktree: .worktrees/REQ-050/
+branch: ticket/REQ-050-neovim-package-map
 ---
 
 # Provision the Neovim binary: engine package maps + verify
@@ -66,11 +66,11 @@ authorizes shipping.
 
 ## Acceptance
 
-- [ ] `arch.yml` and `debian-family.yml` both map `neovim: neovim`.
-- [ ] `verify_system_binaries` contains `nvim`.
-- [ ] Focused mapping/verify tests pass; any fixture mirror is consistent.
-- [ ] `make gates` (or the available subset) passes without applying anything.
-- [ ] No tag, release, `installer.pin` change, package install/apply, or UI
+- [x] `arch.yml` and `debian-family.yml` both map `neovim: neovim`.
+- [x] `verify_system_binaries` contains `nvim`.
+- [x] Focused mapping/verify tests pass; any fixture mirror is consistent.
+- [x] `make gates` (or the available subset) passes without applying anything.
+- [x] No tag, release, `installer.pin` change, package install/apply, or UI
       worktree was touched.
 
 ## Evidence
@@ -96,3 +96,11 @@ bash scripts/worktree-guard.sh create REQ-050 neovim-package-map
 
 Implement on `ticket/REQ-050-neovim-package-map`. Do not tag, release, bump
 `installer.pin`, or apply.
+
+
+## Notes
+
+Originally filed as `REQ-045`; renumbered to `REQ-050` because
+`.worktrees/REQ-045/` already exists on the unrelated
+`ticket/REQ-045-assets-v0200-pin` branch. The existing worktree was not
+touched.

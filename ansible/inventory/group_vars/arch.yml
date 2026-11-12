@@ -120,6 +120,9 @@ packages:
     - starship
   terminal:
     - kitty
+  # Neovim — the provisioned editor. The assets `configs/nvim` tree is
+  # LazyVim; plugin installation stays with LazyVim/lazy.nvim on first launch.
+  neovim: neovim
   btop: btop # System monitor (AGS bar icon launcher)
   thunderbird: thunderbird # Mail client (AGS bar icon launcher)
   # Evolution: a second first-class mail client. Its OAuth tokens are stored

@@ -3060,6 +3060,9 @@ class TestVerifyVars:
             "wl-paste",
             "hyprlock",
             "hypridle",
+            # Editor: LazyVim plugin installation happens on first launch, so
+            # the binary must be installed by the packages role.
+            "nvim",
             # AI development tools (provision-ai-ides-and-clis): the AUR
             # binaries for the three IDEs and the two CLIs.
             "antigravity-ide",
@@ -5458,7 +5461,7 @@ def _write_stub_binaries(home: Path) -> Path:
     machine: report `NetworkManager` as active."""
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    for name in ("hyprland", "hyprpaper", "power-options-gtk", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston", "evolution", "gnome-keyring-daemon"):
+    for name in ("hyprland", "hyprpaper", "power-options-gtk", "weg", "itr", "tpr", "dotfiles-runtime", "wpctl", "pavucontrol", "playerctl", "grim", "slurp", "wl-copy", "wl-paste", "hyprlock", "hypridle", "nvim", "antigravity-ide", "code", "devin-desktop", "copilot", "codex", "kitty", "tidal-hifi", "weston", "evolution", "gnome-keyring-daemon"):
         stub = bin_dir / name
         stub.write_text("#!/bin/sh\nexit 0\n")
         stub.chmod(0o755)
