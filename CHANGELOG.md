@@ -1,3 +1,10 @@
+## 0.1.68
+
+Follow-up pin release: bar **`v0.6.7`** applies the resolved artwork to the
+Playing pages (the overlay previously mapped only the Mixer rows). Assets
+`v0.20.1`, contracts `v0.12.0`, platform `v1.1.0` and runtime ownership are
+unchanged. Uses `gates-pin`; no behavior or schema change.
+
 ## 0.1.67
 
 Follow-up pin release: bar **`v0.6.6`** fixes the live sound-panel QA leftovers
