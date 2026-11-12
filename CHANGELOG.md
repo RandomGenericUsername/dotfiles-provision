@@ -1,3 +1,10 @@
+## 0.1.71
+
+Sound-panel round two: bar **`v0.6.10`**, assets **`v0.21.0`** and platform
+**`v1.2.0`**. Assets adds the owner's `media-controls` and settings-panel gear;
+the platform registry manifest carries the new groups. Engine behavior and
+contracts `v0.12.0` are unchanged. Uses `gates-pin`; no apply.
+
 ## 0.1.70
 
 Follow-up pin release: bar **`v0.6.9`** adds the debug-only `tray-open`
