@@ -11,7 +11,8 @@ Provenance: copied from `dotfiles-v3@854bac08` when the engine was extracted
 (slice S6a):
 
 - `dotfiles/provisioning/*.yaml` — the five manifests, byte-for-byte.
-- `dotfiles/provisioning/scripts/gloview-activate` — byte-for-byte.
+- `dotfiles/provisioning/scripts/gloview-activate` and `gloview-rebuild` —
+  byte-for-byte (refreshed for REQ-047 ABI resilience).
 
 The runtime is **not** stubbed here: since REQ-002 it is the pinned
 `dotfiles-runtime` repo, so the fixture carries only the composition files the

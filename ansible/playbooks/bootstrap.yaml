@@ -12,10 +12,10 @@
 # `verify` last (it asserts every done-criterion after all roles placed their
 # outputs). `gloview-plugin` runs after display_manager so the full desktop
 # stack exists, and before verify: it asserts the gloview-git artifact
-# (/usr/lib/gloview.so) is installed. Loading needs no provisioning step —
-# the plugin loads at the first Hyprland login via gloview-activate, which
-# backs the provision-owned touchpad gestures
-# (the pinned assets configs/hypr/{input,gloview}.lua).
+# (/usr/lib/gloview.so), installs the systemd --user activation unit and the
+# interactive rebuild helper. Loading runs at the first Hyprland login through
+# dotfiles-gloview.service (gloview-activate), which backs the provision-owned
+# touchpad gestures (the pinned assets configs/hypr/{input,gloview}.lua).
 # icons roles — the runtime-seed step (`dotfiles-runtime wallpaper set
 # <install>/wallpapers/default.png`) is the single producer of generated
 # artifacts (cache entries, current.json, current/ + R2 consumer symlinks).

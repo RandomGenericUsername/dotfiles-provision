@@ -1,0 +1,18 @@
+# gloview_plugin handlers.
+#
+# Restart the activation oneshot only when the unit template ACTUALLY changed.
+# Guarded like runtime_clipboard: never in --check (a restart is a state
+# mutation) and only with a live user manager. The graphical-session probe is
+# intentionally NOT required here: restarting an already-active unit in a live
+# session is safe, and on a TTY the handler cannot run anyway (the enable task
+# that notifies does not run without a manager).
+- name: Restart dotfiles gloview activation
+  ansible.builtin.systemd:
+    name: "{{ gloview_plugin_unit_name }}"
+    scope: user
+    daemon_reload: true
+    state: restarted
+  when:
+    - not ansible_check_mode
+    - gloview_plugin_manager_probe.rc | default(1) == 0
+    - gloview_plugin_graphical_probe.rc | default(1) == 0

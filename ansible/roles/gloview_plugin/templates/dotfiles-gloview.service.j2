@@ -1,0 +1,25 @@
+[Unit]
+Description=Load the GloView Hyprland plugin and verify its ABI
+# Session-scoped: the loading and verification need the user bus and a live
+# Hyprland IPC session. Never system scope.
+Requires=dbus.socket
+After=dbus.socket graphical-session.target dotfiles-ags-notifications.service
+# One owner for activation. autostart.lua must not fire gloview-activate; that
+# fire-and-forget path discarded the loader error and hid failures.
+# Start limits are [Unit] directives; in [Service] systemd silently ignores them.
+StartLimitIntervalSec={{ gloview_plugin_start_limit_interval_sec }}
+StartLimitBurst={{ gloview_plugin_start_limit_burst }}
+
+[Service]
+# oneshot + RemainAfterExit: a failed load leaves the unit failed (visible in
+# `systemctl --user --failed` and the journal) instead of vanishing at login.
+Type=oneshot
+RemainAfterExit=yes
+ExecStart="{{ gloview_plugin_bin_dir }}/gloview-activate"
+TimeoutStartSec={{ gloview_plugin_timeout_start_sec }}
+# No sudo, no package manager, no network here. Detection, durable status and
+# one notification only. The interactive `gloview-rebuild` helper is user-run;
+# it is never invoked by this unit.
+
+[Install]
+WantedBy=graphical-session.target

@@ -7,10 +7,12 @@
 # machinery existed only to serve hyprpm. Upstream packages the same plugin
 # as a plain cmake build (gloview-git installs /usr/lib/gloview.so, loaded
 # at runtime via `hyprctl plugin load`), so provisioning installs the
-# package (packages role, aur_packages) and this role only asserts the
-# artifact is present — fully headless-checkable, single TTY run to green.
-# Loading happens in-session via gloview-activate (autostart.lua), which
-# also owns the ABI-stale warning after Hyprland upgrades.
+# package (packages role, aur_packages) and this role asserts the artifact is
+# present, installs the systemd --user activation unit, and deploys the
+# interactive rebuild helper — fully headless-checkable, single TTY run to green.
+# Activation runs in-session from dotfiles-gloview.service (gloview-activate);
+# the unit owns the ABI verification/status and the failure notification after
+# Hyprland upgrades.
 #
 # No task here invokes hyprpm. No task needs become except the legacy
 # sudoers cleanup below.
@@ -43,4 +45,101 @@
       packages role installs aur_packages via yay); if the yay step failed,
       fix that error first. If the file exists but the plugin does not load
       inside Hyprland, the .so is ABI-stale after a Hyprland upgrade:
-      rebuild with `yay -S gloview-git`, then relog.
+      rebuild with `yay -S --rebuild gloview-git`, then relog.
+
+# ── Activation ownership: systemd --user oneshot ──
+# The session activator is a user unit, not an autostart line. That makes a
+# failed load visible (`systemctl --user --failed`, journal) and lets the
+# notification wait for the session's notification daemon. The script itself
+# never escalates privileges; it verifies the compositor's plugin list and
+# records a durable status.
+- name: Assert the composition seam is provided for the GloView scripts
+  ansible.builtin.assert:
+    that:
+      - manifests_dir is defined and manifests_dir | trim | length > 0
+    fail_msg: >-
+      manifests_dir is undefined or empty — this role installs the
+      composition-owned gloview-activate/gloview-rebuild scripts from
+      {{ gloview_plugin_scripts_dir }}. The engine CLI resolves the seam from
+      --manifests-dir; direct runs pass -e manifests_dir=...
+
+- name: Ensure the user systemd unit directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_facts.env.HOME }}/.config/systemd/user"
+    state: directory
+    mode: "0755"
+
+- name: Install the GloView activation unit file
+  ansible.builtin.template:
+    src: dotfiles-gloview.service.j2
+    dest: "{{ ansible_facts.env.HOME }}/.config/systemd/user/{{ gloview_plugin_unit_name }}"
+    mode: "0644"
+  notify: Restart dotfiles gloview activation
+
+- name: Ensure the GloView user bin directory exists
+  ansible.builtin.file:
+    path: "{{ gloview_plugin_bin_dir }}"
+    state: directory
+    mode: "0755"
+
+# The rebuild helper is interactive and user-run. It is deliberately NOT the
+# unit's ExecStart: `yay` and its sudo/polkit prompt belong to a terminal the
+# user owns, never to a login service.
+- name: Install the interactive GloView rebuild helper
+  ansible.builtin.copy:
+    src: "{{ gloview_plugin_scripts_dir }}/gloview-rebuild"
+    dest: "{{ gloview_plugin_bin_dir }}/gloview-rebuild"
+    mode: "0755"
+    remote_src: true
+
+- name: Probe for a live user manager
+  ansible.builtin.shell: "systemctl --user show-environment >/dev/null 2>&1"
+  register: gloview_plugin_manager_probe
+  changed_when: false
+  failed_when: false
+
+- name: Probe for an active graphical session
+  ansible.builtin.shell: "systemctl --user is-active --quiet graphical-session.target"
+  register: gloview_plugin_graphical_probe
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode and gloview_plugin_manager_probe.rc | default(1) == 0
+
+- name: Reload the user manager and enable the GloView activation unit
+  ansible.builtin.systemd:
+    name: "{{ gloview_plugin_unit_name }}"
+    scope: user
+    daemon_reload: true
+    enabled: true
+  when: not ansible_check_mode and gloview_plugin_manager_probe.rc | default(1) == 0
+
+# Start only inside an existing graphical session. A TTY provision must not
+# mark the oneshot active (RemainAfterExit) before Hyprland exists, or it would
+# never run at the next login.
+- name: Start the GloView activation unit in the current graphical session
+  ansible.builtin.systemd:
+    name: "{{ gloview_plugin_unit_name }}"
+    scope: user
+    state: started
+  when:
+    - not ansible_check_mode
+    - gloview_plugin_manager_probe.rc | default(1) == 0
+    - gloview_plugin_graphical_probe.rc | default(1) == 0
+
+# Manager-less path (fresh machine, no running user manager): enable through
+# the graphical-session target wants directory, exactly like runtime_clipboard.
+- name: Ensure the graphical-session wants directory exists for GloView
+  ansible.builtin.file:
+    path: "{{ ansible_facts.env.HOME }}/.config/systemd/user/graphical-session.target.wants"
+    state: directory
+    mode: "0755"
+  when: gloview_plugin_manager_probe.rc | default(1) != 0
+
+- name: Enable the GloView unit without a live user manager
+  ansible.builtin.file:
+    src: "{{ ansible_facts.env.HOME }}/.config/systemd/user/{{ gloview_plugin_unit_name }}"
+    dest: >-
+      {{ ansible_facts.env.HOME }}/.config/systemd/user/graphical-session.target.wants/{{ gloview_plugin_unit_name }}
+    state: link
+    force: true
+  when: gloview_plugin_manager_probe.rc | default(1) != 0

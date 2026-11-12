@@ -15,7 +15,8 @@ Resolution order for tests:
    manifests instead of the fixture.
 2. ``tests/fixtures/composition/`` — a minimal composition tree copied from
    ``dotfiles-v3`` when the engine was extracted (the five manifests and the
-   gloview-activate script; the runtime is a pinned repo, not a stub).
+   gloview-activate/gloview-rebuild scripts; the runtime is a pinned repo, not a
+   stub).
 
 The fixture is a **test input**, never a deployed source: production reads only
 what ``dotfiles-provision --manifests-dir/--composition-root`` resolves.
