@@ -80,7 +80,7 @@ _SEVEN_APPS = [
 
 #: The released tags of the final all-standalone epoch (REQ-032).
 _FINAL_APP_TAGS = {
-    "bar": "v0.6.7",
+    "bar": "v0.6.8",
     "notifications": "v0.5.2",
     "capture": "v0.7.2",
     "clipboard": "v0.6.2",
@@ -1005,7 +1005,7 @@ def _write_composition(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v1.1.0\ncontracts: v0.12.0\ndotfiles-assets: v0.20.1\n",
+        "schemaVersion: 1\nags-platform: v1.1.0\ncontracts: v0.12.0\ndotfiles-assets: v0.20.2\n",
         encoding="utf-8",
     )
     return provisioning

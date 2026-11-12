@@ -1,3 +1,11 @@
+## 0.1.69
+
+Follow-up pin release: assets **`v0.20.2`** (removes the dead
+`.audio-hero-note` selector) and bar **`v0.6.8`** (muted value dim; spawned
+settings/tray outer radius owned by the skin surface). Contracts `v0.12.0`,
+platform `v1.1.0`, runtime ownership and the other six app tags are unchanged.
+Uses `gates-pin`; no behavior or schema change.
+
 ## 0.1.68
 
 Follow-up pin release: bar **`v0.6.7`** applies the resolved artwork to the

@@ -9,7 +9,7 @@
 # exist.
 #
 # `repo` is a placeholder overridden by the execution harness; `tag` pins the
-# final v3 released generation (bar v0.6.7, notifications v0.5.2, capture v0.7.2,
+# final v3 released generation (bar v0.6.8, notifications v0.5.2, capture v0.7.2,
 # clipboard v0.6.2, wallpaper-selector/icme/btop-theme-studio v0.5.2). The bar
 # keeps the ONE stable palette pointer
 # (colors.css -> the runtime-owned XDG state pointer); the v0.1.1 state-migration
@@ -22,7 +22,7 @@ apps:
     installDir: bar
     owner: standalone
     repo: PLACEHOLDER
-    tag: v0.6.7
+    tag: v0.6.8
     instance: ags
     configDir: ags
     configLink: ags
