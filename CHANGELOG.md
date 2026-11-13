@@ -1,3 +1,10 @@
+## 0.1.79
+
+Follow-up pin release for bar **`v0.6.18`** (remove unsupported GTK CSS
+`max-width`/`max-height`; identity labels use `maxWidthChars`; switch keeps
+42x24 requests). Assets `v0.21.3`, platform `v1.2.0` and contracts `v0.12.0`
+are unchanged.
+
 ## 0.1.78
 
 Follow-up pin release for bar **`v0.6.17`** (bare app-owned artwork, MPRIS
