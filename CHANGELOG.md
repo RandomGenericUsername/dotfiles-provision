@@ -1,3 +1,9 @@
+## 0.1.82
+
+Follow-up pin release for bar **`v0.6.21`** (distinct PipeWire stream identity
+and MPRIS player join). Assets `v0.21.3`, platform `v1.2.0` and contracts
+`v0.12.0` are unchanged.
+
 ## 0.1.81
 
 Follow-up pin release for bar **`v0.6.20`** (reliable visible seek progress and
