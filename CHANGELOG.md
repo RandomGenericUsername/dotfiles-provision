@@ -1,3 +1,10 @@
+## 0.1.77
+
+Follow-up pin release for bar **`v0.6.16`** (footer copy removal, shared
+Output/Input label, 42x24 settings switch) and assets **`v0.21.2`** (shared
+label, footer selector cleanup). Platform `v1.2.0`, contracts `v0.12.0` and
+runtime ownership are unchanged.
+
 ## 0.1.76
 
 Follow-up pin release for bar **`v0.6.15`** (strip centering, shuffle-off
