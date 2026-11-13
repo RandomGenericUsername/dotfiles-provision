@@ -1,3 +1,10 @@
+## 0.1.78
+
+Follow-up pin release for bar **`v0.6.17`** (bare app-owned artwork, MPRIS
+Identity/DesktopEntry app resolution, per-player Playing pages/Players rows)
+and assets **`v0.21.3`** (no skin artwork tile paint, per-player identity text).
+Platform `v1.2.0`, contracts `v0.12.0` and runtime ownership are unchanged.
+
 ## 0.1.77
 
 Follow-up pin release for bar **`v0.6.16`** (footer copy removal, shared
