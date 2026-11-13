@@ -1,3 +1,9 @@
+## 0.1.81
+
+Follow-up pin release for bar **`v0.6.20`** (reliable visible seek progress and
+refreshPosition/model propagation). Assets `v0.21.3`, platform `v1.2.0` and
+contracts `v0.12.0` are unchanged.
+
 ## 0.1.80
 
 Follow-up pin release for bar **`v0.6.19`** (per-player dedupe/filtering and
