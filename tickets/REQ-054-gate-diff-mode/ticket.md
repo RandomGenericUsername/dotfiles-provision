@@ -2,7 +2,7 @@
 id: REQ-054
 title: "Add a fail-closed diff/dev gate for changed-file feedback"
 kind: requirement
-status: proposed
+status: done
 lane: direct
 links:
   openspec: none
@@ -122,15 +122,33 @@ The gate must fail closed: no changed path may silently run zero tests.
 
 ## Acceptance
 
-- [ ] `make dev` runs mapped tests plus cheap global checks and reports the
+- [x] `make dev` runs mapped tests plus cheap global checks and reports the
   mapping.
-- [ ] Unknown paths, gate-map changes, and Makefile changes fall back to the
+- [x] Unknown paths, gate-map changes, and Makefile changes fall back to the
   full fast suite.
-- [ ] A role-only change does not run the whole engine suite.
-- [ ] `make gates` and `ci-gates-parity` are unchanged.
-- [ ] `tests/unit/test_gate_diff.py` covers mapping coverage and all fallback
+- [x] A role-only change does not run the whole engine suite.
+- [x] `make gates` and `ci-gates-parity` are unchanged.
+- [x] `tests/unit/test_gate_diff.py` covers mapping coverage and all fallback
   cases.
-- [ ] Documentation says dev mode is not release proof.
+- [x] Documentation says dev mode is not release proof.
+
+## Evidence
+
+Implementation commit `a0804ae`; plan `1581f5f`; branch
+`ticket/REQ-054-gate-diff-mode`.
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q tests/unit/test_gate_diff.py` | 28 passed |
+| `uv run ruff check src tests` | All checks passed |
+| `make docs-check` | exit 0 |
+| `make ci-gates-parity` | PASS; authoritative `GATES` unchanged |
+| Mapping coverage | 23/23 roles; 19 groups; 53/53 test files; 0 uncovered |
+| `make gates-role ROLE=gloview_plugin DRY_RUN=1` | scoped plan, 4 test files, no full suite |
+| `make dev DRY_RUN=1` | full fallback because the branch changes `Makefile`; expected fail-closed behavior |
+
+No engine tag/release is required for this developer-tooling change; the next
+engine release carries it. Full release gates remain authoritative.
 
 ## Expected impact
 
