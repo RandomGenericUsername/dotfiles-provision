@@ -43,6 +43,7 @@
 - [REQ-047-gloview-abi-resilience/ticket.md](./REQ-047-gloview-abi-resilience/ticket.md) — Own GloView activation with an observable systemd user oneshot | `done` | worktree: .worktrees/REQ-047/ | branch: ticket/REQ-047-gloview-abi-resilience | tag: v0.1.88 | assets: v0.21.5
 - [REQ-054-gate-diff-mode/ticket.md](./REQ-054-gate-diff-mode/ticket.md) — Add a fail-closed diff/dev gate for changed-file feedback | `done` | worktree: .worktrees/REQ-054/ | branch: ticket/REQ-054-gate-diff-mode
 - [REQ-055-gate-latency-phase2/ticket.md](./REQ-055-gate-latency-phase2/ticket.md) — Add release preflight + CI sharding/slow-test support | `done` | worktree: .worktrees/REQ-055/ | branch: ticket/REQ-055-gate-latency-phase2
+- [REQ-056-hermetic-sharding/ticket.md](./REQ-056-hermetic-sharding/ticket.md) — Shard the hermetic CI gate | `done` | worktree: .worktrees/REQ-056/ | branch: ticket/REQ-056-hermetic-sharding
 
 ## Bugs
 
