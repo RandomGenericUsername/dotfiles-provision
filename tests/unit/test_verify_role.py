@@ -2269,11 +2269,11 @@ class TestVerifyVars:
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_skins_pin_is_v0180_with_the_v0110_contract_and_templates(self) -> None:
-        """REQ-043: assets v0.20.0 ships five manifests, twelve templates
+        """REQ-043: assets v0.21.4 ships five manifests, twelve templates
         (ten CSS targets plus kitty/rofi artifacts) and the contracts v0.12.0
         window-role plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.20.0"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.21.4"
         assert str(data["verify_skins_expected_contract_tag"]) == "v0.12.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
@@ -3438,7 +3438,7 @@ class TestVerifyAgsPinMirror:
         verify_vars = _vars()
         platform_vars = _sibling_vars("ags_platform")
         assert verify_vars["verify_ags_platform_version"] == platform_vars["ags_platform_version"]
-        assert platform_vars["ags_platform_version"] == "v1.1.0"
+        assert platform_vars["ags_platform_version"] == "v1.2.0"
 
 
 class TestVerifyRuntimePinMirror:
@@ -3821,7 +3821,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_accepts_the_assets_v0180_v0110_envelope(
         self, tmp_path: Path
     ) -> None:
-        """REQ-041: the released assets v0.20.0 skins schema names contracts
+        """REQ-041: the released assets v0.21.4 skins schema names contracts
         v0.12.0 and vendors the fourth canonical (generation) schema."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
@@ -5903,7 +5903,7 @@ def _build_provisioned_layout(
     # installed by the ags_platform role as ONE versioned unit, NOT mirrored
     # per file under config/ags. The fixture mirrors verify_ags_platform_unit_dir
     # / _pin_file / _shortcut so the criterion asserts have something to pass on.
-    unit = install / "ags-platform" / "v1.1.0"
+    unit = install / "ags-platform" / "v1.2.0"
     (unit / "ports").mkdir(parents=True, exist_ok=True)
     (unit / "adapters").mkdir(parents=True, exist_ok=True)
     (unit / "package.json").write_text("{}")
@@ -5915,7 +5915,7 @@ def _build_provisioned_layout(
     (unit / "adapters" / "event-bus.ts").write_text("")
     (unit / "adapters" / "icon-registry.ts").write_text("")
     (unit / "adapters" / "astal.ts").write_text("")
-    (install / "ags-platform" / "pinned").write_text("v1.1.0\n")
+    (install / "ags-platform" / "pinned").write_text("v1.2.0\n")
     # The final all-standalone AGS topology (AD-31/AD-37): every app is its
     # own immutable tag under <install>/apps/<installDir>/<tag>, resolving the
     # ONE shared apps/node_modules/ags-platform shortcut. ags_apps_units owns

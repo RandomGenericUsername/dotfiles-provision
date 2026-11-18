@@ -243,7 +243,7 @@ class TestAgsPlatformExecution:
         home.mkdir()
         install.mkdir()
         # Pre-seed the pinned unit so the presence-guarded clone is skipped.
-        unit = install / "ags-platform" / "v1.1.0"
+        unit = install / "ags-platform" / "v1.2.0"
         (unit / "ports").mkdir(parents=True)
         (unit / "index.ts").write_text("export {}\n")
         (unit / "package.json").write_text("{}")
@@ -254,7 +254,7 @@ class TestAgsPlatformExecution:
 
         pin = install / "ags-platform" / "pinned"
         assert pin.is_file(), "the pin must be recorded"
-        assert pin.read_text().strip() == "v1.1.0"
+        assert pin.read_text().strip() == "v1.2.0"
 
         assert not (install / "config" / "node_modules" / "ags-platform").exists(), (
             "the platform role must not create a second resolver shortcut"
@@ -264,7 +264,7 @@ class TestAgsPlatformExecution:
         # Idempotent: a second run converges to the same state.
         second = self._run(install, home)
         assert second.returncode == 0, second.stdout + second.stderr
-        assert pin.read_text().strip() == "v1.1.0"
+        assert pin.read_text().strip() == "v1.2.0"
 
 
 if __name__ == "__main__":

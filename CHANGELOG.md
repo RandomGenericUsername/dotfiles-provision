@@ -1,3 +1,132 @@
+## 0.1.83
+
+Pin release for bar **`v0.6.34`** (focused-tab/app-level Mixer; display-only
+position clock, long-label caps, fixed transport zones) and assets
+**`v0.21.4`** (paint-only `ags` skin boundary: app-owned layout/components/
+artwork/live dot; no layout in the skin). Platform `v1.2.0` and contracts
+`v0.12.0` are unchanged.
+
+## 0.1.82
+
+Follow-up pin release for bar **`v0.6.21`** (distinct PipeWire stream identity
+and MPRIS player join). Assets `v0.21.3`, platform `v1.2.0` and contracts
+`v0.12.0` are unchanged.
+
+## 0.1.81
+
+Follow-up pin release for bar **`v0.6.20`** (reliable visible seek progress and
+refreshPosition/model propagation). Assets `v0.21.3`, platform `v1.2.0` and
+contracts `v0.12.0` are unchanged.
+
+## 0.1.80
+
+Follow-up pin release for bar **`v0.6.19`** (per-player dedupe/filtering and
+per-stream Mixer detail). Assets `v0.21.3`, platform `v1.2.0` and contracts
+`v0.12.0` are unchanged.
+
+## 0.1.79
+
+Follow-up pin release for bar **`v0.6.18`** (remove unsupported GTK CSS
+`max-width`/`max-height`; identity labels use `maxWidthChars`; switch keeps
+42x24 requests). Assets `v0.21.3`, platform `v1.2.0` and contracts `v0.12.0`
+are unchanged.
+
+## 0.1.78
+
+Follow-up pin release for bar **`v0.6.17`** (bare app-owned artwork, MPRIS
+Identity/DesktopEntry app resolution, per-player Playing pages/Players rows)
+and assets **`v0.21.3`** (no skin artwork tile paint, per-player identity text).
+Platform `v1.2.0`, contracts `v0.12.0` and runtime ownership are unchanged.
+
+## 0.1.77
+
+Follow-up pin release for bar **`v0.6.16`** (footer copy removal, shared
+Output/Input label, 42x24 settings switch) and assets **`v0.21.2`** (shared
+label, footer selector cleanup). Platform `v1.2.0`, contracts `v0.12.0` and
+runtime ownership are unchanged.
+
+## 0.1.76
+
+Follow-up pin release for bar **`v0.6.15`** (strip centering, shuffle-off
+opacity) and assets **`v0.21.1`** (50% shuffle-off art). Platform `v1.2.0`,
+contracts `v0.12.0` and runtime ownership are unchanged.
+
+## 0.1.75
+
+Follow-up pin release for bar **`v0.6.14`** (layer-shell window natural-height
+recalc on Input collapse; live metrics). Assets `v0.21.0`, platform `v1.2.0`,
+contracts `v0.12.0` and runtime ownership are unchanged.
+
+## 0.1.74
+
+Follow-up pin release for bar **`v0.6.13`** (Input body conditionally mounted;
+collapse no longer retains the expanded height). Assets `v0.21.0`, platform
+`v1.2.0`, contracts `v0.12.0` and runtime ownership are unchanged.
+
+## 0.1.73
+
+Follow-up pin release for bar **`v0.6.12`** (Input collapse fit on visibility
+and a 250 ms post-layout pass). Assets `v0.21.0`, platform `v1.2.0`,
+contracts `v0.12.0` and runtime ownership are unchanged.
+
+## 0.1.72
+
+Follow-up pin release for bar **`v0.6.11`**, which restores the content-sized
+Input collapse after the revealer regression. Assets `v0.21.0`, platform
+`v1.2.0`, contracts `v0.12.0` and runtime ownership are unchanged. Uses
+`gates-pin`; no apply.
+
+## 0.1.71
+
+Sound-panel round two: bar **`v0.6.10`**, assets **`v0.21.0`** and platform
+**`v1.2.0`**. Assets adds the owner's `media-controls` and settings-panel gear;
+the platform registry manifest carries the new groups. Engine behavior and
+contracts `v0.12.0` are unchanged. Uses `gates-pin`; no apply.
+
+## 0.1.70
+
+Follow-up pin release: bar **`v0.6.9`** adds the debug-only `tray-open`
+request used to measure the tray radius. Assets `v0.20.2`, contracts
+`v0.12.0`, platform `v1.1.0` and runtime ownership are unchanged. Uses
+`gates-pin`; no behavior or schema change.
+
+## 0.1.69
+
+Follow-up pin release: assets **`v0.20.2`** (removes the dead
+`.audio-hero-note` selector) and bar **`v0.6.8`** (muted value dim; spawned
+settings/tray outer radius owned by the skin surface). Contracts `v0.12.0`,
+platform `v1.1.0`, runtime ownership and the other six app tags are unchanged.
+Uses `gates-pin`; no behavior or schema change.
+
+## 0.1.68
+
+Follow-up pin release: bar **`v0.6.7`** applies the resolved artwork to the
+Playing pages (the overlay previously mapped only the Mixer rows). Assets
+`v0.20.1`, contracts `v0.12.0`, platform `v1.1.0` and runtime ownership are
+unchanged. Uses `gates-pin`; no behavior or schema change.
+
+## 0.1.67
+
+Follow-up pin release: bar **`v0.6.6`** fixes the live sound-panel QA leftovers
+(Gio artwork-cache directory creation and Output header alignment). Assets
+`v0.20.1`, contracts `v0.12.0`, platform `v1.1.0` and runtime ownership are
+unchanged. Uses `gates-pin`; no behavior or schema change.
+
+## 0.1.66
+
+QA release: mirror `dotfiles-assets v0.20.1` (bare icon-only sound controls,
+thumbnail styles) and bar **`v0.6.5`** (sound panel QA). Contracts `v0.12.0`,
+platform `v1.1.0` and runtime ownership are unchanged. Uses `gates-pin`; no
+behavior or schema change.
+
+- Move every engine `*_assets_pinned_tag` mirror, `verify_assets_pinned_tag`,
+  the composition fixtures and the hardcoded pin assertions to assets
+  `v0.20.1`; the skin envelope is unchanged (five manifests, twelve
+  templates, rofi/rasi + kitty/conf).
+- Move the app inventory mirror to bar `v0.6.5`; the other six app tags are
+  unchanged.
+- No apply, runtime/assets/composition/app edits or live state writes.
+
 ## 0.1.65
 
 Assets paint release: mirror `dotfiles-assets v0.20.0` (REQ-028 sound-panel
