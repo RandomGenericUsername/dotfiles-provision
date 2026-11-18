@@ -1,3 +1,17 @@
+## 0.1.89
+
+Provision the Neovim binary and mirror `dotfiles-assets v0.21.6` (LazyVim
+nvim config). Plugin installation remains LazyVim/lazy.nvim's job on first
+launch; provisioning installs only `nvim` and copies the config.
+
+- Map `neovim: neovim` in both distro group_vars and add `nvim` to
+  `verify_system_binaries`.
+- Mirror assets **`v0.21.6`** through every role/verify pin, the composition
+  fixtures, pin-audit and the hardcoded pin assertions. The corpus shape is
+  unchanged; `configs/nvim` is the LazyVim starter plus the committed
+  `lazy-lock.json`.
+- Release metadata 0.1.89 (pyproject + `__version__` + uv.lock) and CHANGELOG.
+
 ## 0.1.88
 
 Sync the composition fixture's `gloview-activate` with the composition fix for
