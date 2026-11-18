@@ -46,6 +46,10 @@ jobs:
   hermetic:
     name: hermetic
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -53,7 +57,7 @@ jobs:
           version: "0.9.22"
           enable-cache: true
       - run: make sync
-      - run: make hermetic
+      - run: make hermetic-shard SHARD=${{ matrix.shard }}/4
 
   lock-check:
     name: lock-check

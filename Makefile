@@ -31,7 +31,7 @@ GATES := test lint hermetic lock-check docs-check
 FAST := -m "not integration and not container_target"
 TEST_FAST := -m "not integration and not container_target and not slow"
 
-.PHONY: help sync collections install test test-fast test-shard test-integration lint format dev dev-hermetic gates-diff gates-role gates gates-ci gates-pin pin-audit release-preflight hermetic lock-check docs-check build assets-parity ci-gates-parity clean
+.PHONY: help sync collections install test test-fast test-shard test-integration lint format dev dev-hermetic gates-diff gates-role gates gates-ci gates-pin pin-audit release-preflight hermetic hermetic-shard lock-check docs-check build assets-parity ci-gates-parity clean
 
 help:
 	@echo "sync             Install the env from uv.lock (uv sync --frozen)"
@@ -48,6 +48,7 @@ help:
 	@echo "lint             Ruff check src/ and tests/"
 	@echo "format           Ruff format src/ and tests/"
 	@echo "hermetic         Run the fast suite with empty HOME/XDG and a foreign cwd"
+	@echo "hermetic-shard   Run one hermetic shard (SHARD=I/N, e.g. SHARD=1/4)"
 	@echo "lock-check       uv lock --check (the committed lock is current)"
 	@echo "docs-check       README/CHANGELOG/LICENSE/AGENTS + CLAUDE symlink exist"
 	@echo "gates            $(GATES)"
@@ -136,6 +137,27 @@ hermetic: collections
 	    PYTHONPATH="$(CURDIR)/src:$(CURDIR)" \
 	    "$(PYTHON)" -m pytest -q $(FAST) \
 	        -c "$(CURDIR)/pyproject.toml" --rootdir="$(CURDIR)" "$(CURDIR)/tests"
+
+# REQ-056: the same hermetic environment, restricted to one deterministic file
+# shard. The file list is made absolute because pytest runs from a foreign cwd.
+hermetic-shard: collections
+	@test -n "$(SHARD)" || { echo "usage: make hermetic-shard SHARD=I/N"; exit 2; }
+	@test -x "$(PYTHON)" || { echo "run 'make sync' first"; exit 1; }
+	@files=$$($(UV) run python scripts/pytest_shard.py --shard "$(SHARD)" --fast --list | sed "s#^#$(CURDIR)/#"); rc=$$?; \
+	test $$rc -eq 0 || exit $$rc; \
+	test -n "$$files" || { echo "no test files selected for hermetic shard $(SHARD)"; exit 1; }; \
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	mkdir -p "$$tmp/cwd"; \
+	cd "$$tmp/cwd" && \
+	env HOME="$$tmp/home" \
+	    XDG_CONFIG_HOME="$$tmp/config" XDG_CACHE_HOME="$$tmp/cache" \
+	    XDG_DATA_HOME="$$tmp/data" XDG_STATE_HOME="$$tmp/state" \
+	    TMPDIR="$$tmp" \
+	    PATH="$(CURDIR)/.venv/bin:$$PATH" \
+	    ANSIBLE_COLLECTIONS_PATH="$(CURDIR)/.collections" \
+	    PYTHONPATH="$(CURDIR)/src:$(CURDIR)" \
+	    "$(PYTHON)" -m pytest -q $(FAST) $$files \
+	        -c "$(CURDIR)/pyproject.toml" --rootdir="$(CURDIR)"
 
 lock-check:
 	$(UV) lock --check
