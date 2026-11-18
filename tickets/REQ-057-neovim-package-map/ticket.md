@@ -1,5 +1,5 @@
 ---
-id: REQ-050
+id: REQ-057
 title: "Provision the Neovim binary: engine package maps + verify"
 kind: requirement
 status: in-progress
@@ -7,8 +7,8 @@ lane: 2
 links:
   openspec: none
   bmad: none
-worktree: .worktrees/REQ-050/
-branch: ticket/REQ-050-neovim-package-map
+worktree: .worktrees/REQ-057/
+branch: ticket/REQ-057-neovim-package-map
 ---
 
 # Provision the Neovim binary: engine package maps + verify
@@ -91,16 +91,16 @@ authorizes shipping.
 From `dotfiles-provision`:
 
 ```bash
-bash scripts/worktree-guard.sh create REQ-050 neovim-package-map
+bash scripts/worktree-guard.sh create REQ-057 neovim-package-map
 ```
 
-Implement on `ticket/REQ-050-neovim-package-map`. Do not tag, release, bump
+Implement on `ticket/REQ-057-neovim-package-map`. Do not tag, release, bump
 `installer.pin`, or apply.
 
 
 ## Notes
 
-Originally filed as `REQ-045`; renumbered to `REQ-050` because
+Originally filed as `REQ-045`; renumbered to `REQ-057` because
 `.worktrees/REQ-045/` already exists on the unrelated
 `ticket/REQ-045-assets-v0200-pin` branch. The existing worktree was not
 touched.
