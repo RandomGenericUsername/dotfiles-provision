@@ -61,6 +61,13 @@ do not present the claim as fact.
 - `make gates` = `test lint hermetic lock-check docs-check` (the authoritative list is `GATES` in
   the `Makefile`). CI runs one job per gate (`.github/workflows/gates.yml`) and
   `make ci-gates-parity` fails when the two sets differ.
+- `make dev`, `make gates-diff BASE=<ref>`, and `make gates-role ROLE=<role>` are **development
+  feedback only, never release proof**. They select tests from the explicit
+  `scripts/gate-map.yaml` mapping (merge-base diff plus working tree/staged/untracked), print the
+  resolved base and mapping, and fail closed: unknown paths, zero-test paths, and
+  `Makefile`/`pyproject.toml`/gate/script changes run the full fast suite. `make dev-hermetic` or
+  `HERMETIC=1` opts into an empty-`HOME` run; hermetic is never implicit. These targets never
+  change `GATES` or `ci-gates-parity`; a release still requires `make gates` and CI.
 - `make test` runs the fast suite (`-m "not integration and not container_target"`);
   `make test-integration` runs the real-`ansible-playbook` suite for a developer machine.
 - A release is an annotated `vMAJOR.MINOR.PATCH` tag plus a GitHub Release carrying the sdist and

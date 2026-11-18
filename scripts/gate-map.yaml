@@ -1,0 +1,353 @@
+# REQ-054 — explicit changed-path to test mapping for `make dev` / `make gates-diff`.
+#
+# DEV FEEDBACK ONLY. `make gates` (GATES in the Makefile) and CI remain the
+# release authority. This map deliberately fails closed: an unrecognised path,
+# a gate-sensitive path, or any path that resolves to zero tests falls back to
+# the full fast suite.
+#
+# Keep this file explicit. Do not replace it with `pytest --lf`, coverage data,
+# or import-graph guessing: a stale cache must never narrow a gate silently.
+
+version: 1
+
+# Every test file below is resolved relative to the repository root and must
+# exist (tests/unit/test_gate_diff.py asserts this).
+
+# Extra tests that assert an Ansible role through a seam or shared fixture.
+# Applied to every ansible/roles/<role>/ change and every role playbook change.
+role_common_tests:
+  - tests/unit/test_composition_seam.py
+  - tests/unit/test_template_vars_parity.py
+
+# One entry per engine role. The transitive role -> test mapping is:
+#   ansible/roles/<role>/** -> roles.<role> + role_common_tests
+# A role path with no entry here is a gate-map defect and falls back to the
+# full fast suite.
+roles:
+  ags_apps_units:
+    - tests/unit/test_ags_apps_units_role.py
+    - tests/unit/test_ags_units_supervision.py
+  ags_platform:
+    - tests/unit/test_ags_platform_role.py
+  assets:
+    - tests/unit/test_assets_role.py
+  btop_config:
+    - tests/unit/test_btop_config_role.py
+    - tests/unit/test_compositor_skeleton_configs.py
+  cli_tools:
+    - tests/unit/test_cli_tools_role.py
+  compositor_configs:
+    - tests/unit/test_compositor_configs_role.py
+    - tests/unit/test_compositor_skeleton_configs.py
+  config_copies:
+    - tests/unit/test_config_copies_role.py
+  config_links:
+    - tests/unit/test_config_links_role.py
+    - tests/unit/test_v3_locality.py
+  display_manager:
+    - tests/unit/test_display_manager_role.py
+  filesystem:
+    - tests/unit/test_filesystem_role.py
+  gloview_plugin:
+    - tests/unit/test_gloview_plugin_role.py
+    - tests/unit/test_gloview_units.py
+  gui_tools:
+    - tests/unit/test_gui_tools_role.py
+  kitty_config:
+    - tests/unit/test_kitty_config_role.py
+    - tests/unit/test_compositor_skeleton_configs.py
+  packages:
+    - tests/unit/test_packages_role.py
+  power_options:
+    - tests/unit/test_power_options_role.py
+  runtime_clipboard:
+    - tests/unit/test_runtime_clipboard_role.py
+  runtime_daemon:
+    - tests/unit/test_runtime_daemon_role.py
+    - tests/unit/test_runtime_seed_playbook.py
+  settings:
+    - tests/unit/test_settings_role.py
+  state_links:
+    - tests/unit/test_v3_locality.py
+    - tests/unit/test_config_links_role.py
+  verify:
+    - tests/unit/test_verify_role.py
+  wlogout_config:
+    - tests/unit/test_wlogout_config_role.py
+    - tests/unit/test_compositor_skeleton_configs.py
+  zsh_config:
+    - tests/unit/test_zsh_config_role.py
+  zsh_tools:
+    - tests/unit/test_zsh_tools_role.py
+
+# Named suites used by path rules. A group is a deterministic list of test
+# files, or all_roles: true (every role's tests, for bootstrap-wide changes).
+groups:
+  gate-tests:
+    tests:
+      - tests/unit/test_gate_diff.py
+  ansible-scaffold:
+    tests:
+      - tests/unit/test_ansible_scaffold.py
+      - tests/unit/test_packages_role.py
+      - tests/unit/test_template_vars_parity.py
+  inventory:
+    tests:
+      - tests/unit/test_ansible_scaffold.py
+      - tests/unit/test_packages_role.py
+      - tests/unit/test_template_vars_parity.py
+      - tests/unit/test_display_manager_role.py
+      - tests/unit/test_zsh_config_role.py
+  bootstrap:
+    all_roles: true
+    tests:
+      - tests/unit/test_bootstrap_playbook.py
+      - tests/unit/test_ansible_scaffold.py
+  config-links-post-seed:
+    tests:
+      - tests/unit/test_bootstrap_playbook.py
+      - tests/unit/test_config_links_role.py
+      - tests/unit/test_v3_locality.py
+      - tests/unit/test_composition_seam.py
+  runtime-seed:
+    tests:
+      - tests/unit/test_bootstrap_playbook.py
+      - tests/unit/test_runtime_daemon_role.py
+      - tests/unit/test_runtime_seed_playbook.py
+      - tests/unit/test_v3_locality.py
+      - tests/unit/test_composition_seam.py
+  cli-tools-playbook:
+    tests:
+      - tests/unit/test_bootstrap_playbook.py
+      - tests/unit/test_cli_tools_role.py
+  fixtures-composition:
+    tests:
+      - tests/unit/test_ansible_scaffold.py
+      - tests/unit/test_assets_role.py
+      - tests/unit/test_btop_config_role.py
+      - tests/unit/test_cli_tools_role.py
+      - tests/unit/test_composition_seam.py
+      - tests/unit/test_compositor_skeleton_configs.py
+      - tests/unit/test_config_copies_role.py
+      - tests/unit/test_display_manager_role.py
+      - tests/unit/test_filesystem_role.py
+      - tests/unit/test_kitty_config_role.py
+      - tests/unit/test_packages_role.py
+      - tests/unit/test_pin_audit.py
+      - tests/unit/test_power_options_role.py
+      - tests/unit/test_settings_role.py
+      - tests/unit/test_template_vars_parity.py
+      - tests/unit/test_v3_locality.py
+      - tests/unit/test_wlogout_config_role.py
+      - tests/unit/test_zsh_config_role.py
+  fixtures-ags-apps:
+    tests:
+      - tests/unit/test_ags_apps_units_role.py
+      - tests/unit/test_ags_platform_role.py
+      - tests/unit/test_ags_units_supervision.py
+      - tests/unit/test_pin_audit.py
+      - tests/unit/test_verify_role.py
+  fixtures-contracts:
+    tests:
+      - tests/unit/test_btop_config_role.py
+      - tests/unit/test_settings_role.py
+      - tests/unit/test_v3_locality.py
+      - tests/unit/test_verify_role.py
+  pin:
+    tests:
+      - tests/unit/test_ansible_scaffold.py
+      - tests/unit/test_packages_role.py
+      - tests/unit/test_pin_audit.py
+      - tests/unit/test_template_vars_parity.py
+  test-support:
+    tests:
+      - tests/unit/test_ansible_scaffold.py
+      - tests/unit/test_assets_role.py
+      - tests/unit/test_btop_config_role.py
+      - tests/unit/test_cli_tools_role.py
+      - tests/unit/test_composition_seam.py
+      - tests/unit/test_compositor_configs_role.py
+      - tests/unit/test_compositor_skeleton_configs.py
+      - tests/unit/test_config_copies_role.py
+      - tests/unit/test_config_links_role.py
+      - tests/unit/test_filesystem_role.py
+      - tests/unit/test_gloview_units.py
+      - tests/unit/test_settings_role.py
+      - tests/unit/test_template_vars_parity.py
+      - tests/unit/test_verify_role.py
+      - tests/unit/test_wlogout_config_role.py
+      - tests/unit/test_zsh_config_role.py
+      - tests/unit/adapters/test_yaml_manifest_reader.py
+      - tests/unit/cli/test_commands.py
+  src-adapters:
+    tests:
+      - tests/unit/adapters/test_ansible_executor.py
+      - tests/unit/adapters/test_ansible_fact_reader.py
+      - tests/unit/adapters/test_yaml_manifest_reader.py
+      - tests/architecture/test_layering.py
+      - tests/test_packaging.py
+  src-application:
+    tests:
+      - tests/unit/application/test_bootstrap_use_case.py
+      - tests/unit/application/test_provision_machine_use_case.py
+      - tests/unit/application/test_verify_capability_use_case.py
+      - tests/test_cli.py
+      - tests/architecture/test_layering.py
+      - tests/test_packaging.py
+  src-cli:
+    tests:
+      - tests/unit/cli/test_build_deps.py
+      - tests/unit/cli/test_commands.py
+      - tests/test_cli.py
+      - tests/architecture/test_layering.py
+      - tests/test_packaging.py
+  src-domain:
+    tests:
+      - tests/unit/test_domain.py
+      - tests/architecture/test_layering.py
+      - tests/test_packaging.py
+  src-ports:
+    tests:
+      - tests/unit/ports/test_fact_reader.py
+      - tests/unit/ports/test_manifest_reader.py
+      - tests/unit/ports/test_provision_executor.py
+      - tests/architecture/test_layering.py
+      - tests/test_packaging.py
+  src-package:
+    tests:
+      - tests/architecture/test_layering.py
+      - tests/test_cli.py
+      - tests/test_packaging.py
+  integration:
+    tests:
+      - tests/integration/test_ansible_dryrun.py
+      - tests/integration/test_apply_verify_container.py
+      - tests/integration/test_btop_theme_deployment_e2e.py
+      - tests/integration/test_btop_theme_e2e.py
+      - tests/integration/test_settings_parity.py
+
+# Ordered rules. First match wins; every changed path must match one or fall
+# back to the full fast suite. `match` is an fnmatch pattern against the
+# repo-relative POSIX path; `prefix` is a literal prefix. A rule may carry:
+#   role: true       -> roles.<role> + role_common_tests
+#   playbook: true   -> the playbook's role tests + test_bootstrap_playbook.py
+#   self: true       -> the changed test file itself
+#   groups: [names]  -> named suites above
+#   checks: [names]  -> global checks without pytest tests (docs-only changes)
+#   full_suite: true -> deliberately broad; `reason` is printed
+rules:
+  # Gate-sensitive inputs: a change here can invalidate the mapping or the
+  # release gates themselves, so never narrow the run.
+  - match: "Makefile"
+    full_suite: true
+    reason: "Makefile defines GATES and the dev targets"
+  - match: "pyproject.toml"
+    full_suite: true
+    reason: "pyproject.toml controls pytest/ruff/build across the whole suite"
+  - match: "uv.lock"
+    full_suite: true
+    reason: "the lock file can change every test dependency"
+  - match: "scripts/gate-map.yaml"
+    full_suite: true
+    reason: "the mapping itself changed"
+  - match: "scripts/gate_diff.py"
+    full_suite: true
+    reason: "the gate implementation changed"
+  - match: "scripts/ci-gates-parity.py"
+    full_suite: true
+    reason: "gate-set parity changed"
+  - match: "scripts/*"
+    full_suite: true
+    reason: "a repository script changed; scripts are gate-sensitive"
+
+  # The engine's shared test fixture contract.
+  - match: "tests/support.py"
+    groups: [test-support]
+
+  # Ansible tree.
+  - prefix: "ansible/roles/"
+    role: true
+  - prefix: "ansible/inventory/"
+    groups: [inventory]
+  - match: "ansible/playbooks/bootstrap.yaml"
+    groups: [bootstrap]
+  - match: "ansible/playbooks/config-links-post-seed.yaml"
+    groups: [config-links-post-seed]
+  - match: "ansible/playbooks/runtime-seed.yaml"
+    groups: [runtime-seed]
+  - match: "ansible/playbooks/_publish_cli_tool_tags.yml"
+    groups: [cli-tools-playbook]
+  - prefix: "ansible/playbooks/"
+    playbook: true
+  - prefix: "ansible/"
+    groups: [ansible-scaffold]
+
+  # Python orchestrator (hexagonal layers).
+  - prefix: "src/provisioning/adapters/"
+    groups: [src-adapters]
+  - prefix: "src/provisioning/application/"
+    groups: [src-application]
+  - prefix: "src/provisioning/cli/"
+    groups: [src-cli]
+  - prefix: "src/provisioning/domain/"
+    groups: [src-domain]
+  - prefix: "src/provisioning/ports/"
+    groups: [src-ports]
+  - prefix: "src/provisioning/"
+    groups: [src-package]
+
+  # Test inputs. Fixtures are shared by many role/seam tests.
+  - prefix: "tests/fixtures/composition/"
+    groups: [fixtures-composition, pin]
+  - prefix: "tests/fixtures/ags-apps/"
+    groups: [fixtures-ags-apps, pin]
+  - prefix: "tests/fixtures/contracts/"
+    groups: [fixtures-contracts]
+  - prefix: "tests/integration/"
+    groups: [integration]
+  - match: "tests/unit/assets_templates.py"
+    groups: [fixtures-contracts, test-support]
+  - prefix: "tests/unit/"
+    self: true
+  - prefix: "tests/architecture/"
+    self: true
+  - match: "tests/test_*.py"
+    self: true
+
+  # Docs and planning artifacts are verified by docs-check; no pytest file
+  # asserts them, so this is the one intentional check-only mapping.
+  - prefix: "docs/"
+    checks: [docs-check]
+  - prefix: "tickets/"
+    checks: [docs-check]
+  - prefix: "openspec/"
+    checks: [docs-check]
+  - match: "*.md"
+    checks: [docs-check]
+  - match: "LICENSE"
+    checks: [docs-check]
+
+  # CI configuration is release-sensitive even though no unit test reads it.
+  - prefix: ".github/"
+    full_suite: true
+    reason: "CI workflow/config changed; release-gate parity is gate-sensitive"
+
+# Run `scripts/pin-audit.py` whenever a pin-bearing manifest, fixture, role
+# vars file, or pin tool changes. This is a cheap global check, not a pytest
+# selector.
+pin_audit_when:
+  - "ansible/roles/*/vars/*"
+  - "tests/fixtures/composition/*"
+  - "tests/fixtures/composition/**/*"
+  - "tests/fixtures/ags-apps/*"
+  - "tests/fixtures/ags-apps/**/*"
+  - "tests/fixtures/contracts/*"
+  - "tests/fixtures/contracts/**/*"
+  - "scripts/pin-audit.py"
+  - "pyproject.toml"
+  - "uv.lock"
+
+# Always run on every `make dev` invocation.
+global_checks:
+  - ruff
+  - docs-check

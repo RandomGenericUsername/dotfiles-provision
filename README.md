@@ -127,6 +127,23 @@ make test-integration     # real ansible-playbook + disposable-container proofs
 make build                # sdist + wheel in dist/
 ```
 
+**Development feedback vs release proof.** `make dev` (and `make gates-diff BASE=<ref>` /
+`make gates-role ROLE=<role>`) runs `ruff`, `docs-check`, conditional `pin-audit`, and only the
+tests mapped from the current diff by `scripts/gate-map.yaml`:
+
+```bash
+make dev                          # merge-base with origin/main (or main) + worktree/staged
+make dev DRY_RUN=1                # print the resolved base and mapping only
+make gates-diff BASE=origin/main  # explicit base
+make gates-role ROLE=verify       # one Ansible role's mapped tests
+make dev-hermetic                 # same selection with empty HOME/XDG (optional)
+```
+
+The diff gate is **feedback only and never proves a release is safe**. It fails closed: unknown
+paths, zero-test mappings, and changes to `Makefile`, `pyproject.toml`, gate scripts, or the map
+itself run the full fast suite with a warning. `make gates` and CI remain authoritative; dev mode
+does not change `GATES` or `ci-gates-parity`, and hermetic is opt-in.
+
 ## Cross-repo pin usage
 
 This repo is consumed as an **immutable git tag**, never a path and never `editable = true`:
@@ -167,6 +184,12 @@ dotfiles-provision --manifests-dir /path/to/dotfiles-v3/dotfiles/provisioning \
 - `make hermetic` runs the same selection with empty `HOME`/`XDG_*` and a foreign cwd. Tests that
   need the pinned `dotfiles-assets` corpus (a separate repo) skip with their stated reason unless
   `$DOTFILES_ASSETS_REPO`, `$DOTFILES_ASSETS_TEMPLATES_DIR` or a provisioned spine provides it.
+- `make dev` / `make gates-diff` / `make gates-role` are the changed-file development gate
+  (REQ-054). The explicit role/fixture/package mapping lives in `scripts/gate-map.yaml`; the gate
+  prints the base and mapping, covers working-tree/staged/untracked changes, and falls back to the
+  full fast suite for unknown or gate-sensitive paths. `tests/unit/test_gate_diff.py` asserts
+  mapping coverage against the real `tests/` tree and the fail-closed cases. This is feedback,
+  not release verification: `make gates`/CI remain authoritative.
 - `make assets-parity` clones `dotfiles-assets` at the tag the composition pins, exports the corpus
   env, and runs `tests/unit/test_template_vars_parity.py` — failing if any parity test skips
   (R-01). CI runs the same target as the `assets-parity` job.

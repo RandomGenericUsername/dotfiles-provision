@@ -28,13 +28,17 @@ GATES := test lint hermetic lock-check docs-check
 # disposable root container. Both are developer proofs, not stock-runner gates.
 FAST := -m "not integration and not container_target"
 
-.PHONY: help sync collections install test test-integration lint format gates gates-ci gates-pin pin-audit hermetic lock-check docs-check build assets-parity ci-gates-parity clean
+.PHONY: help sync collections install test test-integration lint format dev dev-hermetic gates-diff gates-role gates gates-ci gates-pin pin-audit hermetic lock-check docs-check build assets-parity ci-gates-parity clean
 
 help:
 	@echo "sync             Install the env from uv.lock (uv sync --frozen)"
 	@echo "collections      Install the pinned Ansible collections into .collections/"
 	@echo "test             Run the fast suite (excludes integration/container_target)"
 	@echo "test-integration Run the real-ansible and disposable-container suites"
+	@echo "dev              Changed-file feedback gate (NOT release proof; make gates is authoritative)"
+	@echo "dev-hermetic     dev with empty HOME/XDG and a foreign cwd (HERMETIC=1)"
+	@echo "gates-diff       dev against BASE (default origin/main, then main)"
+	@echo "gates-role       Mapped checks/tests for one Ansible role (ROLE=<role>)"
 	@echo "lint             Ruff check src/ and tests/"
 	@echo "format           Ruff format src/ and tests/"
 	@echo "hermetic         Run the fast suite with empty HOME/XDG and a foreign cwd"
@@ -63,6 +67,25 @@ test: collections
 
 test-integration: collections
 	$(UV) run pytest -q -m "integration or container_target"
+
+# REQ-054: changed-file feedback only. `make gates`/CI remain the release
+# authority. The mapping is explicit in scripts/gate-map.yaml and fails closed
+# (unknown/gate-sensitive/zero-test paths run the full fast suite). Diffs use
+# the merge-base with BASE plus working-tree, staged, and untracked changes.
+# HERMETIC=1 (or `make dev-hermetic`) scrubs HOME/XDG and uses a foreign cwd.
+# DRY_RUN=1 prints the resolved base and mapping without running anything.
+dev:
+	$(UV) run python scripts/gate_diff.py $(if $(BASE),--base "$(BASE)",) $(if $(HERMETIC),--hermetic,) $(if $(DRY_RUN),--dry-run,)
+
+dev-hermetic:
+	$(MAKE) dev HERMETIC=1 BASE="$(BASE)" DRY_RUN="$(DRY_RUN)"
+
+gates-diff:
+	$(UV) run python scripts/gate_diff.py $(if $(BASE),--base "$(BASE)",) $(if $(HERMETIC),--hermetic,) $(if $(DRY_RUN),--dry-run,)
+
+gates-role:
+	@test -n "$(ROLE)" || { echo "usage: make gates-role ROLE=<role>"; exit 2; }
+	$(UV) run python scripts/gate_diff.py --role "$(ROLE)" $(if $(HERMETIC),--hermetic,) $(if $(DRY_RUN),--dry-run,)
 
 lint:
 	$(UV) run ruff check src tests
