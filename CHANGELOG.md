@@ -1,3 +1,11 @@
+## 0.1.88
+
+Sync the composition fixture's `gloview-activate` with the composition fix for
+G-4 chronology metadata: expac's install date is `%l` (not `%i`, the
+has-install-scriptlet flag) and both dates are read as epoch seconds with
+`-t '%s'`. This is a test-fixture parity release; the deployed script comes from
+the composition. Assets stay at `v0.21.5`.
+
 ## 0.1.87
 
 Fix the second GloView `verify` assertion found by applying `v0.1.86`: the unit

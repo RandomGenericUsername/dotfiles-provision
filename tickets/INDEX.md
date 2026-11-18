@@ -40,7 +40,7 @@
 - [REQ-043-window-kitty-platform-mirror/ticket.md](./REQ-043-window-kitty-platform-mirror/ticket.md) — Mirror contracts v0.12.0, assets v0.19.0, platform v1.1.0 and bar v0.6.2 (window role + kitty conf) | `done` | worktree: .worktrees/REQ-043/ | branch: ticket/REQ-043-window-kitty-platform-mirror | tag: v0.1.63
 - [REQ-044-app-parity-inventory-pin/ticket.md](./REQ-044-app-parity-inventory-pin/ticket.md) — Mirror the parity app releases in the engine final inventory (bar v0.6.4; v0.6.3 is sound-panel) | `done` | worktree: .worktrees/REQ-044/ | branch: ticket/REQ-044-app-parity-inventory-pin | tag: v0.1.64
 - [REQ-046-evolution-secret-service/ticket.md](./REQ-046-evolution-secret-service/ticket.md) — Provision Evolution + gnome-keyring (secret service) as first-class installs | `done` | worktree: .worktrees/REQ-046/ | branch: ticket/REQ-046-evolution-secret-service | tag: v0.1.84
-- [REQ-047-gloview-abi-resilience/ticket.md](./REQ-047-gloview-abi-resilience/ticket.md) — Own GloView activation with an observable systemd user oneshot | `done` | worktree: .worktrees/REQ-047/ | branch: ticket/REQ-047-gloview-abi-resilience | tag: v0.1.87 | assets: v0.21.5
+- [REQ-047-gloview-abi-resilience/ticket.md](./REQ-047-gloview-abi-resilience/ticket.md) — Own GloView activation with an observable systemd user oneshot | `done` | worktree: .worktrees/REQ-047/ | branch: ticket/REQ-047-gloview-abi-resilience | tag: v0.1.88 | assets: v0.21.5
 
 ## Bugs
 
