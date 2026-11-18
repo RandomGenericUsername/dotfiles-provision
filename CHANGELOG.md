@@ -1,3 +1,11 @@
+## 0.1.83
+
+Pin release for bar **`v0.6.34`** (focused-tab/app-level Mixer; display-only
+position clock, long-label caps, fixed transport zones) and assets
+**`v0.21.4`** (paint-only `ags` skin boundary: app-owned layout/components/
+artwork/live dot; no layout in the skin). Platform `v1.2.0` and contracts
+`v0.12.0` are unchanged.
+
 ## 0.1.82
 
 Follow-up pin release for bar **`v0.6.21`** (distinct PipeWire stream identity

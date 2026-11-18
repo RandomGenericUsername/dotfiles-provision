@@ -80,7 +80,7 @@ _SEVEN_APPS = [
 
 #: The released tags of the final all-standalone epoch (REQ-032).
 _FINAL_APP_TAGS = {
-    "bar": "v0.6.21",
+    "bar": "v0.6.34",
     "notifications": "v0.5.2",
     "capture": "v0.7.2",
     "clipboard": "v0.6.2",
@@ -1005,7 +1005,7 @@ def _write_composition(
         yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
     )
     (provisioning / "program-tuple.yaml").write_text(
-        "schemaVersion: 1\nags-platform: v1.2.0\ncontracts: v0.12.0\ndotfiles-assets: v0.21.3\n",
+        "schemaVersion: 1\nags-platform: v1.2.0\ncontracts: v0.12.0\ndotfiles-assets: v0.21.4\n",
         encoding="utf-8",
     )
     return provisioning
@@ -1276,10 +1276,10 @@ class TestRoleExecution:
     ) -> None:
         """BUG-009: an active always-on unit must not survive the relink.
 
-        First install leaves dotfiles-ags-bar.service active on v0.6.4. The tag
-        bump then has to stop that unit (logging the OLD link), repoint, and
-        explicitly start it (logging the NEW link). `state: started` would have
-        been a no-op here.
+        First install leaves dotfiles-ags-bar.service active on the fixture
+        tag. The tag bump then has to stop that unit (logging the OLD link),
+        repoint, and explicitly start it (logging the NEW link). `state:
+        started` would have been a no-op here.
         """
         repo, provisioning, install = _stage_bar_repo(tmp_path)
         first, paths = _run_role(tmp_path, provisioning, cutover=True, manager=True)
@@ -1305,7 +1305,7 @@ class TestRoleExecution:
             second, _ = _run_role(tmp_path, bumped, cutover=True, manager=True)
             assert second.returncode == 0, second.stdout + second.stderr
 
-            old_unit = install / "apps" / "bar" / "v0.6.4"
+            old_unit = install / "apps" / "bar" / _FINAL_APP_TAGS["bar"]
             new_unit = install / "apps" / "bar" / "v0.2.0"
             calls = Path(paths["systemd_calls"]).read_text().splitlines()
             stop_index = next(
@@ -1373,7 +1373,7 @@ class TestRoleExecution:
         _stop_fake_ags(paths)
         assert result.returncode != 0
         assert "stayed active after systemctl --user stop" in result.stdout
-        assert not (install / "apps" / "bar" / "v0.6.4").exists()
+        assert not (install / "apps" / "bar" / _FINAL_APP_TAGS["bar"]).exists()
 
     def test_second_run_does_not_write_inside_installed_tags(self, tmp_path: Path) -> None:
         install = tmp_path / "install"
