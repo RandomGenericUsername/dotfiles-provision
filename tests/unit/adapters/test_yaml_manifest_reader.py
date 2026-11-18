@@ -588,6 +588,9 @@ class TestReadRealManifests:
             "libva-utils",
             "rofi",
             "thunar",
+            # REQ-057: the provisioned editor. The assets configs/nvim tree is
+            # LazyVim; only the binary is a package.
+            "neovim",
             "btop",
             "thunderbird",
             # REQ-046: Evolution + gnome-keyring (org.freedesktop.secrets)
