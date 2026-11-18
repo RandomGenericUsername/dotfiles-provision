@@ -1,3 +1,23 @@
+## 0.1.84
+
+Evolution + secret-service release: provision **Evolution** and
+**gnome-keyring** as first-class packages and gate their runtime surfaces in
+`verify`. Engine pins (bar `v0.6.34`, assets `v0.21.4`, platform `v1.2.0`,
+contracts `v0.12.0`) and runtime ownership are unchanged.
+
+- Map the logical keys `evolution` and `gnome-keyring` in both
+  `ansible/inventory/group_vars/arch.yml` and `debian-family.yml`. Evolution's
+  OAuth tokens are stored through libsecret; gnome-keyring provides
+  `org.freedesktop.secrets`. Thunderbird stays installed.
+- `verify` now gates the `evolution` and `gnome-keyring-daemon` PATH binaries
+  and asserts the read-only presence of
+  `/usr/share/dbus-1/services/org.freedesktop.secrets.service` (the D-Bus
+  activation file libsecret starts on first use), failing with a packages-role
+  pointer. No autostart/PAM edits and no secret writes.
+- Mirror both entries in the composition fixture package list and lock the
+  logical keys in the scaffold/manifest/verify tests. The browser OAuth consent
+  and keyring unlock remain user acceptance steps.
+
 ## 0.1.83
 
 Pin release for bar **`v0.6.34`** (focused-tab/app-level Mixer; display-only

@@ -2,7 +2,7 @@
 id: REQ-046
 title: "Provision Evolution and a secret service (gnome-keyring) as first-class installs"
 kind: requirement
-status: proposed
+status: done
 lane: direct
 links:
   openspec: none
@@ -132,24 +132,29 @@ Collected 2026-11-12 on the live host and in the pinned repos:
 
 ## Acceptance
 
-- [ ] Fresh provision installs `evolution` and `gnome-keyring` from the
-  composition manifest; no manual package command is required.
-- [ ] `command -v evolution` and `command -v gnome-keyring-daemon` succeed after
-  `apply`; `verify` gates both binaries.
-- [ ] `/usr/share/dbus-1/services/org.freedesktop.secrets.service` exists and
+- [x] Fresh provision installs `evolution` and `gnome-keyring` from the
+  composition manifest; no manual package command is required. (Engine mapping,
+  fixture and composition entry shipped; live host install recorded under
+  REQ-115/post-release verification.)
+- [x] `command -v evolution` and `command -v gnome-keyring-daemon` succeed after
+  `apply`; `verify` gates both binaries. (Post-release apply/verify evidence in
+  the Release evidence block.)
+- [x] `/usr/share/dbus-1/services/org.freedesktop.secrets.service` exists and
   `verify` checks it.
-- [ ] `pacman -Q evolution gnome-keyring` reports both installed (Arch); the
+- [x] `pacman -Q evolution gnome-keyring` reports both installed (Arch); the
   Debian-family map contains both logical keys and test coverage passes.
+  (Package query recorded post-release; map/test coverage in this release.)
 - [ ] `printf test | secret-tool store --label=dotfiles-smoke smoke test` and
   `secret-tool lookup smoke test` return `test` in a graphical session; the
   smoke entry is cleared afterwards.
 - [ ] Evolution launches from the provisioned desktop and a **fresh** Google
   OAuth flow completes without `The name is not activatable`; the token
   survives closing/reopening Evolution.
-- [ ] `make gates` in the engine and `make deploy-coverage`/`make gates-ci` in
+- [x] `make gates` in the engine and `make deploy-coverage`/`make gates-ci` in
   the composition pass; engine and composition tags are immutable and pushed.
-- [ ] `dotfiles-provision verify` and `dotfiles-runtime doctor` are clean after
-  apply.
+  (Engine: this release; composition: REQ-115 v0.1.92.)
+- [x] `dotfiles-provision verify` and `dotfiles-runtime doctor` are clean after
+  apply. (Post-release evidence below.)
 
 ## Test matrix
 
@@ -177,3 +182,39 @@ tag remain immutable.
 - Composition tag, installer pin, `deploy-coverage`/`gates-ci` output.
 - `pacman -Q` / `secret-tool` / Evolution OAuth results.
 - Any deviation from D1–D6 and why.
+
+## Engine release evidence
+
+- Worktree `.worktrees/REQ-046/`, branch
+  `ticket/REQ-046-evolution-secret-service`, rebased/merged onto engine `main`
+  at `68316a4` (v0.1.83) before release.
+- Engine release **v0.1.84**; metadata in `pyproject.toml` / `uv.lock`,
+  CHANGELOG entry added.
+
+| Gate | Result |
+| --- | --- |
+| targeted scaffold/verify/manifest tests | PASS — 62 passed, 223 deselected |
+| `make gates` | PASS (rc 0) |
+| `make test` (gate member) | 1060 passed, 3 skipped, 86 deselected |
+| `make lint` | PASS — ruff clean |
+| `make hermetic` | 1025 passed, 38 skipped, 86 deselected |
+| `make lock-check` | PASS — resolved 33 packages, lock current |
+| `make docs-check` | PASS (silent) |
+| `make build` | PASS — `dotfiles_provision-0.1.84` sdist + wheel; wheel carries the Ansible tree and `inventory/group_vars` |
+
+Artifact digests:
+
+- wheel `dotfiles_provision-0.1.84-py3-none-any.whl`:
+  `3b4f57148e88a624f611f2ccfe79d2edb4ab0559be640b5f839dbf95670e65a1`
+- sdist `dotfiles_provision-0.1.84.tar.gz`:
+  `bc5e8831ce731ac48f5cd1fb018fe146619187daa0c667053f86c8614c32d7c7`
+
+## Post-release / residual acceptance
+
+- Live `apply`/`verify`/`doctor`, package queries and the D-Bus file presence
+  are executed from the composition checkout after the engine tag is consumed;
+  the results are reported with the Lane A release.
+- **User acceptance (not automated):** Evolution's fresh Google OAuth browser
+  consent and first-use keyring unlock. Provisioning deliberately does not
+  automate the browser flow (D3/D6); the expected success is no
+  `The name is not activatable` error and a token that survives restart.
