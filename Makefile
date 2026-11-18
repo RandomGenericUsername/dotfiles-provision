@@ -26,15 +26,21 @@ GATES := test lint hermetic lock-check docs-check
 # The fast suite: unit + architecture + seam guards. The integration marker is
 # for real `ansible-playbook` runs against the host; `container_target` needs a
 # disposable root container. Both are developer proofs, not stock-runner gates.
+# `slow` is a local ergonomics marker: `make test` (and CI/release) still runs
+# those modules; only the optional `make test-fast` excludes them.
 FAST := -m "not integration and not container_target"
+TEST_FAST := -m "not integration and not container_target and not slow"
 
-.PHONY: help sync collections install test test-integration lint format dev dev-hermetic gates-diff gates-role gates gates-ci gates-pin pin-audit hermetic lock-check docs-check build assets-parity ci-gates-parity clean
+.PHONY: help sync collections install test test-fast test-shard test-integration lint format dev dev-hermetic gates-diff gates-role gates gates-ci gates-pin pin-audit release-preflight hermetic lock-check docs-check build assets-parity ci-gates-parity clean
 
 help:
 	@echo "sync             Install the env from uv.lock (uv sync --frozen)"
 	@echo "collections      Install the pinned Ansible collections into .collections/"
 	@echo "test             Run the fast suite (excludes integration/container_target)"
+	@echo "test-fast        Fast suite minus modules marked slow (optional local run)"
+	@echo "test-shard       Run one deterministic shard (SHARD=I/N, e.g. SHARD=1/4)"
 	@echo "test-integration Run the real-ansible and disposable-container suites"
+	@echo "release-preflight Read-only release checks (TAG=vX.Y.Z optional; no tag is created)"
 	@echo "dev              Changed-file feedback gate (NOT release proof; make gates is authoritative)"
 	@echo "dev-hermetic     dev with empty HOME/XDG and a foreign cwd (HERMETIC=1)"
 	@echo "gates-diff       dev against BASE (default origin/main, then main)"
@@ -65,8 +71,27 @@ install: sync
 test: collections
 	$(UV) run pytest -q $(FAST)
 
+# REQ-055: optional local shortcut. Slow-marked modules still run in `make test`,
+# CI, hermetic, and release; only this target skips them.
+test-fast: collections
+	$(UV) run pytest -q $(TEST_FAST)
+
+# REQ-055: one deterministic file shard. `make test` stays the full fast suite;
+# CI runs all I/N selections so every file still executes exactly once.
+test-shard: collections
+	@test -n "$(SHARD)" || { echo "usage: make test-shard SHARD=I/N"; exit 2; }
+	@files=$$($(UV) run python scripts/pytest_shard.py --shard "$(SHARD)" --fast --list); rc=$$?; \
+	test $$rc -eq 0 || exit $$rc; \
+	test -n "$$files" || { echo "no test files selected for shard $(SHARD)"; exit 1; }; \
+	$(UV) run pytest -q $(FAST) $$files
+
 test-integration: collections
 	$(UV) run pytest -q -m "integration or container_target"
+
+# REQ-055: read-only pre-tag check. It never creates or pushes a tag and never
+# applies anything. Keep it OUT of GATES: it is a release ritual, not a gate.
+release-preflight:
+	$(UV) run python scripts/release_preflight.py $(if $(TAG),--tag "$(TAG)",) $(if $(BRANCH),--branch "$(BRANCH)",)
 
 # REQ-054: changed-file feedback only. `make gates`/CI remain the release
 # authority. The mapping is explicit in scripts/gate-map.yaml and fails closed

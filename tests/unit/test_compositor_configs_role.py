@@ -12,6 +12,8 @@ import yaml
 
 from tests.support import manifests_dir
 
+pytestmark = pytest.mark.slow  # real ansible tasks; measured >10s (REQ-055)
+
 
 def _authored_icons_yaml() -> Path | None:
     """Resolve the authored icon map — it is assets corpus since S1.

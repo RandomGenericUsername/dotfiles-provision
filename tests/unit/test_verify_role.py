@@ -17,6 +17,8 @@ import yaml
 
 from tests.support import cli_tool_tags, composition_root, manifests_dir, render_pin
 
+pytestmark = pytest.mark.slow  # real ansible tasks; measured >10s (REQ-055)
+
 
 def _find_ansible_dir() -> Path:
     """Locate the real ansible scaffold dir by walking up from this test file.

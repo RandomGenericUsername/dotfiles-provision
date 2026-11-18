@@ -58,6 +58,7 @@ pythonpath = ["src", "."]
 markers = [
     "integration: test requires a real ansible-playbook + collections (FR-25)",
     "container_target: test requires podman/docker to provision a disposable target (FR-25 apply+verify)",
+    "slow: test runs real ansible-playbook tasks or is demonstrably slow; excluded only by `make test-fast`",
 ]
 
 [tool.ruff]

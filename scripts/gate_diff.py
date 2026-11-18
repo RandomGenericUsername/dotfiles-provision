@@ -37,9 +37,10 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
@@ -535,7 +536,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"gate-diff: {exc}", file=sys.stderr)
         if args.role:
             try:
-                roles = ", ".join(sorted(load_gate_map(root / "scripts" / "gate-map.yaml")["roles"]))
+                gate_map = load_gate_map(root / "scripts" / "gate-map.yaml")
+                roles = ", ".join(sorted(gate_map["roles"]))
                 print(f"known roles: {roles}", file=sys.stderr)
             except GateError:
                 pass

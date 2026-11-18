@@ -20,6 +20,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytestmark = pytest.mark.slow  # real ansible tasks; measured >10s (REQ-055)
+
 
 def _find_ansible_dir() -> Path:
     for parent in Path(__file__).resolve().parents:

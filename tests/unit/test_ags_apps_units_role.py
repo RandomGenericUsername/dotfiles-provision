@@ -20,6 +20,9 @@ from typing import Any
 import pytest
 import yaml
 
+pytestmark = pytest.mark.slow  # real ansible tasks; measured >10s (REQ-055)
+
+
 _TASK_KEYWORDS = {
     "name",
     "when",

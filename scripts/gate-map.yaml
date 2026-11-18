@@ -86,6 +86,8 @@ groups:
   gate-tests:
     tests:
       - tests/unit/test_gate_diff.py
+      - tests/unit/test_pytest_shard.py
+      - tests/unit/test_release_preflight.py
   ansible-scaffold:
     tests:
       - tests/unit/test_ansible_scaffold.py
