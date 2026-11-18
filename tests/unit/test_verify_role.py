@@ -3397,11 +3397,20 @@ class TestVerifyGloviewActivation:
             "RemainAfterExit=yes",
             "After=dbus.socket graphical-session.target dotfiles-ags-notifications.service",
             "WantedBy=graphical-session.target",
-            "verify_gloview_activator",
             "gloview-rebuild' not in",
             "stat.executable",
         ):
             assert expected in text, f"missing verify assertion: {expected!r}"
+
+        # The unit quotes the activator path; verify must compare the quoted
+        # form, otherwise a full apply fails on a correct unit (v0.1.85 bug).
+        assertions = assert_task["ansible.builtin.assert"]["that"]
+        assert any(
+            "ExecStart=" in str(clause)
+            and '"' in str(clause)
+            and "verify_gloview_activator" in str(clause)
+            for clause in assertions
+        ), "verify must assert the quoted ExecStart form"
 
     def test_unit_and_helper_assertions_are_check_gated(self) -> None:
         assert_task = next(

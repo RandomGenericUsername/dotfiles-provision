@@ -70,7 +70,7 @@ in `dotfiles-v3` (`scripts/tests/test_gloview_abi.py`) plus this repo's
   hermetic **1042 passed, 38 skipped**; `uv lock --check` ok.
 - Targeted `test_verify_role.py` + `test_gloview_units.py`: **132 passed, 22
   skipped**.
-- Release tag: **`v0.1.85`**.
+- Release tags: **`v0.1.85`** (initial) and **`v0.1.86`** (quoted-`ExecStart` verify fix found by apply).
 
 ## Residual
 

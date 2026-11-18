@@ -1,3 +1,11 @@
+## 0.1.86
+
+Fix the GloView `verify` assertion found by the first full apply of `v0.1.85`.
+The installed unit writes `ExecStart="{{ bin }}/gloview-activate"` (quoted), but
+verify compared it to the unquoted path and failed the bootstrap's hard verify
+leg. The assertion now expects the quoted form, matching the template and the
+unit test. No behavior change; assets stay at `v0.21.5`.
+
 ## 0.1.85
 
 GloView ABI-resilience release: activation is now an observable systemd user
