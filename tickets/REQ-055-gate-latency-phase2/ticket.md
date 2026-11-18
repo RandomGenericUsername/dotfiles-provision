@@ -2,7 +2,7 @@
 id: REQ-055
 title: "Add release preflight and CI test sharding/slow-test support"
 kind: requirement
-status: proposed
+status: done
 lane: direct
 links:
   openspec: none
@@ -83,16 +83,38 @@ Add deterministic sharding without changing test semantics:
 
 ## Acceptance
 
-- [ ] `make release-preflight TAG=vX.Y.Z` catches version/tag/changelog/pin/CI
+- [x] `make release-preflight TAG=vX.Y.Z` catches version/tag/changelog/pin/CI
   parity/docs/lock failures with actionable messages.
-- [ ] Preflight is read-only and does not create tags or apply changes.
-- [ ] CI `test` runs 4 deterministic shards covering every test file exactly
+- [x] Preflight is read-only and does not create tags or apply changes.
+- [x] CI `test` runs 4 deterministic shards covering every test file exactly
   once; `ci-gates-parity` still passes.
-- [ ] `make test` remains the full fast suite; `make test-fast` excludes
+- [x] `make test` remains the full fast suite; `make test-fast` excludes
   registered slow tests.
-- [ ] New tests and lint/docs/CI parity pass.
-- [ ] Ticket records evidence and is merged to `main` without a release tag
+- [x] New tests and lint/docs/CI parity pass.
+- [x] Ticket records evidence and is merged to `main` without a release tag
   unless the repo flow requires one; the next release carries it.
+
+## Evidence
+
+Implementation commit `26ed591`; plan `e80c186`; branch
+`ticket/REQ-055-gate-latency-phase2`.
+
+| Check | Result |
+| --- | --- |
+| `ruff check src tests scripts` | PASS |
+| Preflight/shard/gate targeted tests | 66 passed |
+| Targeted release + gate tests | 116 passed, 2 skipped |
+| `make ci-gates-parity` | PASS; `GATES` unchanged |
+| `make docs-check` | PASS |
+| `make lock-check` | PASS |
+| `make pin-audit` | PASS |
+| `make test-shard SHARD=1/4` | 214 passed, 2 skipped in 55.57s |
+| Shard partition | 4 shards, 50/50 fast files, exact union, no overlap |
+| Preflight current worktree | correctly fails local/remote existing `v0.1.88` tag and non-main branch |
+
+Shard sizes are 13 / 13 / 12 / 12 test files. The full suite was not rerun
+locally; CI owns the complete authoritative run. No engine tag/release was
+created.
 
 ## Implementation notes
 
