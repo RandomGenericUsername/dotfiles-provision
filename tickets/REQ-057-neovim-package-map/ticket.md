@@ -100,10 +100,11 @@ Implement on `ticket/REQ-057-neovim-package-map`. Do not tag, release, bump
 
 ## Notes
 
-Originally filed as `REQ-045`; renumbered to `REQ-057` because
-`.worktrees/REQ-045/` already exists on the unrelated
-`ticket/REQ-045-assets-v0200-pin` branch. The existing worktree was not
-touched.
+Originally filed as `REQ-045`; renumbered to `REQ-050` when
+`.worktrees/REQ-045/` was found on the unrelated
+`ticket/REQ-045-assets-v0200-pin` branch. It was renumbered again to `REQ-057`
+when the parallel sound work took `REQ-050` (`.worktrees/REQ-050-r4/`,
+`ticket/REQ-050-sound-round4`). Neither existing worktree was touched.
 
 ## Release-time note (not now)
 
