@@ -112,3 +112,15 @@ At release time the engine `main` was at `v0.1.88` and the composition pinned
 assets `v0.21.5`. This branch was rebased onto `main` at `f7f28b4` and the
 targeted tests were rerun; pick the next available engine tag at release (do not
 reuse an existing tag).
+
+## Release evidence (in progress)
+
+- `dotfiles-assets v0.21.6` released and pushed (LazyVim nvim config).
+- Every engine assets mirror, fixture, pin-audit entry and hardcoded assertion
+  moved to `v0.21.6`; release metadata is `0.1.89`.
+- `make gates-pin` PASS (`assets=v0.21.6, contracts=v0.12.0, platform=v1.2.0`).
+- `make assets-parity` PASS (`10 passed, 0 skipped`, assets `v0.21.6`).
+- `make build` PASS (`dotfiles_provision-0.1.89` sdist + wheel; wheel carries
+  the Ansible tree + group_vars).
+- Test shards 1/4, 2/4 and 4/4 PASS; shard 3/4 (the slow Ansible-role file)
+  is still running. Hermetic shards and the on-`main` release preflight follow.
