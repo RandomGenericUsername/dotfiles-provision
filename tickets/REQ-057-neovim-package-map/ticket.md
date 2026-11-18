@@ -108,7 +108,7 @@ when the parallel sound work took `REQ-050` (`.worktrees/REQ-050-r4/`,
 
 ## Release-time note (not now)
 
-At implementation time the engine `main` is at `v0.1.64`; an unrelated branch
-already targets `v0.1.65` for the assets `v0.20.0` mirror. This branch was
-developed from `d8ec793` (`v0.1.64`); the release slice must rebase on the then
-current `main`, rerun the gates, and pick the next available engine tag.
+At release time the engine `main` was at `v0.1.88` and the composition pinned
+assets `v0.21.5`. This branch was rebased onto `main` at `f7f28b4` and the
+targeted tests were rerun; pick the next available engine tag at release (do not
+reuse an existing tag).
