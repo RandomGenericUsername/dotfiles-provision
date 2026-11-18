@@ -122,5 +122,5 @@ reuse an existing tag).
 - `make assets-parity` PASS (`10 passed, 0 skipped`, assets `v0.21.6`).
 - `make build` PASS (`dotfiles_provision-0.1.89` sdist + wheel; wheel carries
   the Ansible tree + group_vars).
-- Test shards 1/4, 2/4 and 4/4 PASS; shard 3/4 (the slow Ansible-role file)
-  is still running. Hermetic shards and the on-`main` release preflight follow.
+- Test shards 1/4, 2/4, 3/4 and 4/4 PASS (shard 3: `377 passed, 2 skipped,
+  52 deselected in 2588.26s`). Hermetic shards are running.
