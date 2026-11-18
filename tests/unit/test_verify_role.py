@@ -3397,7 +3397,6 @@ class TestVerifyGloviewActivation:
             "RemainAfterExit=yes",
             "After=dbus.socket graphical-session.target dotfiles-ags-notifications.service",
             "WantedBy=graphical-session.target",
-            "gloview-rebuild' not in",
             "stat.executable",
         ):
             assert expected in text, f"missing verify assertion: {expected!r}"
@@ -3411,6 +3410,13 @@ class TestVerifyGloviewActivation:
             and "verify_gloview_activator" in str(clause)
             for clause in assertions
         ), "verify must assert the quoted ExecStart form"
+
+        # The template comment names gloview-rebuild; only an ExecStart that
+        # runs it is illegal (v0.1.86 apply bug).
+        assert any(
+            "ExecStart=.*gloview-rebuild" in str(clause)
+            for clause in assertions
+        ), "verify must reject gloview-rebuild as an ExecStart command"
 
     def test_unit_and_helper_assertions_are_check_gated(self) -> None:
         assert_task = next(

@@ -1,3 +1,10 @@
+## 0.1.87
+
+Fix the second GloView `verify` assertion found by applying `v0.1.86`: the unit
+template's explanatory comment names `gloview-rebuild`, so a naive
+`'gloview-rebuild' not in unit` check failed a correct unit. The gate now
+rejects only an `ExecStart=` line that runs the helper. No behavior change.
+
 ## 0.1.86
 
 Fix the GloView `verify` assertion found by the first full apply of `v0.1.85`.

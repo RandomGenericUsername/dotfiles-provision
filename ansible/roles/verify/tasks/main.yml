@@ -3207,7 +3207,7 @@
       - "'After=dbus.socket graphical-session.target dotfiles-ags-notifications.service' in verify_gloview_unit_text"
       - "'WantedBy=graphical-session.target' in verify_gloview_unit_text"
       - "'ExecStart=\"' ~ verify_gloview_activator ~ '\"' in verify_gloview_unit_text"
-      - "'gloview-rebuild' not in verify_gloview_unit_text"
+      - verify_gloview_unit_text is not search('(?m)^[ \t]*ExecStart=.*gloview-rebuild')
     fail_msg: >-
       the GloView activation contract is incomplete: expected the static unit
       {{ verify_gloview_unit_file }} installed and enabled through
