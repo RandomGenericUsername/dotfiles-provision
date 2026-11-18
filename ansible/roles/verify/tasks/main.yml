@@ -2899,7 +2899,7 @@
       sheet last (W-2.6): {{ verify_wlogout_appearance_import.stderr | default('') }}.
       Expected the palette import first and `@import url("appearance.css");`
       last, with wallpaper/icons/layout/transitions kept app-owned. The
-      wlogout_config role renders the pinned assets v0.21.4 style.css.tpl; run
+      wlogout_config role renders the pinned assets v0.21.5 style.css.tpl; run
       the wlogout-config playbook (needs assets + runtime-seed first).
   when: not ansible_check_mode
 
@@ -3156,4 +3156,70 @@
       {{ shell.oh_my_zsh_dir }}, {{ shell.pyenv_dir }},
       {{ shell.nvm_dir }} — done-criterion 11). The zsh_tools role git-clones
       them presence-guarded; run the zsh-tools playbook (needs packages first)
+  when: not ansible_check_mode
+
+# ── GloView activation ownership (REQ-047) ───────────────────────────────────
+# Activation is a systemd --user oneshot, not a fire-and-forget autostart line.
+# The unit must be installed AND enabled in the graphical-session target, and it
+# must be ordered after both the session target and the notifications overlay
+# (a failure notification needs the session's notification daemon). The
+# activator is the unit's ExecStart; the interactive rebuild helper is a
+# separate user-run script and must never be the unit's ExecStart. Both are
+# installed 0755 by the gloview_plugin role. This is the STATIC contract only:
+# the live plugin load, ABI status and failure notification are the unit's own
+# observable job (hyprctl plugin list -j + status.json).
+- name: Check the GloView unit, its enabled link and the installed scripts
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ verify_gloview_unit_file }}"
+    - "{{ verify_gloview_wants_link }}"
+    - "{{ verify_gloview_activator }}"
+    - "{{ verify_gloview_rebuild_helper }}"
+  register: verify_gloview_path_checks
+
+- name: Resolve the GloView unit enabled link target
+  ansible.builtin.stat:
+    path: "{{ verify_gloview_wants_link }}"
+    follow: true
+  register: verify_gloview_wants_target
+
+- name: Read the installed GloView activation unit
+  ansible.builtin.slurp:
+    src: "{{ verify_gloview_unit_file }}"
+  register: verify_gloview_unit_raw
+
+- name: Assert the GloView unit, ordering, activator and rebuild helper
+  ansible.builtin.assert:
+    that:
+      - verify_gloview_path_checks.results[0].stat.isreg
+      - verify_gloview_path_checks.results[1].stat.islnk
+      - verify_gloview_path_checks.results[1].stat.lnk_target is search(verify_gloview_unit_name ~ '$')
+      - verify_gloview_wants_target.stat.exists
+      - verify_gloview_wants_target.stat.isreg
+      - verify_gloview_path_checks.results[2].stat.isreg
+      - verify_gloview_path_checks.results[2].stat.executable
+      - verify_gloview_path_checks.results[3].stat.isreg
+      - verify_gloview_path_checks.results[3].stat.executable
+      - "'Type=oneshot' in verify_gloview_unit_text"
+      - "'RemainAfterExit=yes' in verify_gloview_unit_text"
+      - "'After=dbus.socket graphical-session.target dotfiles-ags-notifications.service' in verify_gloview_unit_text"
+      - "'WantedBy=graphical-session.target' in verify_gloview_unit_text"
+      - "'ExecStart=' ~ verify_gloview_activator in verify_gloview_unit_text"
+      - "'gloview-rebuild' not in verify_gloview_unit_text"
+    fail_msg: >-
+      the GloView activation contract is incomplete: expected the static unit
+      {{ verify_gloview_unit_file }} installed and enabled through
+      {{ verify_gloview_wants_link }}, ordered After=graphical-session.target
+      and dotfiles-ags-notifications.service, with ExecStart= the installed
+      {{ verify_gloview_activator }} (Type=oneshot, RemainAfterExit=yes), plus
+      the executable interactive rebuild helper
+      {{ verify_gloview_rebuild_helper }}. The rebuild helper must NOT be the
+      unit's ExecStart (yay/sudo prompts belong to a user terminal, never a
+      login service). The gloview_plugin role installs all four; run the
+      gloview-plugin playbook first. Live plugin/ABI/notification state is
+      asserted by the unit itself, not this static gate.
+  vars:
+    verify_gloview_unit_text: "{{ verify_gloview_unit_raw.content | b64decode }}"
   when: not ansible_check_mode

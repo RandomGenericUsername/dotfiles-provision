@@ -1,8 +1,34 @@
+## 0.1.85
+
+GloView ABI-resilience release: activation is now an observable systemd user
+oneshot and the engine's `verify` gate asserts the deployed unit. Assets pin
+moves to **`v0.21.5`** (GloView is optional: no autostart launch and no dead
+`hyprctl gloview…` binds/gestures when the plugin is missing or ABI-stale).
+Bar `v0.6.34`, platform `v1.2.0`, contracts `v0.12.0` and runtime ownership are
+unchanged.
+
+- `gloview_plugin` installs `dotfiles-gloview.service` (user scope,
+  `Type=oneshot`, `RemainAfterExit=yes`) ordered after
+  `graphical-session.target` and `dotfiles-ags-notifications.service`, and the
+  interactive `gloview-rebuild` helper (0755, user-run; never the unit's
+  `ExecStart`). The unit starts only inside an active graphical session and
+  falls back to the graphical-session wants link on a manager-less host.
+- `verify` now gates the static activation contract: the unit file and enabled
+  link exist, `ExecStart` names the installed `gloview-activate`, the
+  `After=`/`WantedBy=` ordering is present, and `gloview-rebuild` is installed
+  executable. Live load/ABI/notification state stays the unit's own job.
+- Mirror assets `v0.21.5` through every role/verify pin and the composition
+  fixture; the composition-owned activator/rebuild scripts are the fixture
+  copies tested by `test_gloview_units.py`.
+- The notification names `yay -S --rebuild gloview-git` and the relog step; no
+  `sudo`/`yay`/`pacman`/network call exists in the unit or activator. A
+  clickable notification action is not implemented (documented residual).
+
 ## 0.1.84
 
 Evolution + secret-service release: provision **Evolution** and
 **gnome-keyring** as first-class packages and gate their runtime surfaces in
-`verify`. Engine pins (bar `v0.6.34`, assets `v0.21.4`, platform `v1.2.0`,
+`verify`. Engine pins (bar `v0.6.34`, assets `v0.21.5`, platform `v1.2.0`,
 contracts `v0.12.0`) and runtime ownership are unchanged.
 
 - Map the logical keys `evolution` and `gnome-keyring` in both
@@ -22,7 +48,7 @@ contracts `v0.12.0`) and runtime ownership are unchanged.
 
 Pin release for bar **`v0.6.34`** (focused-tab/app-level Mixer; display-only
 position clock, long-label caps, fixed transport zones) and assets
-**`v0.21.4`** (paint-only `ags` skin boundary: app-owned layout/components/
+**`v0.21.5`** (paint-only `ags` skin boundary: app-owned layout/components/
 artwork/live dot; no layout in the skin). Platform `v1.2.0` and contracts
 `v0.12.0` are unchanged.
 

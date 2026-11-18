@@ -2269,11 +2269,11 @@ class TestVerifyVars:
             assert f"{{{{ verify_assets_tag_dir }}}}/{name}" in dirs
 
     def test_skins_pin_is_v0180_with_the_v0110_contract_and_templates(self) -> None:
-        """REQ-043: assets v0.21.4 ships five manifests, twelve templates
+        """REQ-043: assets v0.21.5 ships five manifests, twelve templates
         (ten CSS targets plus kitty/rofi artifacts) and the contracts v0.12.0
         window-role plane."""
         data = _vars()
-        assert str(data["verify_assets_pinned_tag"]) == "v0.21.4"
+        assert str(data["verify_assets_pinned_tag"]) == "v0.21.5"
         assert str(data["verify_skins_expected_contract_tag"]) == "v0.12.0"
         assert [str(item) for item in data["verify_skins_manifest_names"]] == [
             "glass",
@@ -3342,6 +3342,78 @@ class TestVerifyVars:
         assert hit is None, f"vars/main.yml hardcodes an absolute path: {hit!r} (trim lock)"
 
 
+class TestVerifyGloviewActivation:
+    """REQ-047: GloView activation is a systemd --user oneshot, not autostart.
+
+    This is the deferred verify leg: the unit and its installed scripts must be
+    gated on the provisioned host, with the ordering that lets a failure
+    notification reach the session's notification daemon.
+    """
+
+    def test_vars_name_the_unit_wants_link_and_scripts(self) -> None:
+        data = _vars()
+        assert data["verify_gloview_unit_name"] == "dotfiles-gloview.service"
+        assert "verify_ags_units_dir" in str(data["verify_gloview_unit_file"])
+        assert "graphical-session.target.wants" in str(data["verify_gloview_wants_dir"])
+        assert str(data["verify_gloview_wants_link"]).endswith(
+            "/{{ verify_gloview_unit_name }}"
+        )
+        assert "verify_cli_bin_dir" in str(data["verify_gloview_activator"])
+        assert "verify_cli_bin_dir" in str(data["verify_gloview_rebuild_helper"])
+
+    def test_verify_checks_the_installed_unit_ordering_and_helper(self) -> None:
+        tasks = _load_tasks()
+        stat = next(
+            task
+            for task in tasks
+            if task.get("name") == "Check the GloView unit, its enabled link and the installed scripts"
+        )
+        assert stat["ansible.builtin.stat"]["follow"] is False
+        loop = [str(item) for item in stat["loop"]]
+        assert "verify_gloview_unit_file" in " ".join(loop)
+        assert "verify_gloview_wants_link" in " ".join(loop)
+        assert "verify_gloview_activator" in " ".join(loop)
+        assert "verify_gloview_rebuild_helper" in " ".join(loop)
+
+        assert any(
+            task.get("name") == "Resolve the GloView unit enabled link target"
+            and task["ansible.builtin.stat"]["follow"] is True
+            for task in tasks
+        )
+        assert any(
+            task.get("name") == "Read the installed GloView activation unit"
+            and task["ansible.builtin.slurp"]["src"] == "{{ verify_gloview_unit_file }}"
+            for task in tasks
+        )
+
+        assert_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Assert the GloView unit, ordering, activator and rebuild helper"
+        )
+        text = str(assert_task)
+        for expected in (
+            "Type=oneshot",
+            "RemainAfterExit=yes",
+            "After=dbus.socket graphical-session.target dotfiles-ags-notifications.service",
+            "WantedBy=graphical-session.target",
+            "verify_gloview_activator",
+            "gloview-rebuild' not in",
+            "stat.executable",
+        ):
+            assert expected in text, f"missing verify assertion: {expected!r}"
+
+    def test_unit_and_helper_assertions_are_check_gated(self) -> None:
+        assert_task = next(
+            task
+            for task in _load_tasks()
+            if task.get("name") == "Assert the GloView unit, ordering, activator and rebuild helper"
+        )
+        when = assert_task.get("when")
+        clauses = when if isinstance(when, list) else [when]
+        assert "not ansible_check_mode" in clauses
+
+
 class TestVerifyProducerConfig:
     """BUG-007/BUG-008: verify reads the runtime-owned producer config and
     proves the SELECTED producer can generate; image presence alone is not
@@ -3821,7 +3893,7 @@ class TestVerifySkinPlane:
     def test_skin_plane_accepts_the_assets_v0180_v0110_envelope(
         self, tmp_path: Path
     ) -> None:
-        """REQ-041: the released assets v0.21.4 skins schema names contracts
+        """REQ-041: the released assets v0.21.5 skins schema names contracts
         v0.12.0 and vendors the fourth canonical (generation) schema."""
         install = tmp_path / "spine"
         _write_deployed_skins(install)
