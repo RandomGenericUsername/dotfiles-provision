@@ -53,9 +53,9 @@
 - [REQ-061-nvim-reload-assets-pin/ticket.md](./REQ-061-nvim-reload-assets-pin/ticket.md) — Mirror assets v0.21.9 (live Neovim palette reload) | `done` | lane 2 | worktree: .worktrees/REQ-061/ | branch: ticket/REQ-061-nvim-reload-assets-pin | tag: v0.1.93 | assets: v0.21.9
 - [REQ-062-nvim-appearance-link/ticket.md](./REQ-062-nvim-appearance-link/ticket.md) — Expose the Neovim appearance tokens link (required consumer) | `done` | lane 2 | worktree: .worktrees/REQ-062/ | branch: ticket/REQ-062-nvim-appearance-link | tag: v0.1.94 | assets: v0.22.0
 
+- [REQ-063-assets-v0221-pin/ticket.md](./REQ-063-assets-v0221-pin/ticket.md) — Mirror assets v0.22.1 (absolute Neovim line numbers) | `done` | lane 2 | worktree: .worktrees/REQ-063/ | branch: ticket/REQ-063-assets-v0221-pin | tag: v0.1.95 | assets: v0.22.1
 ## Bugs
 
-- [REQ-063-assets-v0221-pin/ticket.md](./REQ-063-assets-v0221-pin/ticket.md) — Mirror assets v0.22.1 (absolute Neovim line numbers) | `in-progress` | lane 2 | worktree: .worktrees/REQ-063/ | branch: ticket/REQ-063-assets-v0221-pin
 - [BUG-012-v0150-skins-contract-tag/ticket.md](./BUG-012-v0150-skins-contract-tag/ticket.md) — Verify rejects the assets v0.15.0 skins envelope because it still expects contracts v0.7.0 | severity: high | `done` | worktree .worktrees/BUG-012, branch ticket/BUG-012-v0150-skins-contract-tag | tag: v0.1.52
 - [BUG-011-verify-consumer-link-assert-render/ticket.md](./BUG-011-verify-consumer-link-assert-render/ticket.md) — verify consumer-link assert reads `path`/`target` off a registered result dict and fails argument finalization | severity: high | `done` | worktree .worktrees/BUG-011, branch ticket/BUG-011-verify-consumer-link-assert-render | tag: v0.1.47
 - [BUG-010-v3-seed-idempotent-tag-sweep/ticket.md](./BUG-010-v3-seed-idempotent-tag-sweep/ticket.md) — v3 cutover fails an idempotent seed and leaves runtime artifacts in historical app tags | severity: high | `done` | worktree .worktrees/BUG-010, branch ticket/BUG-010-v3-seed-idempotent-tag-sweep | tag: v0.1.46
