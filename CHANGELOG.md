@@ -1,3 +1,16 @@
+## 0.1.92
+
+Mirror `dotfiles-assets v0.21.8` (LazyVim loads the generated palette) and add
+the optional Neovim palette consumer link.
+
+- Every active assets pin, fixture, pin-audit entry and hardcoded assertion
+  moves to `v0.21.8`.
+- `state_links_optional_consumers` publishes
+  `config/nvim/lua/dotfiles-palette.lua -> current/palette/colors.nvim.lua`
+  when the runtime artifact exists; the required consumer resolve assertion is
+  unchanged.
+- Release metadata 0.1.92 (pyproject + `__version__` + uv.lock) and CHANGELOG.
+
 ## 0.1.91
 
 Mirror `dotfiles-assets v0.21.7` (the resolved LazyVim plugin lock). No engine
