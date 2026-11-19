@@ -1,3 +1,9 @@
+## 0.1.91
+
+Mirror `dotfiles-assets v0.21.7` (the resolved LazyVim plugin lock). No engine
+behavior change: every active assets pin, fixture, pin-audit entry and hardcoded
+assertion moves to `v0.21.7`; release metadata is `0.1.91`.
+
 ## 0.1.90
 
 Prune the retired pre-LazyVim Neovim config files after the config copy.
