@@ -48,7 +48,7 @@
     path: "{{ state_links_spine_config_dir }}/{{ item.spine | dirname }}"
     state: directory
     mode: "0755"
-  loop: "{{ state_links_consumers }}"
+  loop: "{{ state_links_consumers + state_links_optional_consumers }}"
   loop_control:
     label: "{{ item.spine }}"
 
@@ -58,7 +58,7 @@
     dest: "{{ state_links_spine_config_dir }}/{{ item.spine }}"
     state: link
     force: true
-  loop: "{{ state_links_consumers }}"
+  loop: "{{ state_links_consumers + state_links_optional_consumers }}"
   loop_control:
     label: "{{ item.spine }}"
 

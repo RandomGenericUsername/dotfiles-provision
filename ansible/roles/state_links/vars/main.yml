@@ -44,3 +44,11 @@ state_links_consumers:
   - { base: appearance, spine: gtk-4.0/appearance.css, target: gtk4.css }
   - { base: appearance, spine: rofi/appearance.rasi, target: rofi.rasi }
   - { base: appearance, spine: kitty/appearance.conf, target: kitty.conf }
+
+# state_links_optional_consumers: links published when the runtime generation
+#   contains the artifact, but NOT part of the resolve assertion. The Neovim
+#   palette is the first entry: tpr emits colors.nvim.lua; until a host has it,
+#   the LazyVim config falls back to Catppuccin. Same addressing shape as the
+#   required table.
+state_links_optional_consumers:
+  - { base: palette, spine: nvim/lua/dotfiles-palette.lua, target: colors.nvim.lua }

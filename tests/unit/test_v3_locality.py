@@ -106,6 +106,12 @@ class TestStableConsumerLinks:
             ("appearance", "rofi/appearance.rasi", "rofi.rasi"),
             ("appearance", "kitty/appearance.conf", "kitty.conf"),
         ]
+        optional = data["state_links_optional_consumers"]
+        assert [
+            (item["base"], item["spine"], item["target"]) for item in optional
+        ] == [
+            ("palette", "nvim/lua/dotfiles-palette.lua", "colors.nvim.lua"),
+        ]
         joined = str(data)
         assert "config/ags" not in joined
         assert data["state_links_state_current_palette_dir"] == (
