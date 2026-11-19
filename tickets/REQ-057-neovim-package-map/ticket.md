@@ -2,7 +2,7 @@
 id: REQ-057
 title: "Provision the Neovim binary: engine package maps + verify"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -124,3 +124,15 @@ reuse an existing tag).
   the Ansible tree + group_vars).
 - Test shards 1/4, 2/4, 3/4 and 4/4 PASS (shard 3: `377 passed, 2 skipped,
   52 deselected in 2588.26s`). All four hermetic shards PASS (shard 3: `377 passed, 2 skipped, 52 deselected in 2707.62s`).
+
+
+## Release evidence
+
+- `dotfiles-provision v0.1.89` tagged, pushed and released with wheel + sdist:
+  https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.89
+- Assets `v0.21.6` mirrored through every role/verify pin, fixture, pin-audit
+  entry and hardcoded assertion.
+- `make release-preflight TAG=v0.1.89` PASS (12 checks).
+- `make gates-pin`, `make assets-parity` (10/10), `make build`, full test shards
+  1-4 and hermetic shards 1-4 all PASS.
+- No host apply/install was run.

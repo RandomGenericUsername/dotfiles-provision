@@ -44,7 +44,7 @@
 - [REQ-054-gate-diff-mode/ticket.md](./REQ-054-gate-diff-mode/ticket.md) — Add a fail-closed diff/dev gate for changed-file feedback | `done` | worktree: .worktrees/REQ-054/ | branch: ticket/REQ-054-gate-diff-mode
 - [REQ-055-gate-latency-phase2/ticket.md](./REQ-055-gate-latency-phase2/ticket.md) — Add release preflight + CI sharding/slow-test support | `done` | worktree: .worktrees/REQ-055/ | branch: ticket/REQ-055-gate-latency-phase2
 - [REQ-056-hermetic-sharding/ticket.md](./REQ-056-hermetic-sharding/ticket.md) — Shard the hermetic CI gate | `done` | worktree: .worktrees/REQ-056/ | branch: ticket/REQ-056-hermetic-sharding
-- [REQ-057-neovim-package-map/ticket.md](./REQ-057-neovim-package-map/ticket.md) — Provision the Neovim binary: map `neovim` in both group_vars and add `nvim` to the PATH verify gate | `in-progress` | lane 2 | worktree: .worktrees/REQ-057/ | branch: ticket/REQ-057-neovim-package-map | implementation-only; no tag/release/merge/installer.pin/apply/UI worktree
+- [REQ-057-neovim-package-map/ticket.md](./REQ-057-neovim-package-map/ticket.md) — Provision the Neovim binary: map `neovim` in both group_vars and add `nvim` to the PATH verify gate | `done` | lane 2 | worktree: .worktrees/REQ-057/ | branch: ticket/REQ-057-neovim-package-map | tag: v0.1.89 | assets: v0.21.6 | released; no host apply
 
 ## Bugs
 
