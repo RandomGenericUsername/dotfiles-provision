@@ -2,7 +2,7 @@
 id: REQ-060
 title: "Expose the Neovim palette link (optional consumer)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -36,3 +36,6 @@ branch: ticket/REQ-060-nvim-palette-link
 - `ansible/roles/state_links/tasks/main.yml`: link loops use the union;
   resolve loop stays required-only.
 - `tests/unit/test_v3_locality.py::TestStableConsumerLinks` updated.
+
+
+- Release: https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.92

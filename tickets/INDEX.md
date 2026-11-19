@@ -48,7 +48,7 @@
 - [REQ-058-nvim-stale-prune/ticket.md](./REQ-058-nvim-stale-prune/ticket.md) — Prune the seven pre-LazyVim nvim files that a directory copy leaves behind | `in-progress` | lane 2 | worktree: .worktrees/REQ-058/ | branch: ticket/REQ-058-nvim-stale-prune | patch pending release
 - [REQ-059-nvim-lock-pin/ticket.md](./REQ-059-nvim-lock-pin/ticket.md) — Mirror assets v0.21.7 (resolved LazyVim lock) | `done` | lane 2 | worktree: .worktrees/REQ-059/ | branch: ticket/REQ-059-nvim-lock-pin | tag: v0.1.91 | assets: v0.21.7
 
-- [REQ-060-nvim-palette-link/ticket.md](./REQ-060-nvim-palette-link/ticket.md) — Expose the Neovim palette link (optional consumer) | `in-progress` | lane 2 | worktree: .worktrees/REQ-060/ | branch: ticket/REQ-060-nvim-palette-link
+- [REQ-060-nvim-palette-link/ticket.md](./REQ-060-nvim-palette-link/ticket.md) — Expose the Neovim palette link (optional consumer) | `done` | lane 2 | worktree: .worktrees/REQ-060/ | branch: ticket/REQ-060-nvim-palette-link | tag: v0.1.92 | assets: v0.21.8
 ## Bugs
 
 - [BUG-012-v0150-skins-contract-tag/ticket.md](./BUG-012-v0150-skins-contract-tag/ticket.md) — Verify rejects the assets v0.15.0 skins envelope because it still expects contracts v0.7.0 | severity: high | `done` | worktree .worktrees/BUG-012, branch ticket/BUG-012-v0150-skins-contract-tag | tag: v0.1.52
