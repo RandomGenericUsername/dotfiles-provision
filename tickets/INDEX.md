@@ -45,14 +45,17 @@
 - [REQ-055-gate-latency-phase2/ticket.md](./REQ-055-gate-latency-phase2/ticket.md) — Add release preflight + CI sharding/slow-test support | `done` | worktree: .worktrees/REQ-055/ | branch: ticket/REQ-055-gate-latency-phase2
 - [REQ-056-hermetic-sharding/ticket.md](./REQ-056-hermetic-sharding/ticket.md) — Shard the hermetic CI gate | `done` | worktree: .worktrees/REQ-056/ | branch: ticket/REQ-056-hermetic-sharding
 - [REQ-057-neovim-package-map/ticket.md](./REQ-057-neovim-package-map/ticket.md) — Provision the Neovim binary: map `neovim` in both group_vars and add `nvim` to the PATH verify gate | `done` | lane 2 | worktree: .worktrees/REQ-057/ | branch: ticket/REQ-057-neovim-package-map | tag: v0.1.89 | assets: v0.21.6 | released; no host apply
-- [REQ-058-nvim-stale-prune/ticket.md](./REQ-058-nvim-stale-prune/ticket.md) — Prune the seven pre-LazyVim nvim files that a directory copy leaves behind | `in-progress` | lane 2 | worktree: .worktrees/REQ-058/ | branch: ticket/REQ-058-nvim-stale-prune | patch pending release
+- [REQ-058-nvim-stale-prune/ticket.md](./REQ-058-nvim-stale-prune/ticket.md) — Prune the seven pre-LazyVim nvim files that a directory copy leaves behind | `done` | lane 2 | worktree: .worktrees/REQ-058/ | branch: ticket/REQ-058-nvim-stale-prune | tag: v0.1.90
 - [REQ-059-nvim-lock-pin/ticket.md](./REQ-059-nvim-lock-pin/ticket.md) — Mirror assets v0.21.7 (resolved LazyVim lock) | `done` | lane 2 | worktree: .worktrees/REQ-059/ | branch: ticket/REQ-059-nvim-lock-pin | tag: v0.1.91 | assets: v0.21.7
 
 - [REQ-060-nvim-palette-link/ticket.md](./REQ-060-nvim-palette-link/ticket.md) — Expose the Neovim palette link (optional consumer) | `done` | lane 2 | worktree: .worktrees/REQ-060/ | branch: ticket/REQ-060-nvim-palette-link | tag: v0.1.92 | assets: v0.21.8
 
-- [REQ-061-nvim-reload-assets-pin/ticket.md](./REQ-061-nvim-reload-assets-pin/ticket.md) — Mirror assets v0.21.9 (live Neovim palette reload) | `in-progress` | lane 2 | worktree: .worktrees/REQ-061/ | branch: ticket/REQ-061-nvim-reload-assets-pin
-- [REQ-062-nvim-appearance-link/ticket.md](./REQ-062-nvim-appearance-link/ticket.md) — Expose the Neovim appearance tokens link (required consumer) | `done` | lane 2 | worktree: .worktrees/REQ-062/ | branch: ticket/REQ-062-nvim-appearance-link | tag: v0.1.94 | assets: v0.22.0## Bugs
+- [REQ-061-nvim-reload-assets-pin/ticket.md](./REQ-061-nvim-reload-assets-pin/ticket.md) — Mirror assets v0.21.9 (live Neovim palette reload) | `done` | lane 2 | worktree: .worktrees/REQ-061/ | branch: ticket/REQ-061-nvim-reload-assets-pin | tag: v0.1.93 | assets: v0.21.9
+- [REQ-062-nvim-appearance-link/ticket.md](./REQ-062-nvim-appearance-link/ticket.md) — Expose the Neovim appearance tokens link (required consumer) | `done` | lane 2 | worktree: .worktrees/REQ-062/ | branch: ticket/REQ-062-nvim-appearance-link | tag: v0.1.94 | assets: v0.22.0
 
+## Bugs
+
+- [REQ-063-assets-v0221-pin/ticket.md](./REQ-063-assets-v0221-pin/ticket.md) — Mirror assets v0.22.1 (absolute Neovim line numbers) | `in-progress` | lane 2 | worktree: .worktrees/REQ-063/ | branch: ticket/REQ-063-assets-v0221-pin
 - [BUG-012-v0150-skins-contract-tag/ticket.md](./BUG-012-v0150-skins-contract-tag/ticket.md) — Verify rejects the assets v0.15.0 skins envelope because it still expects contracts v0.7.0 | severity: high | `done` | worktree .worktrees/BUG-012, branch ticket/BUG-012-v0150-skins-contract-tag | tag: v0.1.52
 - [BUG-011-verify-consumer-link-assert-render/ticket.md](./BUG-011-verify-consumer-link-assert-render/ticket.md) — verify consumer-link assert reads `path`/`target` off a registered result dict and fails argument finalization | severity: high | `done` | worktree .worktrees/BUG-011, branch ticket/BUG-011-verify-consumer-link-assert-render | tag: v0.1.47
 - [BUG-010-v3-seed-idempotent-tag-sweep/ticket.md](./BUG-010-v3-seed-idempotent-tag-sweep/ticket.md) — v3 cutover fails an idempotent seed and leaves runtime artifacts in historical app tags | severity: high | `done` | worktree .worktrees/BUG-010, branch ticket/BUG-010-v3-seed-idempotent-tag-sweep | tag: v0.1.46

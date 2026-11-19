@@ -1,3 +1,9 @@
+## 0.1.95
+
+Mirror `dotfiles-assets v0.22.1` (absolute Neovim line numbers). Every active
+assets pin, fixture, pin-audit entry and hardcoded assertion moves to
+`v0.22.1`; release metadata is `0.1.95`. No engine behavior change.
+
 ## 0.1.94
 
 Mirror `dotfiles-assets v0.22.0` (Neovim skin appearance loader) and expose the
