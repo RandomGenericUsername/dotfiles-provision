@@ -1,3 +1,14 @@
+## 0.1.94
+
+Mirror `dotfiles-assets v0.22.0` (Neovim skin appearance loader) and expose the
+appearance tokens link for Neovim.
+
+- `state_links_consumers` publishes
+  `config/nvim/lua/dotfiles-appearance.json -> current/appearance/tokens.json`;
+  the required resolve assertion includes it.
+- Every active assets pin, fixture, pin-audit entry and hardcoded assertion
+  moves to `v0.22.0`; release metadata is `0.1.94`.
+
 ## 0.1.93
 
 Mirror `dotfiles-assets v0.21.9` (live Neovim palette reload). Every active

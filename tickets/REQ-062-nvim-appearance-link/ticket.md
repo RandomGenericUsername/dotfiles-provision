@@ -2,7 +2,7 @@
 id: REQ-062
 title: "Expose the Neovim appearance tokens link (required consumer)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -62,3 +62,6 @@ Commands (worktree `.worktrees/REQ-062/`):
   the synthetic machine, reproduces unchanged on `main`).
 - `make gates-pin` → pin-audit PASS, ruff clean, CI parity PASS.
 
+
+
+- Release: v0.1.94
