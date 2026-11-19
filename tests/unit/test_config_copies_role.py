@@ -791,7 +791,7 @@ def _seed_pinned_configs(install: Path) -> str:
     tag = str(_vars()["config_copies_assets_pinned_tag"])
     root = install / "assets" / tag / "configs"
     contents = {
-        "nvim": ("init.lua", "lua/options.lua"),
+        "nvim": ("init.lua", "lua/config/lazy.lua"),
         "starship": ("starship.toml",),
         "wlogout": ("layout", "style.css.tpl"),
     }
@@ -879,8 +879,14 @@ class TestConfigCopiesPlaybook:
                     env=env,
                 )
 
+            stale_nvim = install / "config" / "nvim" / "lua" / "plugins" / "catppuccin.lua"
+            stale_nvim.parent.mkdir(parents=True, exist_ok=True)
+            stale_nvim.write_text("-- stale\n")
             first = run()
             assert first.returncode == 0, first.stdout + first.stderr
+            assert not stale_nvim.exists(), (
+                "the LazyVim cutover must prune a stale pre-LazyVim nvim file"
+            )
 
             expected_top = {
                 "nvim": {"init.lua", "lua"},
