@@ -34,6 +34,12 @@ state_links_spine_config_dir: "{{ install_dir | trim }}/config"
 #   each link resolves to the runtime's `current/appearance/<consumer>.<ext>`.
 #   None points through a generation directory or an `<install>/apps/<tag>`
 #   path.
+#
+#   The Neovim appearance document is REQUIRED: `appearance/tokens.json` is
+#   mandatory in every committed v3 generation (the manifest's
+#   `appearance.tokensPath`), and the Neovim appearance loader reads it through
+#   this link. Unlike the optional palette Lua module below, a generation
+#   without it is not a valid generation, so it belongs in the resolved set.
 state_links_consumers:
   - { base: palette, spine: gtk-3.0/colors.css, target: colors.gtk.css }
   - { base: palette, spine: gtk-4.0/colors.css, target: colors.adw.css }
@@ -44,6 +50,7 @@ state_links_consumers:
   - { base: appearance, spine: gtk-4.0/appearance.css, target: gtk4.css }
   - { base: appearance, spine: rofi/appearance.rasi, target: rofi.rasi }
   - { base: appearance, spine: kitty/appearance.conf, target: kitty.conf }
+  - { base: appearance, spine: nvim/lua/dotfiles-appearance.json, target: tokens.json }
 
 # state_links_optional_consumers: links published when the runtime generation
 #   contains the artifact, but NOT part of the resolve assertion. The Neovim

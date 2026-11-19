@@ -105,6 +105,7 @@ class TestStableConsumerLinks:
             ("appearance", "gtk-4.0/appearance.css", "gtk4.css"),
             ("appearance", "rofi/appearance.rasi", "rofi.rasi"),
             ("appearance", "kitty/appearance.conf", "kitty.conf"),
+            ("appearance", "nvim/lua/dotfiles-appearance.json", "tokens.json"),
         ]
         optional = data["state_links_optional_consumers"]
         assert [
@@ -360,6 +361,7 @@ def _stage_palette(state: Path, *, manifest: bool) -> None:
     (appearance / "kitty.conf").write_text(
         "font_family monospace\n", encoding="utf-8"
     )
+    (appearance / "tokens.json").write_text("{}\n", encoding="utf-8")
     if manifest:
         (state / "dotfiles" / "current" / "manifest.json").write_text(
             '{"version": 3}\n', encoding="utf-8"
@@ -381,6 +383,7 @@ class TestStableLinksExecution:
             "btop/themes",
             "wlogout",
             "kitty",
+            "nvim/lua",
         ):
             (install / "config" / spine).mkdir(parents=True)
         _stage_palette(state, manifest=True)
@@ -397,6 +400,7 @@ class TestStableLinksExecution:
             "gtk-4.0/appearance.css": ("appearance", "gtk4.css"),
             "rofi/appearance.rasi": ("appearance", "rofi.rasi"),
             "kitty/appearance.conf": ("appearance", "kitty.conf"),
+            "nvim/lua/dotfiles-appearance.json": ("appearance", "tokens.json"),
         }
         for spine, (base, target) in expected.items():
             link = install / "config" / spine
@@ -424,6 +428,7 @@ class TestStableLinksExecution:
             "btop/themes",
             "wlogout",
             "kitty",
+            "nvim/lua",
         ):
             (install / "config" / spine).mkdir(parents=True)
         fallback = install / "config" / "wlogout" / "appearance.css"
@@ -454,6 +459,7 @@ class TestStableLinksExecution:
             "btop/themes",
             "wlogout",
             "kitty",
+            "nvim/lua",
         ):
             (install / "config" / spine).mkdir(parents=True)
 
@@ -471,6 +477,7 @@ class TestStableLinksExecution:
             "gtk-4.0/appearance.css",
             "rofi/appearance.rasi",
             "kitty/appearance.conf",
+            "nvim/lua/dotfiles-appearance.json",
         ):
             assert (install / "config" / spine).is_symlink(), spine
 

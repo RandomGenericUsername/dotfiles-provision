@@ -1114,6 +1114,9 @@ verify_gui_tools_app_files: []
 #   config directories, so their generated sheet/artifact is exposed as a
 #   stable provisioning-owned link. GTK uses the gtk3/gtk4 consumer aliases because a
 #   contract configDir cannot contain the dot in gtk-3.0/gtk-4.0.
+#   `nvim/lua/dotfiles-appearance.json` exposes the generation's mandatory
+#   `appearance/tokens.json` (the manifest's tokensPath) to the Neovim
+#   appearance loader; it is required, unlike the optional palette Lua module.
 verify_consumer_symlinks:
   - { path: "{{ install_dir | trim }}/config/gtk-3.0/colors.css", base: palette, target: colors.gtk.css }
   - { path: "{{ install_dir | trim }}/config/gtk-4.0/colors.css", base: palette, target: colors.adw.css }
@@ -1124,6 +1127,7 @@ verify_consumer_symlinks:
   - { path: "{{ install_dir | trim }}/config/gtk-4.0/appearance.css", base: appearance, target: gtk4.css }
   - { path: "{{ install_dir | trim }}/config/rofi/appearance.rasi", base: appearance, target: rofi.rasi }
   - { path: "{{ install_dir | trim }}/config/kitty/appearance.conf", base: appearance, target: kitty.conf }
+  - { path: "{{ install_dir | trim }}/config/nvim/lua/dotfiles-appearance.json", base: appearance, target: tokens.json }
 
 # verify_app_tag_forbidden_runtime_artifacts: runtime-owned names that must
 #   never exist inside an immutable app tag (contracts generations.md §6).

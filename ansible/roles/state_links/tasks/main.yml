@@ -19,6 +19,8 @@
 #   <install>/config/gtk-4.0/appearance.css   -> state/current/appearance/gtk4.css
 #   <install>/config/rofi/appearance.rasi     -> state/current/appearance/rofi.rasi
 #   <install>/config/kitty/appearance.conf    -> state/current/appearance/kitty.conf
+#   <install>/config/nvim/lua/dotfiles-appearance.json
+#                                             -> state/current/appearance/tokens.json
 #
 # The links are stable: they name the `current` pointer, never a
 # generation-specific path, so a new commit is visible without repointing them.

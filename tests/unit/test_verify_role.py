@@ -1979,6 +1979,11 @@ class TestVerifyConsumerLinks:
             ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
             ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
             ("config/kitty/appearance.conf", "appearance", "kitty.conf"),
+            (
+                "config/nvim/lua/dotfiles-appearance.json",
+                "appearance",
+                "tokens.json",
+            ),
         ):
             assert any(expected in path for path in paths), f"missing {expected}"
             assert any(
@@ -2148,6 +2153,11 @@ class TestVerifyConsumerLinkRender:
             ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
             ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
             ("config/kitty/appearance.conf", "appearance", "kitty.conf"),
+            (
+                "config/nvim/lua/dotfiles-appearance.json",
+                "appearance",
+                "tokens.json",
+            ),
         ],
     )
     @pytest.mark.parametrize(
@@ -5926,6 +5936,11 @@ def _build_provisioned_layout(
         ("config/gtk-4.0/appearance.css", "appearance", "gtk4.css"),
         ("config/rofi/appearance.rasi", "appearance", "rofi.rasi"),
         ("config/kitty/appearance.conf", "appearance", "kitty.conf"),
+        (
+            "config/nvim/lua/dotfiles-appearance.json",
+            "appearance",
+            "tokens.json",
+        ),
     ):
         pointer = install / rel
         pointer.parent.mkdir(parents=True, exist_ok=True)
