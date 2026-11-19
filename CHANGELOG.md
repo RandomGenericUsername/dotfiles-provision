@@ -1,3 +1,16 @@
+## 0.1.90
+
+Prune the retired pre-LazyVim Neovim config files after the config copy.
+
+`ansible.builtin.copy` does not delete files absent from the source, so a host
+that had the old hand-rolled `configs/nvim` kept `lua/options.lua` and the six
+old `lua/plugins/*.lua` files beside the new LazyVim tree. The new
+`lua/config/lazy.lua` imports `plugins`, so those stale specs were loaded as
+well. `config_copies` now removes the seven retired paths after the copy
+(real-run only; `--check` never mutates).
+
+Assets remain at `v0.21.6`.
+
 ## 0.1.89
 
 Provision the Neovim binary and mirror `dotfiles-assets v0.21.6` (LazyVim
