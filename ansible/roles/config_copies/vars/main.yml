@@ -97,6 +97,20 @@ config_copies_entries:
   - { name: starship, target: starship }
   - { name: wlogout, target: wlogout, files: [layout] }
 
+# config_copies_retired_nvim_files: the pre-LazyVim nvim files the directory
+#   copy leaves behind (ansible.builtin.copy does not delete extras). They are
+#   removed from the nvim spine dir after the copy: the new
+#   `lua/config/lazy.lua` imports `plugins`, so a stale plugin spec would be
+#   loaded beside the LazyVim overrides. Relative to <spine>/config/nvim/.
+config_copies_retired_nvim_files:
+  - lua/options.lua
+  - lua/plugins/catppuccin.lua
+  - lua/plugins/lsp-config.lua
+  - lua/plugins/lualine.lua
+  - lua/plugins/neo-tree.lua
+  - lua/plugins/telescope.lua
+  - lua/plugins/treesitter.lua
+
 # config_copies_guard_patterns: the palette-format filenames the Story 1.12
 #   don't-clobber tripwire scans for inside managed copy destinations
 #   (tasks/main.yml find+assert pair before the copy). Deliberately BROADER

@@ -449,6 +449,37 @@ class TestConfigCopiesTasks:
             "a fresh --check (no fetched checkout) skips instead of failing"
         )
 
+    def test_retired_nvim_files_are_pruned(self) -> None:
+        """LazyVim cutover: the directory copy leaves pre-LazyVim files behind
+        (ansible.builtin.copy does not delete extras). The role must remove the
+        seven retired nvim files after the copy, and a dry run must never
+        mutate."""
+        data = _vars()
+        assert list(data["config_copies_retired_nvim_files"]) == [
+            "lua/options.lua",
+            "lua/plugins/catppuccin.lua",
+            "lua/plugins/lsp-config.lua",
+            "lua/plugins/lualine.lua",
+            "lua/plugins/neo-tree.lua",
+            "lua/plugins/telescope.lua",
+            "lua/plugins/treesitter.lua",
+        ]
+        prune = [
+            task
+            for task in _tasks_with_module("ansible.builtin.file")
+            if "config_copies_retired_nvim_files" in str(task.get("loop", ""))
+        ]
+        assert len(prune) == 1, "expected exactly one retired-nvim prune task"
+        task = prune[0]
+        module = _module(task)
+        assert module.get("state") == "absent"
+        assert module.get("path") == (
+            "{{ config_copies_spine_config_dir }}/nvim/{{ item }}"
+        )
+        assert str(task.get("when")) == "not ansible_check_mode", (
+            "the prune must be a real-run-only mutation; --check must not delete"
+        )
+
     def test_per_file_copy_task_contract(self) -> None:
         """S2 wlogout: `layout` is static config while `style.css` is rendered,
         so the entry names `files` and the copy is per FILE — src without a

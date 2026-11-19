@@ -238,6 +238,13 @@
     label: "{{ item.0.name }}/{{ item.1 }}"
   when: not ansible_check_mode or config_copies_assets_configs_check.stat.isdir | default(false)
 
+- name: Remove retired Neovim config files (LazyVim cutover)
+  ansible.builtin.file:
+    path: "{{ config_copies_spine_config_dir }}/nvim/{{ item }}"
+    state: absent
+  loop: "{{ config_copies_retired_nvim_files }}"
+  when: not ansible_check_mode
+
 - name: Check config copies are real directories in the spine
   ansible.builtin.stat:
     path: "{{ config_copies_spine_config_dir }}/{{ item.target }}"
