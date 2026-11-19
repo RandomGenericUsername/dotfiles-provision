@@ -2,7 +2,7 @@
 id: REQ-059
 title: "Pin assets v0.21.7 (resolved LazyVim lock)"
 kind: requirement
-status: in-progress
+status: done
 lane: 2
 links:
   openspec: none
@@ -28,8 +28,11 @@ the next provision copies the resolved lock instead of the pre-resolution one.
 
 ## Acceptance
 
-- [ ] Active engine pins and fixtures are `v0.21.7`.
-- [ ] `make gates-pin` PASS.
-- [ ] `make build` PASS.
-- [ ] `make release-preflight TAG=v0.1.91` PASS.
-- [ ] `v0.1.91` tagged/pushed/released.
+- [x] Active engine pins and fixtures are `v0.21.7`.
+- [x] `make gates-pin` PASS.
+- [x] `make build` PASS.
+- [x] `make release-preflight TAG=v0.1.91` PASS.
+- [x] `v0.1.91` tagged/pushed/released.
+
+
+- Release: https://github.com/RandomGenericUsername/dotfiles-provision/releases/tag/v0.1.91

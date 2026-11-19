@@ -46,7 +46,7 @@
 - [REQ-056-hermetic-sharding/ticket.md](./REQ-056-hermetic-sharding/ticket.md) — Shard the hermetic CI gate | `done` | worktree: .worktrees/REQ-056/ | branch: ticket/REQ-056-hermetic-sharding
 - [REQ-057-neovim-package-map/ticket.md](./REQ-057-neovim-package-map/ticket.md) — Provision the Neovim binary: map `neovim` in both group_vars and add `nvim` to the PATH verify gate | `done` | lane 2 | worktree: .worktrees/REQ-057/ | branch: ticket/REQ-057-neovim-package-map | tag: v0.1.89 | assets: v0.21.6 | released; no host apply
 - [REQ-058-nvim-stale-prune/ticket.md](./REQ-058-nvim-stale-prune/ticket.md) — Prune the seven pre-LazyVim nvim files that a directory copy leaves behind | `in-progress` | lane 2 | worktree: .worktrees/REQ-058/ | branch: ticket/REQ-058-nvim-stale-prune | patch pending release
-- [REQ-059-nvim-lock-pin/ticket.md](./REQ-059-nvim-lock-pin/ticket.md) — Mirror assets v0.21.7 (resolved LazyVim lock) | `in-progress` | lane 2 | worktree: .worktrees/REQ-059/ | branch: ticket/REQ-059-nvim-lock-pin
+- [REQ-059-nvim-lock-pin/ticket.md](./REQ-059-nvim-lock-pin/ticket.md) — Mirror assets v0.21.7 (resolved LazyVim lock) | `done` | lane 2 | worktree: .worktrees/REQ-059/ | branch: ticket/REQ-059-nvim-lock-pin | tag: v0.1.91 | assets: v0.21.7
 
 ## Bugs
 
