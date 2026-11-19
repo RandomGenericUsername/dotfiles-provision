@@ -33,15 +33,32 @@ non-runtime links; add the Neovim appearance document as a REQUIRED consumer:
 
 ## Acceptance
 
-- [ ] Required consumer entry added; optional table unchanged.
-- [ ] Link parent `config/nvim/lua` is provisioned.
-- [ ] `verify_consumer_symlinks` mirrors the entry.
-- [ ] Locality/verify tests cover the link.
-- [ ] Targeted tests, `gates-pin`, and lint pass.
-- [ ] No tag/release/pin bump.
+- [x] Required consumer entry added; optional table unchanged.
+- [x] Link parent `config/nvim/lua` is provisioned.
+- [x] `verify_consumer_symlinks` mirrors the entry.
+- [x] Locality/verify tests cover the link.
+- [x] Targeted tests, `gates-pin`, and lint pass.
+- [x] No tag/release/pin bump.
 
 ## Evidence
 
-- `ansible/roles/state_links/vars/main.yml`: required consumer table.
-- `ansible/roles/verify/vars/main.yml`: `verify_consumer_symlinks`.
-- `tests/unit/test_v3_locality.py`, `tests/unit/test_verify_role.py`.
+- `ansible/roles/state_links/vars/main.yml`: required consumer table gains
+  `{ base: appearance, spine: nvim/lua/dotfiles-appearance.json, target: tokens.json }`;
+  `state_links_optional_consumers` is unchanged.
+- `ansible/roles/state_links/tasks/main.yml`: the parent-directory task loops the
+  required+optional union, so `config/nvim/lua` is created.
+- `ansible/roles/verify/vars/main.yml`: `verify_consumer_symlinks` mirrors the entry.
+- `tests/unit/test_v3_locality.py`, `tests/unit/test_verify_role.py`: exact
+  consumer lists, post-seed expectations and the verify negative fixture include
+  the link.
+
+Commands (worktree `.worktrees/REQ-062/`):
+
+- `uv run pytest -q tests/unit/test_v3_locality.py tests/unit/test_verify_role.py::TestVerifyConsumerLinks`
+  → `30 passed`.
+- `uv run pytest -q tests/unit/test_verify_role.py::TestVerifyConsumerLinkRender tests/unit/test_verify_role.py::TestVerifyVars`
+  → `72 passed, 1 failed`; the failure is the pre-existing baseline
+  `test_passing_topology_renders_the_consumer_assert` (GloView unit absent from
+  the synthetic machine, reproduces unchanged on `main`).
+- `make gates-pin` → pin-audit PASS, ruff clean, CI parity PASS.
+
