@@ -1,3 +1,9 @@
+## 0.1.93
+
+Mirror `dotfiles-assets v0.21.9` (live Neovim palette reload). Every active
+assets pin, fixture, pin-audit entry and hardcoded assertion moves to
+`v0.21.9`; release metadata is `0.1.93`. No engine behavior change.
+
 ## 0.1.92
 
 Mirror `dotfiles-assets v0.21.8` (LazyVim loads the generated palette) and add
