@@ -1,3 +1,10 @@
+## 0.1.96
+
+Mirror `dotfiles-assets v0.22.2` (paint-only wallpaper selector skin on the
+established `surface.panel` role). Every active assets pin, fixture, pin-audit
+entry and hardcoded assertion moves to `v0.22.2`; release metadata is `0.1.96`.
+No engine behavior change.
+
 ## 0.1.95
 
 Mirror `dotfiles-assets v0.22.1` (absolute Neovim line numbers). Every active
