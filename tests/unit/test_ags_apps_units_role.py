@@ -1096,7 +1096,9 @@ def _run_role(
     ]
     if check:
         args.insert(2, "--check")
-    result = subprocess.run(args, capture_output=True, text=True, env=env, timeout=240)
+    # The historical-tag sweep is I/O-bound and exceeds 240 s on a cold
+    # hermetic host; keep the assertion, widen only the host tolerance.
+    result = subprocess.run(args, capture_output=True, text=True, env=env, timeout=600)
     return result, {
         "install": str(install),
         "xdg": str(xdg),
