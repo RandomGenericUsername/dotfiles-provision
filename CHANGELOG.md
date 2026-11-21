@@ -1,3 +1,10 @@
+## 0.1.97
+
+Mirror `dotfiles-assets v0.22.3` (the wallpaper selector's look-frame radius
+comes from `surface.control.radius`). Every active assets pin, fixture,
+pin-audit entry and hardcoded assertion moves to `v0.22.3`; release metadata is
+`0.1.97`. No engine behavior change.
+
 ## 0.1.96
 
 Mirror `dotfiles-assets v0.22.2` (paint-only wallpaper selector skin on the
