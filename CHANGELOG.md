@@ -459,6 +459,13 @@ unchanged.
 
 # Changelog
 
+## 0.1.98
+
+Mirror `dotfiles-assets v0.22.4` (clipboard overlay paint-only skin on
+`surface.panel`). Every active assets pin, fixture, pin-audit entry and
+hardcoded assertion moves to `v0.22.4`; release metadata is `0.1.98`. No
+engine behavior change.
+
 ## 0.1.52
 
 Accept the released contracts v0.9.0 skins envelope shipped by assets v0.15.0
