@@ -1,3 +1,9 @@
+## 0.1.100
+
+Mirror `dotfiles-assets v0.22.6` (neutral Bluetooth full-signal badge). Every
+active assets pin, composition fixture, pin-audit entry and assertion moves to
+`v0.22.6`; release metadata is `0.1.100`. No engine behavior change.
+
 ## 0.1.99
 
 Mirror `dotfiles-assets v0.22.5` (approved Wi-Fi and Bluetooth control-centre
