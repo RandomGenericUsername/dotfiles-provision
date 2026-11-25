@@ -1,3 +1,10 @@
+## 0.1.99
+
+Mirror `dotfiles-assets v0.22.5` (approved Wi-Fi and Bluetooth control-centre
+overlay skins). Every active assets pin, composition fixture, pin-audit entry
+and hardcoded assertion moves to `v0.22.5`; the bar fixture moves to
+`v0.6.35`. Release metadata is `0.1.99`. No engine behavior change.
+
 ## 0.1.97
 
 Mirror `dotfiles-assets v0.22.3` (the wallpaper selector's look-frame radius

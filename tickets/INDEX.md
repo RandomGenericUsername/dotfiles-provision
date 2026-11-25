@@ -110,3 +110,4 @@
 - [REQ-045-assets-v0200-pin/ticket.md](./REQ-045-assets-v0200-pin/ticket.md) — Mirror dotfiles-assets v0.20.0 (sound panel paint) | `done` | tag: v0.1.65 | worktree: .worktrees/REQ-045/ | branch: ticket/REQ-045-assets-v0200-pin
 - [REQ-049-sound-panel-qa/ticket.md](./REQ-049-sound-panel-qa/ticket.md) — Mirror assets v0.20.1 and bar v0.6.5 (sound panel QA) | `done` | tag: v0.1.66 | worktree: .worktrees/REQ-049/ | branch: ticket/REQ-049-sound-panel-qa
 - [REQ-066-assets-v0224/ticket.md](./REQ-066-assets-v0224/ticket.md) — Mirror dotfiles-assets v0.22.4 (clipboard overlay paint-only skin) | `done` | tag: v0.1.98 | worktree: .worktrees/REQ-066/ | branch: ticket/REQ-066-assets-v0224
+- [REQ-067-assets-v0225/ticket.md](./REQ-067-assets-v0225/ticket.md) — Mirror dotfiles-assets v0.22.5 (Wi-Fi + Bluetooth overlay skins) | `in-progress` | worktree: .worktrees/REQ-067-assets-v0225/ | branch: ticket/REQ-067-assets-v0225 | tag: pending
