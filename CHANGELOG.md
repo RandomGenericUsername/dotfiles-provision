@@ -1,3 +1,9 @@
+## 0.1.102
+
+Move the composition/bar fixture to `ags-bar v0.6.37` (skin-tinted bare
+Bluetooth header glyph). Assets stay `v0.22.6`; release metadata is `0.1.102`.
+No engine behavior change.
+
 ## 0.1.101
 
 Move the composition/bar fixture to `ags-bar v0.6.36` (bare Bluetooth header
