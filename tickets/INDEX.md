@@ -112,3 +112,4 @@
 - [REQ-066-assets-v0224/ticket.md](./REQ-066-assets-v0224/ticket.md) — Mirror dotfiles-assets v0.22.4 (clipboard overlay paint-only skin) | `done` | tag: v0.1.98 | worktree: .worktrees/REQ-066/ | branch: ticket/REQ-066-assets-v0224
 - [REQ-067-assets-v0225/ticket.md](./REQ-067-assets-v0225/ticket.md) — Mirror dotfiles-assets v0.22.5 (Wi-Fi + Bluetooth overlay skins) | `in-progress` | worktree: .worktrees/REQ-067-assets-v0225/ | branch: ticket/REQ-067-assets-v0225 | tag: pending
 - [REQ-068-assets-v0226/ticket.md](./REQ-068-assets-v0226/ticket.md) — Mirror dotfiles-assets v0.22.6 (neutral Bluetooth full-signal badge) | `in-progress` | tag: pending
+- [REQ-069-bar-v0636/ticket.md](./REQ-069-bar-v0636/ticket.md) — Pin ags-bar v0.6.36 (bare Bluetooth header glyph) | `in-progress` | tag: pending

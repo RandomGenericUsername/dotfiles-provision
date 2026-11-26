@@ -1,3 +1,9 @@
+## 0.1.101
+
+Move the composition/bar fixture to `ags-bar v0.6.36` (bare Bluetooth header
+glyph). Assets stay `v0.22.6`; release metadata is `0.1.101`. No engine
+behavior change.
+
 ## 0.1.100
 
 Mirror `dotfiles-assets v0.22.6` (neutral Bluetooth full-signal badge). Every

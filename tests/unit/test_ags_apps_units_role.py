@@ -83,7 +83,7 @@ _SEVEN_APPS = [
 
 #: The released tags of the final all-standalone epoch (REQ-032).
 _FINAL_APP_TAGS = {
-    "bar": "v0.6.35",
+    "bar": "v0.6.36",
     "notifications": "v0.5.2",
     "capture": "v0.7.2",
     "clipboard": "v0.6.2",
