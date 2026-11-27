@@ -1,3 +1,11 @@
+## 0.1.103
+
+Mirror `dotfiles-assets v1.0.0` (the `schema_major 2` icons corpus release and
+the canonical-art collapse). Every active assets pin, the composition fixture,
+the pin-audit input and the hardcoded assertions move to `v1.0.0`; release
+metadata is `0.1.103`. No engine behavior change. The separate `contracts`
+tuple pin (`v0.12.0`) is unchanged.
+
 ## 0.1.102
 
 Move the composition/bar fixture to `ags-bar v0.6.37` (skin-tinted bare
