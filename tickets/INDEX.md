@@ -114,3 +114,4 @@
 - [REQ-068-assets-v0226/ticket.md](./REQ-068-assets-v0226/ticket.md) — Mirror dotfiles-assets v0.22.6 (neutral Bluetooth full-signal badge) | `in-progress` | tag: pending
 - [REQ-069-bar-v0636/ticket.md](./REQ-069-bar-v0636/ticket.md) — Pin ags-bar v0.6.36 (bare Bluetooth header glyph) | `in-progress` | tag: pending
 - [REQ-070-bar-v0637/ticket.md](./REQ-070-bar-v0637/ticket.md) — Pin ags-bar v0.6.37 (skin-tinted bare Bluetooth header) | `in-progress` | tag: pending
+- [REQ-071-assets-v100/ticket.md](./REQ-071-assets-v100/ticket.md) — Mirror dotfiles-assets v1.0.0 (icons schema_major 2 corpus release) | `in-progress` | worktree: .worktrees/REQ-071/ | branch: ticket/REQ-071-assets-v100 | tag: pending
